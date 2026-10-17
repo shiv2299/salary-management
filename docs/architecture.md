@@ -1,6 +1,6 @@
 # Architecture
 
-This document is the engineering design for the system described in `docs/requirements.md`. It covers module boundaries, data model, core subsystems, API surface, frontend structure, and testing strategy. Trade-offs and alternatives considered are logged separately in `docs/decisions.md`; this document describes what was built and why it's shaped this way.
+This document is the engineering design for the system described in `docs/requirements.md`. It covers module boundaries, data model, core subsystems, API surface, frontend structure, and testing strategy. Visual design and UI interaction rules live in `docs/design.md`, which this document defers to rather than duplicates. Trade-offs and alternatives considered are logged separately in `docs/decisions.md`; this document describes what was built and why it's shaped this way.
 
 ## 1. Stack and module boundaries
 
@@ -27,6 +27,7 @@ Rules:
 - Routes never call repositories directly.
 - Services never touch the Drizzle query builder directly; they call repositories.
 - `domain/` has zero I/O, which is what makes its tests fast and deterministic without a database.
+- Exactly one service function writes `salary_history`, and it always writes the employee's `current_*` columns in the same transaction. No other code path is allowed to touch either, which is what keeps the denormalized cache in §2/§12 correct.
 
 ## 2. Data model
 
@@ -43,11 +44,12 @@ Core tables:
 
 | Table | Columns | Notes |
 |---|---|---|
-| `employees` | `id`, `first_name`, `last_name`, `email`, `country_code` (FK), `department_id` (FK), `level_id` (FK), `job_title`, `hire_date`, `status` (`active`/`inactive`), timestamps | No manager/reporting hierarchy (see §9) |
-| `salary_history` | `id`, `employee_id` (FK), `amount_minor` (integer), `currency_code`, `effective_date`, `reason` (`hire`/`raise`/`promotion`/`correction`), `created_at` | Append-only. Current salary = the row per employee with the latest `effective_date <= today`, derived via query, never a separate mutable column |
+| `employees` | `id`, `first_name`, `last_name`, `email`, `country_code` (FK), `department_id` (FK), `level_id` (FK), `job_title`, `hire_date`, `status` (`active`/`inactive`), `current_amount_minor`, `current_currency_code`, `current_effective_date`, `current_reason`, timestamps | No manager/reporting hierarchy (see §9). The `current_*` columns are a denormalized cache of the latest `salary_history` row — see §12 for why |
+| `salary_history` | `id`, `employee_id` (FK), `amount_minor` (integer), `currency_code`, `effective_date`, `reason` (`hire`/`raise`/`promotion`/`correction`), `batch_id` (FK, nullable), `created_at` | Append-only, the source of truth for current salary. Rows applied together via a bulk revision (§7) share a `batch_id` |
+| `salary_revision_batches` | `id`, `created_at`, `percentage`, `note` | One row per bulk revision (e.g. "7% raise — Engineering L3 India"); lets `salary_history` rows be grouped back into a single event for display (§5, FR-10) |
 | `users` | `id`, `email`, `password_hash`, `created_at` | Single seeded HR row; no roles table |
 
-Indexes: `employees(country_code, department_id, level_id)` composite for list/filter; `employees(status)`; `salary_history(employee_id, effective_date)` for current-salary lookups; a name/email index on `employees` for search.
+Indexes: `employees(country_code, department_id, level_id)` composite for list/filter; `employees(status)`; `employees(current_amount_minor)` for insights queries that filter/sort on current pay; `salary_history(employee_id, effective_date)` for audit/history lookups; `salary_history(batch_id)` for grouping; a name/email index on `employees` for search.
 
 ## 3. Money and currency
 
@@ -75,7 +77,7 @@ computeDistribution(amounts: number[]): {
 }
 ```
 
-SQLite has no percentile functions, so the service layer fetches the filtered set of current salaries (already converted to USD via the FX domain module) and passes the array to `computeDistribution`; at 10,000 rows this is a single query plus an in-memory sort, which is not a performance concern at this scale (see `docs/performance.md` for measured numbers, and `docs/decisions.md` for where this stops scaling).
+SQLite has no percentile functions, so the service layer fetches the filtered set of current salaries (already converted to USD via the FX domain module) and passes the array to `computeDistribution`. Because `current_amount_minor` is a denormalized, indexed column on `employees` (§12) rather than a derived join, this fetch stays a single indexed query at any employee count this system is designed for; the in-memory sort that follows is cheap even at 100,000 rows (see `docs/performance.md` for measured numbers at the seeded 10,000, and `docs/decisions.md` for where this approach would eventually stop scaling).
 
 | HR question | Endpoint | Behavior |
 |---|---|---|
@@ -83,7 +85,7 @@ SQLite has no percentile functions, so the service layer fetches the filtered se
 | Cross-country comparison in one currency | Same endpoint | Amounts pre-converted to USD before grouping |
 | Who's an outlier vs. peers | `GET /api/insights/outliers` | Peer group = same country + level. Flags employees whose current (USD) salary falls outside `p25 - 1.5*IQR` .. `p75 + 1.5*IQR` for their peer group (Tukey's fences), reusing `computeDistribution`'s existing p25/p75 — no separate threshold parameter |
 | Total payroll by country/department | `GET /api/insights/payroll?groupBy=country\|department` | Sum of current (USD) salaries per group |
-| What changed, when | `GET /api/insights/recent-changes?days=90` | `salary_history` rows within the trailing window, joined to employee name/country |
+| What changed, when | `GET /api/insights/recent-changes?days=90` | `salary_history` rows within the trailing window, joined to employee name/country. Rows sharing a `batch_id` collapse into a single entry (e.g. "47 people, +7%, Engineering L3 India") rather than one row per employee |
 
 Peer grouping for outliers is country + level, not + department: at 10,000 employees across 7 departments x 3 countries x 6 levels, department-scoped peer groups would often be too small (fewer than 5 people) for a stable median.
 
@@ -105,7 +107,8 @@ Peer grouping for outliers is country + level, not + department: at 10,000 emplo
 | `GET /api/employees/:id` | Employee record + current salary + full salary history |
 | `POST /api/employees` | Create employee + initial (hire) salary row |
 | `PATCH /api/employees/:id` | Edit non-salary fields |
-| `POST /api/employees/:id/salary-changes` | Add an effective-dated salary change |
+| `POST /api/employees/:id/salary-changes` | Add an effective-dated salary change for one employee |
+| `POST /api/employees/bulk-salary-changes` | Apply a percentage increase to a set of employees (explicit IDs or a filter) as of one effective date, with optional per-employee amount overrides. Creates one `salary_revision_batches` row, one `salary_history` row per employee, and updates each employee's `current_*` columns, all in a single transaction with a reused prepared statement (same pattern as the seed script, §6) |
 | `DELETE /api/employees/:id` | Soft delete (`status: inactive`); never a hard delete, to preserve salary history |
 | `GET /api/employees/export` | Streams CSV of current employees + current salary |
 | `GET /api/insights/distribution` \| `/payroll` \| `/outliers` \| `/recent-changes` | As described in §5 |
@@ -116,22 +119,27 @@ All endpoints except `POST /api/auth/login` and `GET /api/health` sit behind the
 
 ## 8. Frontend structure
 
+All visual and interaction decisions (layout, color, typography, component conventions, responsive behavior) are specified in `docs/design.md`, not here — this section covers routing and data-flow structure only, and every screen must follow `docs/design.md` rather than improvising.
+
 ```
 src/app/
   login/page.tsx                   # public
-  (app)/employees/page.tsx         # list: table, filters, pagination, export button
-  (app)/employees/[id]/page.tsx    # detail/edit + salary history timeline + "add change" form
-  (app)/insights/page.tsx          # dashboard: distribution charts, payroll summary, outliers, recent changes
+  (app)/insights/page.tsx          # default landing page post-login: distribution charts, payroll summary, outliers, recent changes
+  (app)/employees/page.tsx         # list: table, inline filter row, pagination, export, bulk-revision action bar
+  (app)/employees/[id]/            # intercepted route: opens as a slide-over drawer over the list, not a full navigation
 src/features/
   auth/       # login form, token context, route guard
-  employees/  # query hooks, table columns, forms
+  employees/  # query hooks, table columns, forms, bulk-revision preview logic
   insights/   # query hooks, chart components
 src/lib/api.ts  # typed fetch wrapper, attaches Authorization header, throws a typed error on non-2xx
 ```
 
 - Route guard: client-side check in a layout for the `(app)` route group; no token redirects to `/login`. Sufficient for a single-user, non-SEO internal tool.
-- Components: shadcn/ui (Table, Dialog, Form, Select, Badge, Card, Toast) for CRUD UI; Recharts for the insights dashboard.
+- Insights is the default route after login (§5): it's the surface used weekly, versus the employee list and salary changes which are used far less often.
+- Employee detail opens via Next.js's intercepting-routes pattern as a slide-over drawer, preserving the list's scroll position and filters; it falls back to a full page at the same URL on direct navigation/refresh.
+- Components: shadcn/ui (Table, Sheet, Dialog, Form, Select, Badge, Toast) as the base, themed per `docs/design.md`; Recharts for the insights dashboard.
 - All data fetching via TanStack Query, through the existing Next.js `/api` rewrite; no server-side API calls.
+- Fully responsive per the breakpoint rules in `docs/design.md` §8 — there is one implementation, not a separate mobile build.
 
 ## 9. Explicitly excluded from the data model
 
@@ -152,3 +160,13 @@ Test names are plain sentences. Coverage is reported honestly; no arbitrary perc
 ## 11. Deployment
 
 The architecture assumes a single Docker image serving the Fastify API and the Next.js standalone build, as already reflected in the scaffold (`output: 'standalone'`, `/api` rewrite, `API_URL` env var). The specific hosting platform (Render / Railway / Fly.io) is an operational choice deferred to the deployment phase, not an open architectural question, and will be recorded in `docs/decisions.md` once made.
+
+## 12. Scalability
+
+The system is seeded with 10,000 employees, but the data model and query patterns are chosen so the design holds at 100,000+ without a rework. This is validated architecturally, not by actually seeding or load-testing 100k rows in the submitted build (see `docs/decisions.md`).
+
+- **Current salary is a denormalized, indexed column on `employees`** (§2), kept correct by a single service-layer write path (§1) rather than derived per-request from `salary_history`. This turns every list and insights query from a per-employee aggregation into a plain indexed read, which is what actually breaks down at scale — SQLite itself comfortably handles well past 100,000 rows; the risk was always query shape, not the database.
+- **Bulk salary revisions run as one transaction with a reused prepared statement** (§7), the same pattern the seed script already uses (§6) — applying a revision to thousands of employees is one round trip, not thousands.
+- **CSV export streams rows from a database cursor directly to the response** instead of buffering the full result set in memory.
+- **List pagination stays offset-based.** It remains index-backed and fast through 100,000 rows; it is not designed to stay fast at millions of rows with very deep offsets. That threshold, and the cursor-based alternative, is recorded as a forward-looking trade-off in `docs/decisions.md` rather than built now.
+- **Insights statistics are computed in application memory** (`computeDistribution`, §5) because SQLite has no percentile functions. Sorting an array of 100,000 numbers is on the order of milliseconds, so this remains fine at the scale this architecture targets; `docs/decisions.md` records where it would need to change (a DB-side percentile extension or pre-aggregated rollups) if the target scale grew by another order of magnitude.

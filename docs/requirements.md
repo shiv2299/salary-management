@@ -18,23 +18,24 @@ Replace ACME's Excel-based salary management for 10,000 employees across multipl
 ### Compensation
 
 - **FR-3**: Record salary as effective-dated history (reasons: hire, raise, promotion, correction), not a mutable snapshot — so past pay is never lost.
-- **FR-4**: Export current employee and salary data as CSV.
+- **FR-4**: Apply a salary revision to a group of employees at once (a filtered selection, e.g. "all L3 Engineers in India") as a single percentage increase, with the option to hand-override the computed amount for any individual employee before confirming. This reflects how revisions actually happen (a few times a year, across many people at once), not one employee at a time.
+- **FR-5**: Export current employee and salary data as CSV.
 
 ### Insights (the HR Manager's core compensation questions)
 
-- **FR-5**: Show pay distribution (headcount, min, max, mean, median, p25/p75/p90) by country, department, and level.
-- **FR-6**: Compare pay across countries in a single base currency, using a static FX table.
-- **FR-7**: Flag employees whose current pay is a statistical outlier against same-country, same-level peers.
-- **FR-8**: Show total payroll cost by country and by department.
-- **FR-9**: Show recent salary changes within a trailing time window (what changed, when, from what to what).
+- **FR-6**: Show pay distribution (headcount, min, max, mean, median, p25/p75/p90) by country, department, and level.
+- **FR-7**: Compare pay across countries in a single base currency, using a static FX table.
+- **FR-8**: Flag employees whose current pay is a statistical outlier against same-country, same-level peers.
+- **FR-9**: Show total payroll cost by country and by department.
+- **FR-10**: Show recent salary changes within a trailing time window (what changed, when, from what to what); changes applied together as one bulk revision (FR-4) are shown as a single grouped entry, not one row per employee.
 
 ### Access
 
-- **FR-10**: The single HR user authenticates (login) before accessing any employee or insights data.
+- **FR-11**: The single HR user authenticates (login) before accessing any employee or insights data.
 
 ### Data
 
-- **FR-11**: Seed the system with a deterministic 10,000-employee dataset spanning 3 countries, 7 departments, and 6 levels, for development, testing, and demo purposes.
+- **FR-12**: Seed the system with a deterministic 10,000-employee dataset spanning 3 countries, 7 departments, and 6 levels, for development, testing, and demo purposes.
 
 ## 4. Out of Scope
 
@@ -45,7 +46,7 @@ Replace ACME's Excel-based salary management for 10,000 employees across multipl
 | Live FX rates | A static, dated FX table keeps conversions deterministic and removes an external dependency and failure mode. |
 | Role-based access control / SSO / multi-user | One persona only. The service layer accepts an unused visibility-scope parameter so country/department-restricted access can be added later without a rewrite. |
 | Excel import | The seed script supplies the data, so import isn't required to use the app. It's the natural first follow-up, and would reuse the same validation and bulk-create path the seed script already uses. |
-| Org chart / reporting hierarchy | None of the FR-5..FR-9 insights require it, and a believable reporting tree in seed data adds complexity with no analytical payoff here. |
+| Org chart / reporting hierarchy | None of the FR-6..FR-10 insights require it, and a believable reporting tree in seed data adds complexity with no analytical payoff here. |
 | Approval workflows and notifications | State machines that don't serve any requirement above. |
 | Demographic pay-equity analysis (e.g. by gender) | Sensitive data that needs a policy decision outside the scope of this exercise. |
 
@@ -56,7 +57,7 @@ Where a product decision was not fully specified, this document records the assu
 - Salary means annual base pay only (no bonus/equity/allowances).
 - Cross-country comparison uses a static, dated FX table, converting to a common base currency for insights.
 - Full effective-dated salary history is tracked, not just a current snapshot.
-- FR-5..FR-9 are the product's own answer to "what should HR be able to ask," derived from the problem statement.
+- FR-6..FR-10 are the product's own answer to "what should HR be able to ask," derived from the problem statement.
 - Single HR user; no role/country/department-based access restriction, but the service layer is structured so this can be added later.
 - No Excel import; CSV export only.
 
@@ -66,3 +67,5 @@ Where a product decision was not fully specified, this document records the assu
 - **Performance**: list and insights endpoints respond within a measured, stated latency on the full 10,000-row dataset — see `docs/performance.md` for actual numbers once measured.
 - **Data integrity**: monetary amounts are stored as integer minor units with an ISO currency code, never floats; salary history is append-only.
 - **Observability of build effort**: seed time and full test-suite runtime are measured and recorded, not estimated.
+- **Scalability**: the data model and query patterns are designed to hold up at 100,000+ employees, not just the seeded 10,000 — see `docs/architecture.md` §12. This is an architectural property, not something demonstrated with a 100k seed in the submitted build.
+- **UI/UX**: the interface follows `docs/design.md` — a single, binding reference so the visual and interaction design stays consistent regardless of which session or tool implements a given screen.

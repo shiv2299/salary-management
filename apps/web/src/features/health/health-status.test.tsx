@@ -38,6 +38,16 @@ describe('HealthStatus', () => {
     expect(screen.getByText('Database: ok')).toBeDefined();
   });
 
+  it('shows error when the API is up but the database is not', async () => {
+    stubFetch(Response.json({ status: 'ok', database: 'error' }));
+
+    renderHealthStatus();
+
+    expect(await screen.findByText('error')).toBeDefined();
+    expect(screen.getByText('Database: error')).toBeDefined();
+    expect(screen.queryByText('ok')).toBeNull();
+  });
+
   it('shows the API error message when the request fails', async () => {
     stubFetch(
       Response.json(

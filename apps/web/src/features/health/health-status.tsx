@@ -24,11 +24,11 @@ export function HealthStatus() {
     );
   }
 
+  const healthy = data.database === 'ok';
+
   return (
     <div className="flex flex-col gap-1">
-      <Badge variant={data.database === 'ok' ? 'positive' : 'destructive'}>
-        {data.status === 'ok' ? 'ok' : 'error'}
-      </Badge>
+      <Badge variant={healthy ? 'positive' : 'destructive'}>{healthy ? 'ok' : 'error'}</Badge>
       <p className="text-text-secondary">Database: {data.database}</p>
     </div>
   );

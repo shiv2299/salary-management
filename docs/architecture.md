@@ -139,7 +139,7 @@ src/lib/api.ts  # typed fetch wrapper, attaches Authorization header, throws a t
 - Employee detail opens via Next.js's intercepting-routes pattern as a slide-over drawer, preserving the list's scroll position and filters; it falls back to a full page at the same URL on direct navigation/refresh.
 - Components: shadcn/ui (Table, Sheet, Dialog, Form, Select, Badge, Toast) as the base, themed per `docs/design.md`; Recharts for the insights dashboard.
 - All data fetching via TanStack Query, through the existing Next.js `/api` rewrite; no server-side API calls.
-- Fully responsive per the breakpoint rules in `docs/design.md` §8 — there is one implementation, not a separate mobile build.
+- Fully responsive per the breakpoint rules in `docs/design.md` §7 — there is one implementation, not a separate mobile build.
 
 ## 9. Explicitly excluded from the data model
 

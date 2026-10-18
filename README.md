@@ -43,6 +43,8 @@ node apps/web/.next/standalone/apps/web/server.js
 
 `API_URL` is read at build time because Next.js resolves rewrite destinations during `next build`.
 
+A relative `DATABASE_PATH` is resolved against `apps/api`, so the default database is always `apps/api/data/app.db` whichever directory the API is started from.
+
 ## Structure
 
 ```

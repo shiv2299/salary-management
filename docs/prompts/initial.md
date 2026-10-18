@@ -8,13 +8,13 @@ An employee salary management web app for an HR Manager at a 10,000-employee, mu
 1. First print a short plan (steps and the packages you intend to install).
 2. Verify every package version with `npm view <package> version` and read the installed package's docs for its current setup. Stable releases only, no canary or pre-release.
 3. Scaffold only. Do NOT add: employees, salaries, auth, database tables, seed data, or any domain logic. No lorem ipsum, no unused dependencies, no commented-out code. Delete all create-next-app boilerplate (default page content, logos, demo styles).
-4. This repository already exists on branch `main` with prior commits (`docs/` and `AGENTS.md`/`CLAUDE.md` at the repo root). Do NOT run `git init`, and do NOT recreate, move, or duplicate the content of `AGENTS.md`, `CLAUDE.md`, or anything under `docs/` — read `AGENTS.md` first and follow it. Continue committing on top of the existing history. Make small commits as you go, using Conventional Commits (chore/feat/test/ci/docs). Every commit must pass lint, typecheck and tests as of that commit. Never force-push or rewrite history.
+4. This repository already exists on branch `main` with prior commits (`docs/` and `AGENTS.md` at the repo root). Do NOT run `git init`, and do NOT recreate, move, or duplicate the content of `AGENTS.md` or anything under `docs/` — read `AGENTS.md` first and follow it. Continue committing on top of the existing history. Make small commits as you go, using Conventional Commits (chore/feat/test/ci/docs). Every commit must pass lint, typecheck and tests as of that commit. Never force-push or rewrite history.
 5. Run every command and report real output. If something fails, fix the root cause. Never skip tests, disable lint rules, or use `any` / `@ts-ignore` to get past errors.
 6. If a requirement is ambiguous, choose the simpler option and record it in the final report. Only ask me a question if you are truly blocked.
 
 # TARGET STRUCTURE
   /
-  AGENTS.md, CLAUDE.md (already exist — do not recreate)
+  AGENTS.md (already exists — do not recreate)
   README.md, package.json (npm workspaces)
   tsconfig.base.json, eslint.config.js (root), .prettierrc, .editorconfig, .gitignore, .nvmrc
   .github/workflows/ci.yml
@@ -61,7 +61,7 @@ An employee salary management web app for an HR Manager at a 10,000-employee, mu
 `.github/workflows/ci.yml` on push and pull_request: checkout, setup-node (version from .nvmrc, npm cache), `npm ci`, lint, typecheck, test, build. Use the current major versions of the actions (verify).
 
 # DOCS
-- AGENTS.md and CLAUDE.md already exist at the repo root — read AGENTS.md before doing anything else and follow it; do not edit or duplicate its content.
+- AGENTS.md already exists at the repo root — read it before doing anything else and follow it; do not edit or duplicate its content.
 - README.md: short. What it is, prerequisites, setup and run commands, repo structure. No marketing text.
 
 # SUGGESTED COMMIT SEQUENCE

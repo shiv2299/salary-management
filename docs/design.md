@@ -26,6 +26,8 @@ This document is the single source of truth for how the application looks and be
 | `warning` | `#B45309` (amber-700) | Outlier flags |
 | `inactive` | `#6B7280` (gray-500) | Text of deactivated-employee rows, always paired with an "Inactive" badge |
 
+**In code**, the blue `accent` above is the Tailwind/shadcn `primary` color (`bg-primary`, `text-primary`, `ring`). Tailwind's own `accent` class is shadcn's subtle hover background and maps to `surface`, so never use `bg-accent`/`text-accent` for the blue. The other tokens keep their names (`bg-surface`, `text-text-secondary`, `text-positive`, …).
+
 The accent is blue, not green, so that an action or a chart series is never mistaken for "pay went up". Every foreground token meets WCAG AA (≥ 4.5:1) as text on both `background` and `surface`. Measured on `surface`, the tightest background: accent 6.3, positive 5.1, negative 6.0, warning 4.7, inactive / text-secondary 4.5.
 
 No gradients. No dark mode in v1 (an internal data tool used on a work laptop; not worth the design and QA surface it adds — revisit only if asked).

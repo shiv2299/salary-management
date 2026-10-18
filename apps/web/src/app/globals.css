@@ -55,6 +55,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  /* shadcn's hover background, not the design accent; the design accent is `primary` (docs/design.md §2). */
   --color-accent: var(--surface);
   --color-accent-foreground: var(--text-primary);
   --color-destructive: var(--destructive);

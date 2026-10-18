@@ -9,3 +9,5 @@ coverage
 **/data/*.db-*
 *.tsbuildinfo
 .DS_Store
+
+next-env.d.ts

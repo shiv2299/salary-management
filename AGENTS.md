@@ -11,12 +11,15 @@ Before writing any feature code (not required for pure scaffolding with no domai
 3. `docs/design.md` — binding visual and interaction rules for anything the HR Manager sees or clicks. UI work follows this exactly; it is not a style suggestion.
 4. `docs/decisions.md` — trade-offs already made and why, so they aren't re-litigated or accidentally reversed.
 
+`docs/performance.md` holds measured latency, seed time, and test runtime.
+
 ## Backend conventions
 
 - Layering is `routes -> services -> repositories`. Routes never call repositories directly. Services never touch the Drizzle query builder directly.
 - `domain/` contains pure functions only — no I/O, no database, no clock/RNG calls — so it stays fast and deterministic to test.
 - Money is always an integer minor-unit amount plus an ISO 4217 currency code. Never a float.
-- Exactly one service function writes `salary_history`, and it writes the employee's denormalized `current_*` columns in the same transaction. No other code path touches either (see `docs/architecture.md` §1, §12).
+- Exactly one service function (`applySalaryChanges`) writes `salary_history`, and in the same transaction it writes the employee's denormalized `current_*` columns and, for promotions/relocations, `level_id` / `country_code`. No other code path touches any of these, apart from an FX-rate migration recomputing `current_amount_base_minor` (see `docs/architecture.md` §1, §3, §12).
+- Effective dates are never in the future; FX conversion and all money rounding (half away from zero, once) live in `domain/` (see `docs/architecture.md` §3).
 - Validate all input at the API boundary with Zod. Inner layers trust validated data.
 - Lists are paginated server-side (offset-based; see `docs/decisions.md` for why and its limits).
 

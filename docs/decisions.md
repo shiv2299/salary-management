@@ -1,32 +1,168 @@
 # Decisions
 
-A short log of non-obvious trade-offs: what was chosen, what the alternative was, and why. `docs/architecture.md` describes what was built; this document explains the calls that weren't forced by the requirements alone.
+A short log of non-obvious trade-offs: what was chosen, what the alternative was, and why. `docs/architecture.md` describes what will be built; this document explains the calls that weren't forced by the requirements alone.
+
+## Database: SQLite, not Postgres
+
+**Alternative considered**: Postgres (managed, or in a second container).
+
+**Chosen**: SQLite via better-sqlite3, one file on a persistent volume.
+
+**Why**: one HR user means almost no concurrent writes, which is the main thing SQLite gives up. In exchange: zero setup for reviewers (`npm ci && npm run dev`), tests run against a real in-memory database in milliseconds with no Docker, and deployment is one container. At 100,000 rows SQLite is nowhere near its limits; the scaling risks are query shape (addressed by the denormalized current salary below), not the engine. Drizzle keeps the schema and queries portable.
+
+**Revisit if**: multiple concurrent users are introduced, the app needs to run as more than one instance, or percentile queries need to move into the database (Postgres has `percentile_cont`).
+
+## Base currency: USD
+
+**Chosen**: all cross-country figures are shown in USD.
+
+**Why**: it's the conventional reporting currency for multinational compensation, one of the three currencies already in the data, and the one leadership is most likely to think in. It's a single constant, not hardcoded throughout the code.
+
+**Revisit if**: leadership reports in another currency; the change is a config value plus an FX migration.
+
+## Money and FX: integer rates, one rounding step, half away from zero
+
+**Alternative considered**: storing FX rates as floats / `REAL`.
+
+**Chosen**: rates stored as integers scaled by 10⁹ (`rate_to_base_nano`). Conversions are computed in `BigInt` and rounded once at the end, half away from zero, to an integer minor unit. The same rounding rule applies to bulk-revision amounts and to computed means and percentiles.
+
+**Why**: a float rate brings float arithmetic straight back into money, which the integer-minor-unit rule exists to prevent. A single, documented rounding rule makes results reproducible and testable to the cent.
 
 ## Outlier detection: Tukey's IQR fences, not a fixed threshold
 
 **Alternative considered**: flag anyone more than ±40% from their peer-group median.
 
-**Chosen**: flag anyone outside `p25 - 1.5×IQR` .. `p75 + 1.5×IQR` for their country+level peer group.
+**Chosen**: flag anyone outside `p25 - 1.5×IQR` .. `p75 + 1.5×IQR` for their country+level peer group. Peer groups smaller than 10 are not evaluated.
 
 **Why**: a fixed ±40% is an arbitrary number with no justification beyond "it seemed reasonable." IQR fences are a standard statistical method, and the insights endpoint already computes p25/p75 for the distribution feature (FR-6), so this reuses existing output instead of introducing a new threshold parameter to pick and defend.
 
-## Auth: JWT, no refresh token
+## Outlier peer group: country + level, not + department
 
-**Alternative considered**: server-side session with an httpOnly cookie.
+**Chosen**: peers are employees in the same country at the same level, across departments.
 
-**Chosen**: JWT (`{ sub: userId }`, 1-hour expiry), held client-side in memory, no refresh token.
+**Why**: pay is set mainly by labor market (country) and seniority (level). Adding department splits the 10,000 employees into 126 groups, many of which would fall below the 10-person minimum needed for reliable quartiles.
 
-**Why**: a single HR user with no RBAC doesn't need session invalidation machinery. Re-login on expiry is simpler to build, test, and explain than refresh-token rotation, for a tool used in short, infrequent sessions (see the usage pattern below).
+**Revisit if**: department pay really does diverge within a level (e.g. Engineering vs. Support). The peer key is a single service-layer parameter.
+
+## Percentiles: linear interpolation (Excel `PERCENTILE.INC`)
+
+**Alternative considered**: nearest-rank percentiles.
+
+**Chosen**: linear interpolation between the two nearest ranks.
+
+**Why**: it's the method the HR Manager's existing Excel pivots use, so numbers match what they'd have computed by hand. Pinning the method also makes the stats tests exact.
+
+## Auth: session cookie carrying a JWT, no refresh token
+
+**Alternative considered**: JWT held in browser memory and sent as an `Authorization: Bearer` header (the original plan).
+
+**Chosen**: a signed JWT (`{ sub }`, 8-hour expiry) stored in an `HttpOnly; SameSite=Strict` cookie, set by the API through the same-origin `/api` rewrite. No refresh token; re-login when it expires.
+
+**Why**: an in-memory token is lost on every refresh, new tab, or bookmark. That would break the design's promises that a refreshed detail URL renders and that a bookmarked filtered view is reproducible. It also prevents CSV export from being a plain download link. A cookie fixes all three with less client code, and `HttpOnly` keeps the token away from JavaScript entirely. `SameSite=Strict` plus JSON-only mutation endpoints covers CSRF. 8 hours matches a working day. A single user with no RBAC doesn't need refresh-token rotation or server-side revocation.
+
+## Auth guard: deny by default
+
+**Chosen**: every `/api/*` route requires a session except an explicit allowlist (`POST /api/auth/login`, `GET /api/health`).
+
+**Why**: guarding a list of protected prefixes means every new route is unprotected until someone remembers to add it. An allowlist fails safe.
 
 ## Current salary: denormalized cache, not a derived query
 
 **Alternative considered**: keep `current_amount_minor` purely derived — a window function or correlated subquery finding each employee's latest `salary_history` row at read time.
 
-**Chosen**: cache `current_amount_minor` / `current_currency_code` / `current_effective_date` / `current_reason` directly on `employees`, written transactionally by the single service function that writes `salary_history`.
+**Chosen**: cache `current_amount_minor` / `current_currency_code` / `current_amount_base_minor` / `current_effective_date` / `current_reason` directly on `employees`, written transactionally by the single service function that writes `salary_history`. "Current" means the latest `effective_date`, with the highest `id` breaking ties.
 
 **Why**: this system is designed to hold up at 100,000+ employees (`docs/requirements.md` §6), not just the seeded 10,000. A derived "latest row per employee" query re-aggregates on every list and insights request; a denormalized, indexed column turns that into a plain read. The cost is a second place the value lives, mitigated by funneling every write through exactly one service function (`docs/architecture.md` §1) — there is no second code path that could let it drift from `salary_history`, which remains the append-only source of truth.
 
 **Revisit if**: a future requirement needs the "current" salary to be computed differently per caller (e.g. as-of an arbitrary past date for every list view, not just the detail/history view) — at that point the cache stops being a correct shortcut and the derived query comes back, likely behind the same read path.
+
+## Salary sort and insights: cached USD amount
+
+**Alternative considered**: sort and aggregate on `current_amount_minor` and convert at query time.
+
+**Chosen**: the single writer also stores `current_amount_base_minor` (USD cents), and the salary sort and every insight use it.
+
+**Why**: `current_amount_minor` mixes paise, cents, and euro cents, so sorting on it ranks ₹15,00,000 above $150,000. Converting at query time would make the salary sort unindexable. FX rates are static, so the cached value only changes when a salary changes or an FX migration runs, and that migration recomputes it.
+
+## No future-dated salary changes
+
+**Alternative considered**: allow scheduled changes (e.g. enter in March a raise effective 1 April).
+
+**Chosen**: effective dates must be today or earlier.
+
+**Why**: with future dates allowed, "current salary" depends on the day you read it, so the denormalized cache would need a scheduled job to stay correct, and insights could count pay nobody receives yet. Disallowing them keeps the cache a pure function of the history rows. Backdated changes are allowed and handled by the current-row rule.
+
+**Revisit if**: HR needs to enter increment cycles ahead of time. That would need a `scheduled` status on rows plus a daily job that applies them through the single writer.
+
+## Salary-change reasons: raise and promotion are distinct; relocation is its own reason
+
+**Chosen**: `raise` changes pay only. `promotion` changes level (to a higher rank) and pay together. `relocation` changes country and pay together, with the new amount in the new currency. `correction` fixes a mistake. Country and level cannot be edited through `PATCH`.
+
+**Why**: a promotion and a raise mean different things to HR and leadership, and a promotion without its level change (or vice versa) would make level-based insights wrong. Country affects currency, so changing it without a salary change would leave the employee's pay in the wrong currency. Routing both through the salary writer keeps level, country, and pay consistent in one transaction and visible in history.
+
+## Relocation: pre-filled with the converted salary, editable
+
+**Chosen**: the relocation form pre-fills the new-country salary with the current salary converted at the static FX rate (done server-side), and the HR Manager can change it before saving.
+
+**Why**: a straight conversion is the obvious starting point, but relocations usually come with a local-market adjustment, so the number must be editable. Doing the conversion on the server keeps money arithmetic out of the browser.
+
+## Inactive employees
+
+**Chosen**:
+- Hidden from the employee list by default (the status filter can show them).
+- Excluded from all insights.
+- Included in recent changes, marked as inactive.
+- Included in "export all"; included in "export current result" only if the current filter includes them.
+- Cannot receive salary changes and are skipped by bulk revisions.
+- Can be reactivated.
+
+**Why**: an inactive employee isn't being paid, so counting them in payroll or pay bands would misstate both. Their history is still history, though, so it stays visible where history is shown.
+
+## Bulk salary revision: percentage with per-row override, not exact-amount-only
+
+**Context**: salary revisions happen a few times a year, applied to groups of employees at once (an increment cycle), not one employee at a time. It surfaced while designing the UX around how often each feature is actually used.
+
+**Alternative considered**: bulk action that only supports setting the exact same new amount for every selected employee.
+
+**Chosen**: a single percentage increase computed per employee, with the resulting amount editable per row before confirming.
+
+**Why**: a flat percentage is what an increment cycle actually is ("everyone in this group gets 7%"), and the per-row override avoids forcing a second workflow for the inevitable exceptions (one person in the group needs a different number) without building a second bulk-edit feature.
+
+## Bulk revision: confirm an explicit, checked list, not a filter
+
+**Alternative considered**: confirm by resending the filter used for the preview.
+
+**Chosen**: the confirm request carries the exact employee IDs from the preview, each with the current amount it was based on (`expectedCurrentAmountMinor`) and its final new amount. If anything changed since the preview, the whole request is rejected with `409` and nothing is written. The percentage is stored in integer basis points; only increases (1–10,000 bp) are allowed.
+
+**Why**: a filter evaluated twice can return a different set of employees the second time, and the overrides are keyed by employee. Committing exactly what was reviewed is the only way the preview means anything. Decreases are rare, individual events and go through `correction`.
+
+**Trade-off**: the preview returns the full matching set (~1 MB at 10,000 rows) so the UI can page through it and hold overrides locally. That's fine at this scale, and selecting tens of thousands of people in one revision isn't a realistic workflow.
+
+## Search: substring match, unindexed
+
+**Alternative considered**: prefix-only search (B-tree indexable), or an SQLite FTS5 trigram index.
+
+**Chosen**: case-insensitive `LIKE '%term%'` across full name, email, and job title.
+
+**Why**: the HR Manager expects a search like Excel's Find, which matches anywhere in the text. A substring scan of 100,000 short rows is a few tens of milliseconds, inside the latency target, and needs no extra table or triggers. FTS5 would add a virtual table that Drizzle doesn't model, plus sync triggers, for no measurable benefit at this scale.
+
+**Revisit if**: measured search latency approaches the target, which is likely somewhere past a few hundred thousand rows. Then add an FTS5 table with the `trigram` tokenizer, which supports substring matching.
+
+## Salary changes view: 3 or 5 years, by effective date
+
+**Alternatives considered**: a short window such as 90 days; windowing by `created_at` (when the change was entered).
+
+**Chosen**: the window is the last 3 or 5 years (default 3), and a change counts if its `effective_date` falls inside it.
+
+**Why**: revisions happen a few times a year, so a 90-day window would usually show one cycle or none. Compensation questions are about multi-year patterns: how pay moved across the last few increment cycles, and who was promoted when. Bulk revisions collapse into one entry each, and the list is paginated, so even 5 years stays readable. The window is based on effective date because the question is when pay actually changed. The cost is that a correction entered today but backdated to before the window won't appear. That's acceptable because the change is still visible in that employee's history.
+
+## Seed data: deterministic relative to a reference date
+
+**Alternative considered**: fixed absolute dates.
+
+**Chosen**: `seed({ rngSeed, referenceDate })`; all dates are offsets back from `referenceDate`.
+
+**Why**: with fixed absolute dates the seeded history would slide out of the 3/5-year window over time, and the view would gradually empty. Generating dates relative to a reference date keeps the demo meaningful whenever it runs, and the output is still fully deterministic for tests because they pass a fixed date.
 
 ## Pagination: offset, not cursor
 
@@ -44,16 +180,14 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Revisit if**: the target scale grows by another order of magnitude (millions of rows). At that point, either a SQLite percentile extension or pre-aggregated rollup tables would be needed instead of fetching the full filtered set per request.
 
-## Bulk salary revision: percentage with per-row override, not exact-amount-only
+## No pre-built access-scope parameter
 
-**Context**: salary revisions happen a few times a year, applied to groups of employees at once (an increment cycle), not one employee at a time. It surfaced while designing the UX around how often each feature is actually used.
+**Alternative considered**: an unused "visibility scope" parameter threaded through the service layer, for future country/department-restricted access.
 
-**Alternative considered**: bulk action that only supports setting the exact same new amount for every selected employee.
+**Chosen**: not built.
 
-**Chosen**: a single percentage increase computed per employee, with the resulting amount editable per row before confirming.
-
-**Why**: a flat percentage is what an increment cycle actually is ("everyone in this group gets 7%"), and the per-row override avoids forcing a second workflow for the inevitable exceptions (one person in the group needs a different number) without building a second bulk-edit feature.
+**Why**: `AGENTS.md` rules out speculative abstractions, and an unused parameter is untested by definition. The layering already gives restricted access one obvious place to live (a scope applied in the service layer to every repository query) if it's ever needed.
 
 ## Deployment platform: deferred, not decided
 
-**Status**: open. The architecture assumes a single Docker image (`docs/architecture.md` §11); the specific host (Render/Railway/Fly.io) is an operational choice made during the deployment phase, not an architectural one. Will be recorded here once chosen, with the reason.
+**Status**: open. The architecture assumes a single Docker image (`docs/architecture.md` §11); the specific host (Render/Railway/Fly.io) is an operational choice made during the deployment phase, not an architectural one. Whichever is chosen must provide a **persistent volume** for the SQLite file. All three have ephemeral container filesystems, and seed-on-boot would mask the data loss by silently re-seeding. Will be recorded here once chosen, with the reason.

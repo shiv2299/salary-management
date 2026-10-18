@@ -1,10 +1,10 @@
 # Architecture
 
-This document is the engineering design for the system described in `docs/requirements.md`. It covers module boundaries, data model, core subsystems, API surface, frontend structure, and testing strategy. Visual design and UI interaction rules live in `docs/design.md`, which this document defers to rather than duplicates. Trade-offs and alternatives considered are logged separately in `docs/decisions.md`; this document describes what was built and why it's shaped this way.
+This document is the engineering design for the system described in `docs/requirements.md`. It covers module boundaries, data model, core subsystems, API surface, frontend structure, and testing strategy. Visual design and UI interaction rules live in `docs/design.md`, which this document defers to rather than duplicates. Trade-offs and alternatives considered are logged separately in `docs/decisions.md`; this document describes what will be built and why it's shaped this way.
 
 ## 1. Stack and module boundaries
 
-Monorepo (npm workspaces), as scaffolded in `docs/prompts/initial.md`:
+Monorepo (npm workspaces), scaffolded per `docs/prompts/initial.md`:
 
 ```
 packages/shared/   Zod schemas + inferred types shared by API and web
@@ -27,7 +27,7 @@ Rules:
 - Routes never call repositories directly.
 - Services never touch the Drizzle query builder directly; they call repositories.
 - `domain/` has zero I/O, which is what makes its tests fast and deterministic without a database.
-- Exactly one service function writes `salary_history`, and it always writes the employee's `current_*` columns in the same transaction. No other code path is allowed to touch either, which is what keeps the denormalized cache in §2/§12 correct.
+- **Single salary writer.** Exactly one service function, `applySalaryChanges(changes[])`, writes `salary_history`. In the same transaction it recomputes the employee's `current_*` columns (§2) and, for a promotion or relocation, updates `level_id` / `country_code`. It takes an array, so a single change, a bulk revision (§7), and the seed script (§6) all go through the same function. No other code path writes any of these columns, which is what keeps the denormalized cache in §2/§12 correct. The one documented exception is an FX-rate migration (§3).
 
 ## 2. Data model
 
@@ -37,85 +37,126 @@ Reference/config tables (small, mostly static, seeded once):
 |---|---|---|
 | `countries` | `code` (PK, ISO 3166-1 alpha-2), `name`, `currency_code` (ISO 4217) | India (INR), United States (USD), Germany (EUR) |
 | `departments` | `id`, `name` | Fixed list: Engineering, Sales, Marketing, Finance, People/HR, Support, Operations |
-| `levels` | `id`, `code` (`L1`-`L6`), `label`, `rank` | `rank` orders levels for band comparisons |
-| `fx_rates` | `currency_code`, `as_of_date`, `rate_to_base` | Static, dated table; base currency is USD |
+| `levels` | `id`, `code` (`L1`-`L6`), `label`, `rank` | `rank` orders levels; a promotion must move to a higher `rank` |
+| `fx_rates` | `currency_code`, `as_of_date`, `rate_to_base_nano` (integer) | Static, dated table; base currency is USD. See §3 for the representation |
 
 Core tables:
 
 | Table | Columns | Notes |
 |---|---|---|
-| `employees` | `id`, `first_name`, `last_name`, `email`, `country_code` (FK), `department_id` (FK), `level_id` (FK), `job_title`, `hire_date`, `status` (`active`/`inactive`), `current_amount_minor`, `current_currency_code`, `current_effective_date`, `current_reason`, timestamps | No manager/reporting hierarchy (see §9). The `current_*` columns are a denormalized cache of the latest `salary_history` row — see §12 for why |
-| `salary_history` | `id`, `employee_id` (FK), `amount_minor` (integer), `currency_code`, `effective_date`, `reason` (`hire`/`raise`/`promotion`/`correction`), `batch_id` (FK, nullable), `created_at` | Append-only, the source of truth for current salary. Rows applied together via a bulk revision (§7) share a `batch_id` |
-| `salary_revision_batches` | `id`, `created_at`, `percentage`, `note` | One row per bulk revision (e.g. "7% raise — Engineering L3 India"); lets `salary_history` rows be grouped back into a single event for display (§5, FR-10) |
+| `employees` | `id`, `first_name`, `last_name`, `email`, `country_code` (FK), `department_id` (FK), `level_id` (FK), `job_title`, `hire_date`, `status` (`active`/`inactive`), `current_amount_minor`, `current_currency_code`, `current_amount_base_minor`, `current_effective_date`, `current_reason`, timestamps | No manager/reporting hierarchy (see §9). The `current_*` columns are a denormalized cache of the current `salary_history` row (rule below); `current_amount_base_minor` is that amount in USD cents, used for every cross-currency sort and every insight. See §12 for why |
+| `salary_history` | `id` (autoincrement), `employee_id` (FK), `amount_minor` (integer), `currency_code`, `effective_date`, `reason` (`hire`/`raise`/`promotion`/`relocation`/`correction`), `level_id` (FK), `country_code` (FK), `batch_id` (FK, nullable), `created_at` | Append-only, the source of truth for current salary. Stores the level and country in force from that row onward, so history shows promotions and relocations. Rows applied together via a bulk revision (§7) share a `batch_id` |
+| `salary_revision_batches` | `id`, `created_at`, `effective_date`, `percentage_bp` (integer basis points; 700 = 7%), `employee_count`, `note` | One row per bulk revision (e.g. "7% raise — Engineering L3 India"); lets `salary_history` rows be grouped back into a single event for display (§5, FR-10) |
 | `users` | `id`, `email`, `password_hash`, `created_at` | Single seeded HR row; no roles table |
 
-Indexes: `employees(country_code, department_id, level_id)` composite for list/filter; `employees(status)`; `employees(current_amount_minor)` for insights queries that filter/sort on current pay; `salary_history(employee_id, effective_date)` for audit/history lookups; `salary_history(batch_id)` for grouping; a name/email index on `employees` for search.
+**Which row is "current"**: the employee's `salary_history` row with the latest `effective_date`, with the highest `id` breaking ties. Because future effective dates are rejected at the API boundary (`docs/requirements.md` FR-3), the latest-dated row is always already in effect, so the cache never has to change on its own as time passes. The single writer (§1) re-selects the current row inside its transaction after inserting rather than assuming the new row is current, so:
+- a **backdated** change (earlier than the current row) is recorded in history without changing current pay;
+- a **correction** dated the same day as the row it fixes wins the tie on `id` and becomes current. The wrong row stays in history for audit.
+
+Indexes:
+- `employees(status, current_amount_base_minor)` — salary sort, and insights over active employees
+- `employees(country_code, level_id)` — outlier peer groups (§5) and the country filter
+- `employees(department_id)`, `employees(level_id)` — single-column filters
+- `employees(last_name, first_name)` — default list sort
+- `salary_history(employee_id, effective_date, id)` — current-row selection and history lookups
+- `salary_history(effective_date)` — salary-changes window (FR-10)
+- `salary_history(batch_id)` — grouping
+
+Search is a substring match and deliberately uses no index (§7, `docs/decisions.md`).
 
 ## 3. Money and currency
 
-- All monetary amounts are stored as **integer minor units** (e.g. paise, cents) plus an ISO 4217 currency code — never floats, to avoid rounding bugs.
-- Cross-country comparisons convert to a common base currency (USD) via the static, dated `fx_rates` table at query time. Conversion is a pure domain function, independently testable.
+- All monetary amounts are stored as **integer minor units** (e.g. paise, cents) plus an ISO 4217 currency code — never floats, to avoid rounding bugs. All three supported currencies have 2 minor digits; the domain module still looks up the exponent per currency rather than hardcoding 100.
+- **FX rate representation**: `rate_to_base_nano` is the value of one major unit of the currency in USD, multiplied by 10⁹ and stored as an integer (e.g. 1 INR = 0.011980000 USD → `11980000`). Nine decimal places is enough precision for any realistic rate without using a float.
+- **Conversion** is a pure domain function, `convert(amountMinor, from, to, rates)`. It computes `amountMinor × rate_from ÷ rate_to` (adjusted for minor-unit exponents) in `BigInt`, so large amounts can't overflow, and **rounds once at the end, half away from zero**, to an integer minor unit. Going between two non-USD currencies (relocation pre-fill) is a single calculation, not two separately rounded conversions.
+- **Which rate**: the row with the latest `as_of_date` for each currency. The build ships one row per currency, and the UI shows its date ("FX rates as of …") wherever converted amounts appear.
+- **Base amount cache**: the single writer (§1) stores the converted USD amount in `current_amount_base_minor` whenever it writes a salary. Insights and salary sort read this column, so no conversion happens at query time.
+- **Changing FX rates**: the table is static, so rates only change by migration. That migration inserts new `fx_rates` rows and recomputes `current_amount_base_minor` for every employee in the same transaction. This is the only code path outside the single writer that touches a `current_*` column.
 - Live FX rates are explicitly out of scope (see `docs/requirements.md`).
 
 ## 4. Auth
 
-- `POST /api/auth/login` validates email/password (argon2id hash) against the single seeded `users` row and returns a JWT (`{ sub: userId }`, 1-hour expiry, signed with `JWT_SECRET`).
-- No refresh token: given a single user, re-login on expiry is simpler to build, test, and explain than refresh rotation.
-- The client holds the token in memory (not `localStorage`), attached as `Authorization: Bearer <token>` via the shared API client.
-- A Fastify `preHandler` hook guards `/api/employees*`, `/api/insights*`, `/api/reference*`; returns `401` with the standard `{ error: { code, message } }` shape on a missing/invalid/expired token.
+- **Session cookie, not a client-held token.** `POST /api/auth/login` validates email/password (argon2id hash) against the single seeded `users` row. On success it sets a cookie named `session` containing a signed JWT (`{ sub: userId }`, 8-hour expiry, signed with `JWT_SECRET`), with flags `HttpOnly; SameSite=Strict; Path=/; Secure` (`Secure` in production only).
+- Because the browser reaches the API through the same-origin `/api` rewrite, the cookie travels with every request automatically. So refreshing the page, opening a new tab, following a bookmarked URL, and a plain `<a href>` CSV download all work, and JavaScript never handles the token.
+- `POST /api/auth/logout` clears the cookie. `GET /api/auth/me` returns the logged-in user's email, or 401; the frontend route guard and the user menu both use it.
+- **CSRF**: `SameSite=Strict` stops the browser from sending the cookie on cross-site requests. As a second layer, every mutating endpoint accepts only `application/json` bodies, which a cross-site HTML form cannot send.
+- No refresh token: when the 8 hours are up, the user logs in again.
+- **Deny by default**: a Fastify `onRequest` hook requires a valid session on **every** `/api/*` route, except an explicit allowlist: `POST /api/auth/login` and `GET /api/health`. A new route is therefore protected without anyone having to remember to add it. Failures return `401` with the standard `{ error: { code, message } }` shape.
+- Dependency: `@fastify/cookie`, for parsing and setting the cookie. The JWT is signed and verified with `jose`.
 - The seed script creates the one HR user from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` environment variables (documented in `.env.example` and the README), not a hardcoded credential.
 - No password reset, registration, or RBAC — one persona only (see `docs/requirements.md`).
 
 ## 5. Insights engine
 
+All insights read **active employees only**, using `current_amount_base_minor` (USD cents). Every figure is therefore already in one currency (FR-7) with no conversion at query time.
+
 One core building block reused for every distribution-shaped question:
 
 ```ts
 // domain/stats.ts — pure, no I/O
-computeDistribution(amounts: number[]): {
+computeDistribution(amountsMinor: number[]): {
   headcount, min, max, mean, median, p25, p75, p90
 }
 ```
 
-SQLite has no percentile functions, so the service layer fetches the filtered set of current salaries (already converted to USD via the FX domain module) and passes the array to `computeDistribution`. Because `current_amount_minor` is a denormalized, indexed column on `employees` (§12) rather than a derived join, this fetch stays a single indexed query at any employee count this system is designed for; the in-memory sort that follows is cheap even at 100,000 rows (see `docs/performance.md` for measured numbers at the seeded 10,000, and `docs/decisions.md` for where this approach would eventually stop scaling).
+- **Percentile method**: linear interpolation between the two nearest ranks. This is the same method as Excel's `PERCENTILE.INC`, so the HR Manager's numbers match what their old spreadsheet would have produced.
+- **Rounding**: `mean` and any interpolated percentile are rounded half away from zero to an integer minor unit, so every value the function returns is an integer.
+
+SQLite has no percentile functions, so the service layer fetches the filtered set of current USD amounts and passes the array to `computeDistribution`. The filter is a single indexed read on `employees` (§2) rather than a join to `salary_history`, and sorting even 100,000 numbers in memory takes only milliseconds. See `docs/performance.md` for measured numbers at the seeded 10,000, and `docs/decisions.md` for where this approach would eventually stop scaling.
 
 | HR question | Endpoint | Behavior |
 |---|---|---|
 | Pay distribution by country/department/level | `GET /api/insights/distribution?groupBy=country\|department\|level` | `computeDistribution` per group value |
-| Cross-country comparison in one currency | Same endpoint | Amounts pre-converted to USD before grouping |
-| Who's an outlier vs. peers | `GET /api/insights/outliers` | Peer group = same country + level. Flags employees whose current (USD) salary falls outside `p25 - 1.5*IQR` .. `p75 + 1.5*IQR` for their peer group (Tukey's fences), reusing `computeDistribution`'s existing p25/p75 — no separate threshold parameter |
-| Total payroll by country/department | `GET /api/insights/payroll?groupBy=country\|department` | Sum of current (USD) salaries per group |
-| What changed, when | `GET /api/insights/recent-changes?days=90` | `salary_history` rows within the trailing window, joined to employee name/country. Rows sharing a `batch_id` collapse into a single entry (e.g. "47 people, +7%, Engineering L3 India") rather than one row per employee |
+| Cross-country comparison in one currency | Same endpoint | All amounts are USD (`current_amount_base_minor`) |
+| Who's an outlier vs. peers | `GET /api/insights/outliers` | Peer group = same country + level. Flags employees whose current USD salary falls outside `p25 - 1.5*IQR` .. `p75 + 1.5*IQR` for their peer group (Tukey's fences), reusing `computeDistribution`'s existing p25/p75 — no separate threshold parameter. Peer groups with fewer than 10 active employees are not evaluated, since quartiles of a handful of salaries aren't meaningful |
+| Total payroll by country/department | `GET /api/insights/payroll?groupBy=country\|department` | Sum of current USD salaries per group |
+| What changed, when | `GET /api/insights/recent-changes?years=3\|5&limit=&offset=` (default `years=3`) | `salary_history` rows whose `effective_date` falls in the trailing window, newest first, joined to employee name, country, and status (inactive employees are included and marked). Rows sharing a `batch_id` collapse into a single entry (e.g. "47 people, +7%, Engineering L3 India") rather than one row per employee. Offset-paginated over the grouped entries |
 
-Peer grouping for outliers is country + level, not + department: at 10,000 employees across 7 departments x 3 countries x 6 levels, department-scoped peer groups would often be too small (fewer than 5 people) for a stable median.
+Peer grouping for outliers is country + level, not + department: at 10,000 employees across 7 departments × 3 countries × 6 levels, many department-scoped peer groups would fall below the 10-person minimum, so their quartiles (and therefore their fences) wouldn't be reliable.
 
 ## 6. Seed data generation
 
 - 10,000 employees across 3 countries, 7 departments, 6 levels.
 - A small TypeScript script (`apps/api/src/db/seed.ts`), not hand-written data: `@faker-js/faker` (seeded, deterministic) generates names/emails/job titles; salary amounts are drawn from a per-(country, level) distribution calibrated to realistic local pay magnitudes, not a flat uniform range.
 - ~1-2% of employees get a deliberately out-of-band salary, so the outlier/IQR feature has real data to surface in the demo.
-- Each employee gets 1-3 `salary_history` rows (hire plus occasional raise/promotion) with staggered `effective_date`s.
-- Fixed RNG seed for reproducibility; single batched transaction with a reused prepared statement for insert performance; idempotent (no-op if `employees` already has rows), safe to run on app boot.
-- The seed script calls the same service-layer bulk-create/validation path the API uses, so a future Excel import would be a thin layer on top rather than duplicated logic.
+- Hire dates are spread over the 10 years before `referenceDate`. Within the last 5 years, the seed creates one company-wide increment cycle per year as a real bulk revision (one `salary_revision_batches` row per country + department group, a few percent each). It also adds occasional individual promotions and relocations. Each employee ends up with 1 hire row plus roughly one change per year since hire, which is about 40–50k `salary_history` rows in total.
+- **Inputs**: `seed({ rngSeed, referenceDate })`. All generated dates are offsets back from `referenceDate`, so the salary-changes view (FR-10) always has data across its whole 5-year window. On app boot the server passes today's date; tests pass a fixed date. The same two inputs always produce identical data.
+- Runs in a single transaction for insert performance; idempotent (no-op if `employees` already has rows), safe to run on app boot.
+- Writes go through the service layer: `createEmployees(batch)` (the same function `POST /api/employees` calls with a batch of one), and from there the single salary writer (§1). The seed has no HTTP endpoint of its own, and a future Excel import would be a thin layer on top of these functions rather than duplicated logic.
 
 ## 7. API surface
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/auth/login` | Returns a JWT |
-| `GET /api/employees` | Paginated list; filters: `country`, `department`, `level`, `status`, `search`; sort; offset pagination |
+| `POST /api/auth/login` \| `/logout`, `GET /api/auth/me` | Session cookie lifecycle (§4) |
+| `GET /api/employees` | Paginated list; filters: `country`, `department`, `level`, `status` (default `active`; also `inactive`, `all`), `search`; sort (salary sorts by `current_amount_base_minor`); offset pagination |
 | `GET /api/employees/:id` | Employee record + current salary + full salary history |
-| `POST /api/employees` | Create employee + initial (hire) salary row |
-| `PATCH /api/employees/:id` | Edit non-salary fields |
-| `POST /api/employees/:id/salary-changes` | Add an effective-dated salary change for one employee |
-| `POST /api/employees/bulk-salary-changes` | Apply a percentage increase to a set of employees (explicit IDs or a filter) as of one effective date, with optional per-employee amount overrides. Creates one `salary_revision_batches` row, one `salary_history` row per employee, and updates each employee's `current_*` columns, all in a single transaction with a reused prepared statement (same pattern as the seed script, §6) |
+| `POST /api/employees` | Create employee + initial (hire) salary row, via `createEmployees` (§6) |
+| `PATCH /api/employees/:id` | Edit name, email, department, job title. Requests that change `country_code`, `level_id`, or salary fields are rejected with a 400 — those change only through `salary-changes` |
+| `POST /api/employees/:id/salary-changes` | One effective-dated change: `{ reason, effectiveDate, amountMinor, newLevelId?, newCountryCode? }`. See the validation rules below |
+| `POST /api/employees/bulk-salary-changes/preview` | `{ filter \| employeeIds, percentageBp }` → every matching **active** employee with `currentAmountMinor`, currency, and `proposedAmountMinor`. Read-only. Returns the full set (not paginated) so the UI can page through it and hold overrides locally; at 10,000 rows that is roughly 1 MB |
+| `POST /api/employees/bulk-salary-changes` | Confirm: `{ percentageBp, effectiveDate, note, items: [{ employeeId, expectedCurrentAmountMinor, newAmountMinor }] }`. Always an explicit list from the preview, never a filter, so the committed set is exactly the set the HR Manager reviewed. If any employee's current amount no longer matches `expectedCurrentAmountMinor`, or any employee is now inactive, the whole request fails with `409` and nothing is written. Otherwise it creates one `salary_revision_batches` row and calls the single writer once with every item, in one transaction |
 | `DELETE /api/employees/:id` | Soft delete (`status: inactive`); never a hard delete, to preserve salary history |
-| `GET /api/employees/export` | Streams CSV of current employees + current salary |
+| `POST /api/employees/:id/reactivate` | Sets `status: active` |
+| `GET /api/employees/export?scope=filtered&<list filters>` \| `?scope=all` | Streams CSV. `filtered` = exactly the rows the list query matches (all pages, same search/filters); `all` = every employee, active and inactive. Columns include status, local amount + currency, USD amount, and effective date. Amounts are written as decimal strings formatted from integer minor units (`123456.78`), never via a float |
 | `GET /api/insights/distribution` \| `/payroll` \| `/outliers` \| `/recent-changes` | As described in §5 |
-| `GET /api/reference/countries` \| `/departments` \| `/levels` | Powers UI dropdowns/filters |
-| `GET /api/health` | Already scaffolded |
+| `GET /api/reference/countries` \| `/departments` \| `/levels` \| `/fx-rates` | Powers UI dropdowns/filters and the "FX rates as of" label |
+| `GET /api/reference/fx/convert?amountMinor=&from=&to=` | Server-side conversion for the relocation pre-fill. The browser never does money arithmetic |
+| `GET /api/health` | Scaffolded in the initial setup |
 
-All endpoints except `POST /api/auth/login` and `GET /api/health` sit behind the JWT auth hook.
+Every `/api/*` route requires a session except `POST /api/auth/login` and `GET /api/health` (§4).
+
+**Salary-change validation** (Zod at the boundary, business rules in the service):
+- **All reasons**: `effectiveDate` ≤ today (injected clock) and ≥ the employee's `hire_date`; the employee must be active; `amountMinor` > 0.
+- **`raise`**: `amountMinor` greater than the current amount; `newLevelId` and `newCountryCode` not allowed.
+- **`promotion`**: `newLevelId` required, with a higher `rank` than the current level.
+- **`relocation`**: `newCountryCode` required and different from the current country; `amountMinor` is in the new country's currency.
+- **`correction`**: any positive amount; optional `newLevelId` to fix a mis-entered level.
+- **`hire`**: not accepted here — hire rows come only from `POST /api/employees`.
+
+**Bulk-revision math**: `percentageBp` is an integer from 1 to 10,000 (0.01%–100%). The proposed amount is `round_half_away_from_zero(current × (10000 + bp) / 10000)`, computed in integer arithmetic in `domain/`. Every bulk row has reason `raise`.
+
+**Search**: case-insensitive substring match (`LIKE '%term%'`, with `%`, `_`, and `\` in the user's input escaped) against `first_name || ' ' || last_name`, `email`, and `job_title`. This is an unindexed scan; see `docs/decisions.md` for why that's acceptable at the target scale and when to switch to SQLite FTS5.
 
 ## 8. Frontend structure
 
@@ -123,50 +164,56 @@ All visual and interaction decisions (layout, color, typography, component conve
 
 ```
 src/app/
-  login/page.tsx                   # public
-  (app)/insights/page.tsx          # default landing page post-login: distribution charts, payroll summary, outliers, recent changes
-  (app)/employees/page.tsx         # list: table, inline filter row, pagination, export, bulk-revision action bar
-  (app)/employees/[id]/            # intercepted route: opens as a slide-over drawer over the list, not a full navigation
+  login/page.tsx                          # public
+  (app)/layout.tsx                        # auth guard (GET /api/auth/me) + top bar; renders {children} and {drawer}
+  (app)/insights/page.tsx                 # default landing page post-login: distribution charts, payroll summary, outliers, recent changes
+  (app)/employees/page.tsx                # list: table, inline filter row, pagination, export, bulk-revision action bar
+  (app)/employees/[id]/page.tsx           # full-page detail (direct navigation / refresh)
+  (app)/@drawer/default.tsx               # renders nothing when no drawer is open
+  (app)/@drawer/(.)employees/[id]/page.tsx  # intercepted route: same detail rendered in a slide-over drawer over the list
 src/features/
-  auth/       # login form, token context, route guard
-  employees/  # query hooks, table columns, forms, bulk-revision preview logic
+  auth/       # login form, useSession hook (wraps /api/auth/me), route guard
+  employees/  # query hooks, table columns, forms, bulk-revision preview state (pagination + overrides)
   insights/   # query hooks, chart components
-src/lib/api.ts  # typed fetch wrapper, attaches Authorization header, throws a typed error on non-2xx
+src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), throws a typed error on non-2xx; on 401 redirects to /login
 ```
 
-- Route guard: client-side check in a layout for the `(app)` route group; no token redirects to `/login`. Sufficient for a single-user, non-SEO internal tool.
+- Route guard: the `(app)` layout calls `GET /api/auth/me`; a 401 redirects to `/login`. Sufficient for a single-user, non-SEO internal tool.
 - Insights is the default route after login (§5): it's the surface used weekly, versus the employee list and salary changes which are used far less often.
-- Employee detail opens via Next.js's intercepting-routes pattern as a slide-over drawer, preserving the list's scroll position and filters; it falls back to a full page at the same URL on direct navigation/refresh.
+- Employee detail uses a Next.js parallel route slot (`@drawer`) plus an intercepting route, so it opens as a slide-over drawer while keeping the list's scroll position and filters. On direct navigation or refresh, the same URL renders the full page instead. Both render the same detail component from `features/employees`.
+- The relocation form fetches the converted amount from `/api/reference/fx/convert` to pre-fill the salary field; the HR Manager can then edit it.
+- CSV export is a plain `<a href="/api/employees/export?...">` built from the current URL's filter params (or `scope=all`); the session cookie authenticates it.
 - Components: shadcn/ui (Table, Sheet, Dialog, Form, Select, Badge, Toast) as the base, themed per `docs/design.md`; Recharts for the insights dashboard.
 - All data fetching via TanStack Query, through the existing Next.js `/api` rewrite; no server-side API calls.
 - Fully responsive per the breakpoint rules in `docs/design.md` §7 — there is one implementation, not a separate mobile build.
 
 ## 9. Explicitly excluded from the data model
 
-No `manager_id` / reporting hierarchy on `employees`. None of the five HR questions in `docs/requirements.md` require an org chart, and seeding a believable reporting tree would add generator complexity with no analytical payoff.
+No `manager_id` / reporting hierarchy on `employees`. None of the five HR questions in `docs/requirements.md` (FR-6..FR-10) require an org chart, and seeding a believable reporting tree would add generator complexity with no analytical payoff.
 
 ## 10. Testing strategy
 
 | Layer | What | Tool | Notes |
 |---|---|---|---|
-| Domain | money, FX conversion, `computeDistribution`, IQR outlier check, seed distribution math | Vitest | Pure functions, no I/O; written first |
-| Repository/service | employee CRUD, salary-change creation, insights queries, auth (hash/verify/issue token) | Vitest + in-memory SQLite, small fixed fixture | Injected clock and RNG for determinism |
-| API | route validation, pagination params, auth 401/200, error shape, CSV export headers | Vitest + Fastify `app.inject()` | A handful per route |
-| Frontend | employee table rendering, form validation, insights chart data mapping, auth redirect | Vitest + React Testing Library + jsdom, stubbed `fetch` | Follows the pattern set by the scaffolded health-check test |
-| E2E | — | Skipped | Not committed to in the plan; the first thing added back if time allows, never something cut from a committed scope |
+| Domain | money rounding, FX conversion, bulk-revision amount, `computeDistribution` (incl. interpolation), IQR outlier check, current-row selection rule, seed distribution math | Vitest | Pure functions, no I/O; written first |
+| Repository/service | employee CRUD, single salary writer (backdated, same-day correction, promotion, relocation), bulk revision incl. 409 on stale preview, insights queries, auth (hash/verify/issue token) | Vitest + in-memory SQLite, small fixed fixture | Injected clock and RNG for determinism |
+| API | route validation, pagination params, auth 401/200 and deny-by-default, error shape, CSV export scopes and headers | Vitest + Fastify `app.inject()` | A handful per route |
+| Frontend | employee table rendering, form validation, relocation pre-fill, bulk preview overrides, insights chart data mapping, auth redirect | Vitest + React Testing Library + jsdom, stubbed `fetch` | Follows the pattern set by the scaffolded health-check test |
+| E2E | — | Not in this build | Matches `AGENTS.md` |
 
 Test names are plain sentences. Coverage is reported honestly; no arbitrary percentage target is chased.
 
 ## 11. Deployment
 
-The architecture assumes a single Docker image serving the Fastify API and the Next.js standalone build, as already reflected in the scaffold (`output: 'standalone'`, `/api` rewrite, `API_URL` env var). The specific hosting platform (Render / Railway / Fly.io) is an operational choice deferred to the deployment phase, not an open architectural question, and will be recorded in `docs/decisions.md` once made.
+The architecture assumes a single Docker image serving the Fastify API and the Next.js standalone build, matching the scaffold (`output: 'standalone'`, `/api` rewrite, `API_URL` env var). The SQLite file must live on a **persistent volume** mounted at `DATABASE_PATH`. Render, Railway, and Fly.io all have ephemeral container filesystems, and seed-on-boot (§6) would silently recreate fresh data after every deploy, hiding the data loss. The specific hosting platform is an operational choice deferred to the deployment phase, and will be recorded in `docs/decisions.md` once made.
 
 ## 12. Scalability
 
 The system is seeded with 10,000 employees, but the data model and query patterns are chosen so the design holds at 100,000+ without a rework. This is validated architecturally, not by actually seeding or load-testing 100k rows in the submitted build (see `docs/decisions.md`).
 
-- **Current salary is a denormalized, indexed column on `employees`** (§2), kept correct by a single service-layer write path (§1) rather than derived per-request from `salary_history`. This turns every list and insights query from a per-employee aggregation into a plain indexed read, which is what actually breaks down at scale — SQLite itself comfortably handles well past 100,000 rows; the risk was always query shape, not the database.
-- **Bulk salary revisions run as one transaction with a reused prepared statement** (§7), the same pattern the seed script already uses (§6) — applying a revision to thousands of employees is one round trip, not thousands.
-- **CSV export streams rows from a database cursor directly to the response** instead of buffering the full result set in memory.
+- **Current salary is a denormalized, indexed column on `employees`** (§2), in both local currency and USD, kept correct by a single service-layer write path (§1) rather than derived per-request from `salary_history`. This turns every list and insights query from a per-employee aggregation into a plain indexed read. Per-employee aggregation is what breaks down at scale — SQLite itself comfortably handles well past 100,000 rows; the risk was always query shape, not the database.
+- **Bulk salary revisions run as one transaction** (§7), the same pattern the seed script uses (§6). In embedded SQLite there are no network round trips; the win is that thousands of rows commit with one disk sync instead of thousands.
+- **CSV export streams rows from a database iterator directly to the response** instead of buffering the full result set in memory.
 - **List pagination stays offset-based.** It remains index-backed and fast through 100,000 rows; it is not designed to stay fast at millions of rows with very deep offsets. That threshold, and the cursor-based alternative, is recorded as a forward-looking trade-off in `docs/decisions.md` rather than built now.
+- **Search is an unindexed substring scan**, which is fast enough at 100,000 rows; `docs/decisions.md` records the FTS5 trigram alternative.
 - **Insights statistics are computed in application memory** (`computeDistribution`, §5) because SQLite has no percentile functions. Sorting an array of 100,000 numbers is on the order of milliseconds, so this remains fine at the scale this architecture targets; `docs/decisions.md` records where it would need to change (a DB-side percentile extension or pre-aggregated rollups) if the target scale grew by another order of magnitude.

@@ -5,7 +5,7 @@ coverage
 .env
 .env.*
 !.env.example
-data/*.db
-data/*.db-*
+**/data/*.db
+**/data/*.db-*
 *.tsbuildinfo
 .DS_Store

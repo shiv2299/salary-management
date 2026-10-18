@@ -8,13 +8,14 @@ An employee salary management web app for an HR Manager at a 10,000-employee, mu
 1. First print a short plan (steps and the packages you intend to install).
 2. Verify every package version with `npm view <package> version` and read the installed package's docs for its current setup. Stable releases only, no canary or pre-release.
 3. Scaffold only. Do NOT add: employees, salaries, auth, database tables, seed data, or any domain logic. No lorem ipsum, no unused dependencies, no commented-out code. Delete all create-next-app boilerplate (default page content, logos, demo styles).
-4. `git init` on branch `main`. Make small commits as you go, using Conventional Commits (chore/feat/test/ci/docs). Every commit must pass lint, typecheck and tests as of that commit. Never force-push or rewrite history.
+4. This repository already exists on branch `main` with prior commits (`docs/` and `AGENTS.md`/`CLAUDE.md` at the repo root). Do NOT run `git init`, and do NOT recreate, move, or duplicate the content of `AGENTS.md`, `CLAUDE.md`, or anything under `docs/` — read `AGENTS.md` first and follow it. Continue committing on top of the existing history. Make small commits as you go, using Conventional Commits (chore/feat/test/ci/docs). Every commit must pass lint, typecheck and tests as of that commit. Never force-push or rewrite history.
 5. Run every command and report real output. If something fails, fix the root cause. Never skip tests, disable lint rules, or use `any` / `@ts-ignore` to get past errors.
 6. If a requirement is ambiguous, choose the simpler option and record it in the final report. Only ask me a question if you are truly blocked.
 
 # TARGET STRUCTURE
   /
-  AGENTS.md, CLAUDE.md, README.md, package.json (npm workspaces)
+  AGENTS.md, CLAUDE.md (already exist — do not recreate)
+  README.md, package.json (npm workspaces)
   tsconfig.base.json, eslint.config.js (root), .prettierrc, .editorconfig, .gitignore, .nvmrc
   .github/workflows/ci.yml
   packages/shared/   (name @acme/shared)
@@ -44,7 +45,7 @@ An employee salary management web app for an HR Manager at a 10,000-employee, mu
 
 # apps/web
 - Next.js (latest stable), App Router, TypeScript, Tailwind CSS, ESLint, `src/` directory, import alias `@/*`. Create it with `npx create-next-app@latest` inside apps/web: run `--help` first and pass flags non-interactively (use npm, skip git init). Then reconcile with the root tooling as described above and delete boilerplate.
-- shadcn/ui initialised per the CURRENT official Next.js install guide. Add only the components you actually use (Card, Badge).
+- shadcn/ui initialised per the CURRENT official Next.js install guide. Add only the components you actually use (Card, Badge). Set the Tailwind theme's color tokens, base typography (Inter), and border-radius scale to match `docs/design.md` §2 exactly (background/surface/border/text/accent/semantic colors, 4px radius on inputs/buttons/badges) — do this now, in the shadcn theme config, rather than leaving the library defaults for a later session to redo.
 - `next.config.ts`:
   - `transpilePackages: ['@acme/shared']`.
   - `output: 'standalone'`, with `outputFileTracingRoot` set to the monorepo root so workspace dependencies are traced. Verify against the docs.
@@ -60,21 +61,19 @@ An employee salary management web app for an HR Manager at a 10,000-employee, mu
 `.github/workflows/ci.yml` on push and pull_request: checkout, setup-node (version from .nvmrc, npm cache), `npm ci`, lint, typecheck, test, build. Use the current major versions of the actions (verify).
 
 # DOCS
-- AGENTS.md is the single source of project conventions. Include: commands; layering (routes -> services -> repositories, pure domain functions with no I/O); money as integer minor units plus ISO currency code, never floats; validate at boundaries with Zod; server-side pagination for lists; tests are fast, deterministic, named as sentences, with injected clock and RNG; Conventional Commits and small commits; add dependencies only with a stated reason; no scope beyond the current task. Web conventions: App Router; Server Components for static shell only; interactive and data-driven UI as Client Components using TanStack Query via the same-origin `/api` proxy; add `'use client'` only where needed.
-- CLAUDE.md contains only: `@AGENTS.md`.
+- AGENTS.md and CLAUDE.md already exist at the repo root — read AGENTS.md before doing anything else and follow it; do not edit or duplicate its content.
 - README.md: short. What it is, prerequisites, setup and run commands, repo structure. No marketing text.
 
 # SUGGESTED COMMIT SEQUENCE
-1. chore: add AGENTS.md and CLAUDE.md
-2. chore: initialise npm workspace, TypeScript base config, lint and format tooling
-3. feat(shared): add shared package with health response schema
-4. feat(api): scaffold Fastify app with config, health route and error handling (with tests)
-5. feat(api): add SQLite client factory and Drizzle configuration
-6. feat(web): scaffold Next.js app with Tailwind and shadcn/ui
-7. feat(web): add typed API client and health status page (with tests)
-8. chore: add dev orchestration and standalone production build wiring
-9. ci: add GitHub Actions workflow
-10. docs: add README
+1. chore: initialise npm workspace, TypeScript base config, lint and format tooling
+2. feat(shared): add shared package with health response schema
+3. feat(api): scaffold Fastify app with config, health route and error handling (with tests)
+4. feat(api): add SQLite client factory and Drizzle configuration
+5. feat(web): scaffold Next.js app with Tailwind and shadcn/ui
+6. feat(web): add typed API client and health status page (with tests)
+7. chore: add dev orchestration and standalone production build wiring
+8. ci: add GitHub Actions workflow
+9. docs: add README
 
 # ACCEPTANCE CRITERIA
 - On a fresh clone, `npm ci && npm run dev` starts both apps, and http://localhost:3000 shows API health "ok" through the proxy.

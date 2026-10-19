@@ -1,0 +1,14 @@
+# Local run of the production image: `cp .env.example .env`, fill it in, `docker compose up --build`.
+# Serves http://localhost:3000. The SQLite file lives on the named volume, so data survives restarts.
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file: .env
+    volumes:
+      - salary-data:/data
+    restart: unless-stopped
+
+volumes:
+  salary-data:

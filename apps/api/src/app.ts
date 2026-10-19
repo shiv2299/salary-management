@@ -1,3 +1,4 @@
+import fastifyCookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
@@ -6,10 +7,26 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 import type { Database } from './db/client';
+import { authRoutes, SESSION_COOKIE } from './routes/auth';
 import { healthRoutes } from './routes/health';
+import { verifySessionToken } from './services/auth';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    /** The logged-in user's id, or null when the request carries no valid session. */
+    userId: number | null;
+  }
+}
+
+// Every other /api route requires a session, so a new route is protected without anyone
+// remembering to add it (architecture §4).
+const PUBLIC_ROUTES = new Set(['POST /api/auth/login', 'GET /api/health']);
 
 export interface AppDeps {
   database: Database;
+  jwtSecret: string;
+  secureCookies: boolean;
+  now?: () => Date;
   logger?: FastifyServerOptions['logger'];
 }
 
@@ -26,11 +43,36 @@ function toClientError(
   };
 }
 
-export function buildApp({ database, logger = false }: AppDeps): FastifyInstance {
+export function buildApp({
+  database,
+  jwtSecret,
+  secureCookies,
+  now = () => new Date(),
+  logger = false,
+}: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  void app.register(fastifyCookie);
+  app.decorateRequest('userId', null);
+
+  app.addHook('onRequest', async (request, reply) => {
+    const path = request.url.split('?')[0] ?? '';
+    if (!path.startsWith('/api/')) return;
+
+    // Parsed here rather than via request.cookies, which is not populated yet when this runs.
+    const token = fastifyCookie.parse(request.headers.cookie ?? '')[SESSION_COOKIE];
+    const session = token ? await verifySessionToken(token, jwtSecret, now()) : null;
+    request.userId = session?.userId ?? null;
+
+    if (!session && !PUBLIC_ROUTES.has(`${request.method} ${path}`)) {
+      return reply.code(401).send({
+        error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
+      });
+    }
+  });
 
   app.setErrorHandler((error, request, reply) => {
     if (hasZodFastifySchemaValidationErrors(error)) {
@@ -59,6 +101,7 @@ export function buildApp({ database, logger = false }: AppDeps): FastifyInstance
   );
 
   void app.register(healthRoutes(database));
+  void app.register(authRoutes({ database, jwtSecret, secureCookies, now }));
 
   return app;
 }

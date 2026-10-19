@@ -16,9 +16,13 @@ const configSchema = z.object({
     .default('./data/app.db')
     .transform((path) => (path === ':memory:' ? path : resolve(API_ROOT, path))),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  JWT_SECRET: z.string().min(32).optional(),
 });
 
-export type Config = z.infer<typeof configSchema>;
+// Used outside production only, so a fresh clone runs without setup. Production must set its own.
+const DEV_JWT_SECRET = 'development-only-secret-do-not-use-in-production';
+
+export type Config = Omit<z.infer<typeof configSchema>, 'JWT_SECRET'> & { JWT_SECRET: string };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const result = configSchema.safeParse(env);
@@ -28,5 +32,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
-  return result.data;
+  const { JWT_SECRET, ...rest } = result.data;
+  if (rest.NODE_ENV === 'production' && !JWT_SECRET) {
+    throw new Error(
+      'Invalid environment configuration:\n  JWT_SECRET: required in production (at least 32 characters)',
+    );
+  }
+  return { ...rest, JWT_SECRET: JWT_SECRET ?? DEV_JWT_SECRET };
 }

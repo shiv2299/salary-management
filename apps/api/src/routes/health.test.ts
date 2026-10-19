@@ -10,7 +10,7 @@ describe('GET /api/health', () => {
 
   beforeEach(() => {
     database = createDatabase(':memory:');
-    app = buildApp({ database });
+    app = buildApp({ database, jwtSecret: 'x'.repeat(32), secureCookies: false });
   });
 
   afterEach(async () => {

@@ -6,13 +6,16 @@ const apiRoot = resolve(import.meta.dirname, '..');
 
 describe('loadConfig', () => {
   it('applies defaults when the environment is empty', () => {
-    expect(loadConfig({})).toEqual({
+    const { JWT_SECRET, ...rest } = loadConfig({});
+
+    expect(rest).toEqual({
       NODE_ENV: 'development',
       PORT: 3001,
       HOST: '0.0.0.0',
       DATABASE_PATH: resolve(apiRoot, 'data/app.db'),
       LOG_LEVEL: 'info',
     });
+    expect(JWT_SECRET.length).toBeGreaterThanOrEqual(32);
   });
 
   it('resolves a relative database path against the api package', () => {
@@ -33,6 +36,14 @@ describe('loadConfig', () => {
   it('throws a readable error naming every invalid variable', () => {
     expect(() => loadConfig({ PORT: 'abc', NODE_ENV: 'staging' })).toThrow(
       /Invalid environment configuration:\n {2}NODE_ENV: .*\n {2}PORT: /,
+    );
+  });
+
+  it('requires a JWT secret of at least 32 characters in production', () => {
+    expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/JWT_SECRET/);
+    expect(() => loadConfig({ NODE_ENV: 'production', JWT_SECRET: 'short' })).toThrow(/JWT_SECRET/);
+    expect(loadConfig({ NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(32) }).JWT_SECRET).toBe(
+      'x'.repeat(32),
     );
   });
 });

@@ -13,7 +13,12 @@ function readConfig() {
 
 const config = readConfig();
 const database = createDatabase(config.DATABASE_PATH);
-const app = buildApp({ database, logger: { level: config.LOG_LEVEL } });
+const app = buildApp({
+  database,
+  jwtSecret: config.JWT_SECRET,
+  secureCookies: config.NODE_ENV === 'production',
+  logger: { level: config.LOG_LEVEL },
+});
 
 let shuttingDown = false;
 

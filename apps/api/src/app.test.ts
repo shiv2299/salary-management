@@ -1,24 +1,24 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { FastifyInstance } from 'fastify';
-import { buildApp } from './app';
-import { createDatabase, type Database } from './db/client';
+import { afterEach, describe, expect, it } from 'vitest';
+import { createTestApp } from './test/test-app';
 
 describe('app', () => {
-  let database: Database;
-  let app: FastifyInstance;
-
-  beforeEach(() => {
-    database = createDatabase(':memory:');
-    app = buildApp({ database });
-  });
+  let current: Awaited<ReturnType<typeof createTestApp>> | undefined;
 
   afterEach(async () => {
-    await app.close();
-    database.close();
+    await current?.app.close();
+    current?.database.close();
+    current = undefined;
   });
 
   it('answers an unknown api route with a JSON 404 in the standard error shape', async () => {
-    const response = await app.inject({ method: 'GET', url: '/api/does-not-exist' });
+    current = await createTestApp();
+    const cookie = await current.loginCookie();
+
+    const response = await current.app.inject({
+      method: 'GET',
+      url: '/api/does-not-exist',
+      headers: { cookie },
+    });
 
     expect(response.statusCode).toBe(404);
     expect(response.headers['content-type']).toContain('application/json');

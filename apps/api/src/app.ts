@@ -9,6 +9,7 @@ import {
 import type { Database } from './db/client';
 import { authRoutes, SESSION_COOKIE } from './routes/auth';
 import { healthRoutes } from './routes/health';
+import { referenceRoutes } from './routes/reference';
 import { verifySessionToken } from './services/auth';
 
 declare module 'fastify' {
@@ -103,6 +104,7 @@ export function buildApp({
 
   void app.register(healthRoutes(database));
   void app.register(authRoutes({ database, jwtSecret, secureCookies, now }));
+  void app.register(referenceRoutes(database));
 
   return app;
 }

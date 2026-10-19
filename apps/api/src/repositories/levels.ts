@@ -1,3 +1,4 @@
+import { asc } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import { levels, type Level, type NewLevel } from '../db/schema';
 
@@ -6,5 +7,5 @@ export function insertLevels(db: DbHandle, rows: NewLevel[]): void {
 }
 
 export function listLevels(db: DbHandle): Level[] {
-  return db.select().from(levels).all();
+  return db.select().from(levels).orderBy(asc(levels.rank)).all();
 }

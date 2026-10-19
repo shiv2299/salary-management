@@ -1,3 +1,4 @@
+import { asc } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import { departments, type Department } from '../db/schema';
 
@@ -8,5 +9,5 @@ export function insertDepartments(db: DbHandle, names: string[]): void {
 }
 
 export function listDepartments(db: DbHandle): Department[] {
-  return db.select().from(departments).all();
+  return db.select().from(departments).orderBy(asc(departments.name)).all();
 }

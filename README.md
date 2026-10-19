@@ -45,6 +45,12 @@ node apps/web/.next/standalone/apps/web/server.js
 
 A relative `DATABASE_PATH` is resolved against `apps/api`, so the default database is always `apps/api/data/app.db` whichever directory the API is started from.
 
+## Scope
+
+Salary means annual base pay. The app keeps every salary change as effective-dated history and shows cross-country insights in USD through a static FX table. It is built for a single HR Manager login.
+
+Deliberately left out: bonus, allowances and equity; live FX rates; role-based or country/department-restricted access; Excel import (CSV export is supported). The full list, with reasons, is in `docs/requirements.md` §4. Trade-offs, including how restricted access would be added, are in `docs/decisions.md`.
+
 ## Structure
 
 ```

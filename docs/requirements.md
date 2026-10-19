@@ -46,7 +46,7 @@ All insights cover **active employees only** — deactivated employees are no lo
 
 - **FR-12**: Seed the system with a 10,000-employee dataset spanning 3 countries, 7 departments, and 6 levels, for development, testing, and demo purposes. Given the same RNG seed and the same reference date, the seed produces identical data; salary-change dates are generated relative to the reference date (today when the app seeds itself, a fixed date in tests), so the salary-changes view always has realistic data spread across the full 5-year window, including a yearly company-wide increment cycle recorded as bulk revisions.
 
-## 4. Out of Scope
+## 4. Deliberately Left Out
 
 | Item | Why excluded |
 |---|---|
@@ -58,16 +58,16 @@ All insights cover **active employees only** — deactivated employees are no lo
 | Excel import | The seed script supplies the data, so import isn't required to use the app. It's the natural first follow-up, and would reuse the same service-layer bulk-create function the seed script already uses. |
 | Org chart / reporting hierarchy | None of the FR-6..FR-10 insights require it, and a believable reporting tree in seed data adds complexity with no analytical payoff here. |
 | Approval workflows and notifications | State machines that don't serve any requirement above. |
-| Demographic pay-equity analysis (e.g. by gender) | Sensitive data that needs a policy decision outside the scope of this exercise. |
+| Demographic pay-equity analysis (e.g. by gender) | Sensitive data that needs a policy decision outside the scope of this product. |
 
 ## 5. Assumptions
 
-Where a product decision was not fully specified, this document records the assumption made and proceeds on it.
+Product decisions that shape the scope above, and the choice made for each. The reasoning behind the less obvious ones is in `docs/decisions.md`.
 
 - Salary means annual base pay only (no bonus/equity/allowances).
-- Cross-country comparison uses a static, dated FX table, converting to a common base currency (USD) for insights.
+- Cross-country comparison uses a static, dated FX table, converting to a common base currency (USD) for insights. Outlier peer groups stay within one country (see `docs/decisions.md`).
 - Full effective-dated salary history is tracked, not just a current snapshot.
-- FR-6..FR-10 are the product's own answer to "what should HR be able to ask," derived from the problem statement.
+- FR-6..FR-10 are the product's own answer to "what should HR be able to ask," chosen as the compensation questions an HR Manager most often has to answer for leadership.
 - Single HR user; no role/country/department-based access restriction.
 - No Excel import; CSV export only.
 

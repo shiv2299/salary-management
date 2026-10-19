@@ -8,7 +8,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: SQLite via better-sqlite3, one file on a persistent volume.
 
-**Why**: one HR user means almost no concurrent writes, which is the main thing SQLite gives up. In exchange: zero setup for reviewers (`npm ci && npm run dev`), tests run against a real in-memory database in milliseconds with no Docker, and deployment is one container. At 100,000 rows SQLite is nowhere near its limits; the scaling risks are query shape (addressed by the denormalized current salary below), not the engine. Drizzle keeps the schema and queries portable.
+**Why**: one HR user means almost no concurrent writes, which is the main thing SQLite gives up. In exchange: zero setup for developers (`npm ci && npm run dev`), tests run against a real in-memory database in milliseconds with no Docker, and deployment is one container. At 100,000 rows SQLite is nowhere near its limits; the scaling risks are query shape (addressed by the denormalized current salary below), not the engine. Drizzle keeps the schema and queries portable.
 
 **Revisit if**: multiple concurrent users are introduced, the app needs to run as more than one instance, or percentile queries need to move into the database (Postgres has `percentile_cont`).
 
@@ -19,6 +19,16 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 **Why**: it's the conventional reporting currency for multinational compensation, one of the three currencies already in the data, and the one leadership is most likely to think in. It's a single constant, not hardcoded throughout the code.
 
 **Revisit if**: leadership reports in another currency; the change is a config value plus an FX migration.
+
+## Cross-country comparison: one base currency for insights, peers within one country
+
+**Alternative considered**: comparison within each country only, in local currency.
+
+**Chosen**: both, each where it fits. Every insight (distribution, payroll, cross-country comparison) is shown in USD through the static FX table. Outlier detection compares an employee only with peers in the same country and level. Employee records and salary history keep the local currency the employee is actually paid in.
+
+**Why**: the HR Manager's hardest questions to answer in Excel are the cross-country ones, such as "what does an L4 cost us in India vs. Germany?" or "where is payroll going?". Answering them needs one currency. Within-country-only comparison would leave them answering those questions by hand, which is the spreadsheet work this app is meant to replace. The trade-off is that an FX rate is a snapshot: a USD comparison mixes pay differences with exchange-rate movement, and it is not a cost-of-living or purchasing-power comparison. A German salary that looks high in USD may simply reflect a strong euro. Two choices limit how far that can mislead. First, the rate date is shown wherever converted amounts appear. Second, "is this person paid fairly?" (outliers) is answered only against same-country peers, where conversion is one constant factor and cannot change anyone's rank. Local amounts are never overwritten by converted ones, so nothing is lost if the rate is wrong.
+
+**Revisit if**: leadership wants purchasing-power-adjusted comparison, or rates move enough that a single dated table is misleading. Both mean replacing the FX table, not the data model.
 
 ## Money and FX: integer rates, one rounding step, half away from zero
 
@@ -65,6 +75,14 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 **Chosen**: every `/api/*` route requires a session except an explicit allowlist (`POST /api/auth/login`, `GET /api/health`).
 
 **Why**: guarding a list of protected prefixes means every new route is unprotected until someone remembers to add it. An allowlist fails safe.
+
+## Salary history: effective-dated history, not a current snapshot
+
+**Alternative considered**: store only each employee's current salary and overwrite it on change.
+
+**Chosen**: an append-only `salary_history` table, one row per change with an effective date and a reason, plus a cached current salary on `employees` (next entry).
+
+**Why**: a snapshot answers "what do we pay now?" but not "how did we get here?". Several of the HR Manager's core questions are about change over time: who was promoted and when, what the last increment cycles actually did (FR-10), and why someone's pay looks the way it does. A snapshot also loses information on every edit, so a mistyped amount cannot be audited or corrected without losing what was there before. That is the same weakness the Excel sheet has. The cost is a second table and a rule for which row is current. The denormalized current-salary cache keeps reads as cheap as a snapshot would be.
 
 ## Current salary: denormalized cache, not a derived query
 
@@ -187,6 +205,14 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 **Chosen**: not built.
 
 **Why**: `AGENTS.md` rules out speculative abstractions, and an unused parameter is untested by definition. The layering already gives restricted access one obvious place to live (a scope applied in the service layer to every repository query) if it's ever needed.
+
+**How it would be extended**, if restricted access is ever required:
+
+1. **Data**: add a `role` column to `users` (e.g. `hr_admin`, `hr_viewer`) and a `user_scopes` table listing the countries and/or departments each user may see. No rows means unrestricted.
+2. **Auth**: the session JWT keeps carrying only `sub`. The deny-by-default hook loads the user's role and scope once per request and attaches them to the request. Because the JWT does not embed permissions, a changed scope applies on the next request, without waiting 8 hours for the token to expire.
+3. **Services**: every service function takes that scope and passes it to the repositories as an extra `WHERE country_code IN (…) AND department_id IN (…)`. This covers the list, detail, history, export, bulk-revision preview and confirm, and every insight. Insights then describe only the employees the user may see, so a country manager's payroll total is their country's total. An employee outside scope returns 404, not 403, so its existence isn't revealed.
+4. **Roles**: write endpoints (create, edit, salary changes, bulk revision) check the role in a route-level guard. A viewer gets read-only access.
+5. **Tests**: one service-level test per read path shows that out-of-scope employees are excluded, plus API tests showing a viewer gets 403 on every write route.
 
 ## Deployment platform: deferred, not decided
 

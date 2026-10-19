@@ -1,3 +1,11 @@
+import {
+  countrySchema,
+  departmentSchema,
+  fxConvertQuerySchema,
+  fxConvertResponseSchema,
+  fxRatesSchema,
+  levelSchema,
+} from '@acme/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Database } from '../db/client';
@@ -8,31 +16,6 @@ import {
   getFxRates,
   getLevels,
 } from '../services/reference';
-
-const countrySchema = z.object({ code: z.string(), name: z.string(), currencyCode: z.string() });
-const departmentSchema = z.object({ id: z.number().int(), name: z.string() });
-const levelSchema = z.object({
-  id: z.number().int(),
-  code: z.string(),
-  label: z.string(),
-  rank: z.number().int(),
-});
-const fxRatesSchema = z.object({
-  baseCurrency: z.string(),
-  rates: z.array(
-    z.object({
-      currencyCode: z.string(),
-      asOfDate: z.string(),
-      rateToBaseNano: z.number().int(),
-    }),
-  ),
-});
-
-const convertQuerySchema = z.object({
-  amountMinor: z.coerce.number().int().min(0),
-  from: z.string().length(3),
-  to: z.string().length(3),
-});
 
 export const referenceRoutes =
   (database: Database): FastifyPluginAsyncZod =>
@@ -60,8 +43,8 @@ export const referenceRoutes =
       '/api/reference/fx/convert',
       {
         schema: {
-          querystring: convertQuerySchema,
-          response: { 200: z.object({ amountMinor: z.number().int(), currencyCode: z.string() }) },
+          querystring: fxConvertQuerySchema,
+          response: { 200: fxConvertResponseSchema },
         },
       },
       ({ query }) => convertAmount(db, query.amountMinor, query.from, query.to),

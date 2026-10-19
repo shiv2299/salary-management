@@ -254,3 +254,16 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 **Chosen**: the `text/plain` body parser Fastify installs by default is removed, so form-encoded, multipart and `text/plain` bodies all get `415`.
 
 **Why**: `docs/architecture.md` §4 relies on "JSON only" as a second CSRF layer. A cross-site HTML form can send `text/plain`, which would have reached body-less mutations such as reactivate. Clients must not send a `Content-Type: application/json` header with an empty body on those routes.
+
+## Recent changes: every history row counts, shown under the country in force
+
+**Chosen**: the recent-changes view lists every `salary_history` row effective in the window, including hire rows (shown with no "from" amount). Each entry's country is the one in force from that row onward, not the employee's current country. "From" is the pay on the employee's previous row by effective date, which may be in another currency after a relocation.
+
+**Why**: a hire is the first change to someone's pay and is part of "what changed, when". Using the row's country keeps a relocation entry under the country the person moved to, and keeps an old change under the country it was made in. Taking "from" by effective date rather than entry order means a backdated change compares against the row actually before it.
+
+## Outlier fences are shown rounded, compared exactly
+
+**Chosen**: the outliers response gives each peer group's fences rounded to a whole minor unit, while the outlier test itself uses the exact fence values.
+
+**Why**: Tukey's fences are 1.5 × IQR and can fall on a half unit. Every other amount in the API is an integer minor unit, so the displayed fence follows suit, and the decision about who is an outlier is never affected by that display rounding.
+

@@ -1,4 +1,5 @@
 import type { DbHandle } from '../db/client';
+import type { Employee } from '../db/schema';
 import { selectCurrentRow } from '../domain/current-salary';
 import { validateSalaryChange, type SalaryChangeInput } from '../domain/salary-change-rules';
 import { notFound, unprocessable } from '../errors';
@@ -7,6 +8,17 @@ import { findEmployeesByIds } from '../repositories/employees';
 import { listLevels } from '../repositories/levels';
 import { listSalaryHistory } from '../repositories/salary-history';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
+
+/**
+ * The currency the employee is paid in on `effectiveDate`: that of the history row in force then,
+ * which differs from the current currency when the date is before a relocation.
+ */
+export function currencyInForce(db: DbHandle, employee: Employee, effectiveDate: string): string {
+  const inForce = listSalaryHistory(db, employee.id).filter(
+    (row) => row.effectiveDate <= effectiveDate,
+  );
+  return inForce.length > 0 ? selectCurrentRow(inForce).currencyCode : employee.currentCurrencyCode;
+}
 
 /**
  * Records one effective-dated change for an employee: checks the business rules in
@@ -47,18 +59,12 @@ export function recordSalaryChange(
       throw unprocessable('INVALID_SALARY_CHANGE', violations.join('; '));
     }
 
-    // A relocation is paid in the new country's currency. Any other change is in the currency of
-    // the history row in force on its effective date, which differs from the current currency
-    // when the change is backdated to before a relocation.
-    const inForce = listSalaryHistory(tx, employeeId).filter(
-      (row) => row.effectiveDate <= input.effectiveDate,
-    );
+    // A relocation is paid in the new country's currency. Any other change is in the currency
+    // in force on its effective date.
     const currencyCode =
       input.newCountryCode !== undefined
         ? countries.get(input.newCountryCode)!.currencyCode
-        : inForce.length > 0
-          ? selectCurrentRow(inForce).currencyCode
-          : employee.currentCurrencyCode;
+        : currencyInForce(tx, employee, input.effectiveDate);
 
     applySalaryChanges(
       tx,

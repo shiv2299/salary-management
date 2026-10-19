@@ -170,6 +170,28 @@ export function listActiveEmployeeRows(db: DbHandle): EmployeeListRow[] {
   return selectEmployeeRows(db).where(eq(employees.status, 'active')).all().map(toListRow);
 }
 
+/** Active employees matching the list's filters, in the list's default name order. */
+export function listActiveEmployeeRowsMatching(
+  db: DbHandle,
+  filter: Omit<EmployeeListFilter, 'status'>,
+): EmployeeListRow[] {
+  return selectEmployeeRows(db)
+    .where(listWhere({ ...filter, status: 'active' }))
+    .orderBy(...listOrderBy({ sortBy: 'name', sortOrder: 'asc', limit: 0, offset: 0 }))
+    .all()
+    .map(toListRow);
+}
+
+/** The active employees among `ids`, in the list's default name order. Others are dropped. */
+export function listActiveEmployeeRowsByIds(db: DbHandle, ids: number[]): EmployeeListRow[] {
+  if (ids.length === 0) return [];
+  return selectEmployeeRows(db)
+    .where(and(inArray(employees.id, ids), eq(employees.status, 'active')))
+    .orderBy(...listOrderBy({ sortBy: 'name', sortOrder: 'asc', limit: 0, offset: 0 }))
+    .all()
+    .map(toListRow);
+}
+
 export function findEmployeeListRow(db: DbHandle, id: number): EmployeeListRow | undefined {
   const row = selectEmployeeRows(db).where(eq(employees.id, id)).get();
   return row && toListRow(row);

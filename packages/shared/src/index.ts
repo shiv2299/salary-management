@@ -36,3 +36,15 @@ export {
   type RecentChangeEntry,
   type RecentChangesResponse,
 } from './insights';
+export {
+  bulkConfirmBodySchema,
+  bulkConfirmResponseSchema,
+  bulkPreviewBodySchema,
+  bulkPreviewItemSchema,
+  bulkPreviewResponseSchema,
+  type BulkConfirmBody,
+  type BulkConfirmResponse,
+  type BulkPreviewBody,
+  type BulkPreviewItem,
+  type BulkPreviewResponse,
+} from './bulk-revision';

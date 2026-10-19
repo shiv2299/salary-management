@@ -267,3 +267,12 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: Tukey's fences are 1.5 × IQR and can fall on a half unit. Every other amount in the API is an integer minor unit, so the displayed fence follows suit, and the decision about who is an outlier is never affected by that display rounding.
 
+
+## Bulk revision confirm: which failures are 409, 422 and 404
+
+**Chosen**: a confirm request is checked in this order, and the first failing group rejects the whole request with nothing written.
+- `404` if any listed employee does not exist.
+- `409` if any employee's current amount differs from `expectedCurrentAmountMinor`, or any employee is now inactive. These mean the preview is out of date, so the message tells the HR Manager to preview again.
+- `422` for a request that breaks a rule whatever the data: a future or pre-hire effective date, an amount (including a hand override) that does not exceed the current pay, or the same employee listed twice. Every bulk row is a `raise`, so the single-change rule that a raise must increase pay applies to overrides too; a smaller figure is a `correction`.
+
+**Why**: the client reacts differently to each. A `409` is fixed by reloading the preview, a `422` by editing the form, and a `404` means the list itself is wrong. Checking for staleness before the rules means a stale preview is never reported as a form error. Each item's currency is the one in force on the effective date, as for a single change, so a revision backdated to before someone's relocation is not labelled in the wrong currency.

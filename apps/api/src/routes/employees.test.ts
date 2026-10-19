@@ -200,3 +200,101 @@ describe('POST /api/employees', () => {
     expect(response.statusCode).toBe(415);
   });
 });
+
+describe('PATCH /api/employees/:id', () => {
+  it('edits name, email, department and job title and returns the detail', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'PATCH', '/api/employees/1', {
+      jobTitle: 'Principal Engineer',
+      email: 'Ann.New@acme.test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: 1,
+      jobTitle: 'Principal Engineer',
+      email: 'ann.new@acme.test',
+    });
+  });
+
+  it('rejects country, level and salary fields with 400', async () => {
+    const t = await setup();
+
+    for (const field of [
+      { countryCode: 'IN' },
+      { levelId: 2 },
+      { amountMinor: 1 },
+      { currentAmountMinor: 1 },
+      { status: 'inactive' },
+    ]) {
+      const response = await send(t, 'PATCH', '/api/employees/1', { jobTitle: 'x', ...field });
+
+      expect(response.statusCode, JSON.stringify(field)).toBe(400);
+      expect(response.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('rejects an empty change', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'PATCH', '/api/employees/1', {});
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('answers an unknown employee with 404', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'PATCH', '/api/employees/999', { jobTitle: 'x' });
+
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+describe('DELETE /api/employees/:id and POST /api/employees/:id/reactivate', () => {
+  it('deactivates an employee, who then leaves the default list, and reactivates them', async () => {
+    const t = await setup();
+
+    const deactivated = await send(t, 'DELETE', '/api/employees/1');
+    const listed = await get(t, '/api/employees');
+    const reactivated = await send(t, 'POST', '/api/employees/1/reactivate');
+
+    expect(deactivated.statusCode).toBe(200);
+    expect(deactivated.json<{ status: string }>().status).toBe('inactive');
+    expect(listed.json<{ total: number }>().total).toBe(2);
+    expect(reactivated.json<{ status: string }>().status).toBe('active');
+  });
+
+  it('keeps the history of a deactivated employee readable', async () => {
+    const t = await setup();
+    await send(t, 'DELETE', '/api/employees/1');
+
+    const response = await get(t, '/api/employees/1');
+
+    expect(response.json<{ history: unknown[] }>().history).toHaveLength(1);
+  });
+
+  it('answers an unknown employee with 404', async () => {
+    const t = await setup();
+
+    expect((await send(t, 'DELETE', '/api/employees/999')).statusCode).toBe(404);
+    expect((await send(t, 'POST', '/api/employees/999/reactivate')).statusCode).toBe(404);
+  });
+
+  it('accepts only JSON on body-less mutations so a cross-site form cannot reactivate', async () => {
+    const t = await setup();
+    const cookie = await t.loginCookie();
+
+    for (const contentType of ['application/x-www-form-urlencoded', 'text/plain']) {
+      const response = await t.app.inject({
+        method: 'POST',
+        url: '/api/employees/1/reactivate',
+        headers: { cookie, 'content-type': contentType },
+        payload: 'x=1',
+      });
+
+      expect(response.statusCode, contentType).toBe(415);
+    }
+  });
+});

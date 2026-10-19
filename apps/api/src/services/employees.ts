@@ -1,10 +1,14 @@
 import type { DbHandle } from '../db/client';
 import { listCountries } from '../repositories/countries';
-import { conflict, unprocessable } from '../errors';
+import { conflict, notFound, unprocessable } from '../errors';
 import { listDepartments } from '../repositories/departments';
 import {
   findEmployeeIdByEmail,
+  findEmployeesByIds,
   insertEmployeeWithPlaceholderSalary,
+  setEmployeeStatus,
+  updateEmployeeProfile,
+  type EmployeeProfileFields,
 } from '../repositories/employees';
 import { listLevels } from '../repositories/levels';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
@@ -97,4 +101,48 @@ export function createEmployee(
 
     return createEmployees(tx, [input], deps)[0]!;
   });
+}
+
+function requireEmployee(db: DbHandle, id: number): void {
+  if (findEmployeesByIds(db, [id]).length === 0) {
+    throw notFound('EMPLOYEE_NOT_FOUND', `Employee ${id} not found`);
+  }
+}
+
+/** Edits profile fields only; country, level and salary change through salary changes. */
+export function updateEmployee(
+  db: DbHandle,
+  id: number,
+  fields: EmployeeProfileFields,
+  deps: SalaryWriterDeps,
+): void {
+  db.transaction((tx) => {
+    requireEmployee(tx, id);
+
+    if (fields.departmentId !== undefined) {
+      const departmentId = fields.departmentId;
+      if (!listDepartments(tx).some((d) => d.id === departmentId)) {
+        throw unprocessable('INVALID_EMPLOYEE', `unknown department: ${departmentId}`);
+      }
+    }
+    if (fields.email !== undefined) {
+      const owner = findEmployeeIdByEmail(tx, fields.email);
+      if (owner !== undefined && owner !== id) {
+        throw conflict('EMAIL_TAKEN', `An employee with email ${fields.email} already exists`);
+      }
+    }
+
+    updateEmployeeProfile(tx, id, fields, deps.now());
+  });
+}
+
+/** Soft delete: the salary history stays, and the employee can be reactivated. */
+export function deactivateEmployee(db: DbHandle, id: number, deps: SalaryWriterDeps): void {
+  requireEmployee(db, id);
+  setEmployeeStatus(db, id, 'inactive', deps.now());
+}
+
+export function reactivateEmployee(db: DbHandle, id: number, deps: SalaryWriterDeps): void {
+  requireEmployee(db, id);
+  setEmployeeStatus(db, id, 'active', deps.now());
 }

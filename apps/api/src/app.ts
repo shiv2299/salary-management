@@ -54,6 +54,10 @@ export function buildApp({
 }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
 
+  // Only JSON bodies are accepted, so a cross-site HTML form (urlencoded, multipart or text/plain)
+  // cannot drive a mutating endpoint (architecture §4). Fastify parses text/plain by default.
+  app.removeContentTypeParser('text/plain');
+
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 

@@ -10,10 +10,12 @@ export {
   employeeListQuerySchema,
   employeeListResponseSchema,
   salaryHistoryEntrySchema,
+  updateEmployeeSchema,
   type EmployeeDetail,
   type EmployeeListItem,
   type NewEmployeeBody,
   type EmployeeListQueryParams,
   type EmployeeListResponse,
   type SalaryHistoryEntry,
+  type UpdateEmployeeBody,
 } from './employees';

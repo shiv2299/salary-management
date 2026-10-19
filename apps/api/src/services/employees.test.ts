@@ -2,7 +2,15 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { employees, salaryHistory } from '../db/schema';
 import { FIXED_NOW, createTestDb } from '../test/test-db';
-import { createEmployee, createEmployees, type NewEmployeeInput } from './employees';
+import {
+  createEmployee,
+  createEmployees,
+  deactivateEmployee,
+  reactivateEmployee,
+  updateEmployee,
+  type NewEmployeeInput,
+} from './employees';
+import { applySalaryChanges } from './salary-writer';
 
 const deps = { now: () => FIXED_NOW };
 
@@ -153,5 +161,117 @@ describe('createEmployee', () => {
     failure({ countryCode: 'FR' });
 
     expect(database.db.select().from(employees).all()).toHaveLength(0);
+  });
+});
+
+describe('updateEmployee', () => {
+  const later = { now: () => '2026-02-01T09:00:00.000Z' };
+
+  function row(id: number) {
+    return database.db.select().from(employees).where(eq(employees.id, id)).get()!;
+  }
+
+  it('changes only the fields given and stamps updated_at', () => {
+    const id = createEmployee(database.db, input(), deps);
+
+    updateEmployee(database.db, id, { jobTitle: 'Staff Engineer', departmentId: 1 }, later);
+
+    expect(row(id)).toMatchObject({
+      jobTitle: 'Staff Engineer',
+      firstName: 'Asha',
+      email: 'asha@acme.test',
+      updatedAt: '2026-02-01T09:00:00.000Z',
+    });
+  });
+
+  it('keeps the salary, level and country untouched', () => {
+    const id = createEmployee(database.db, input(), deps);
+    const before = row(id);
+
+    updateEmployee(database.db, id, { lastName: 'Menon' }, later);
+
+    expect(row(id)).toMatchObject({
+      levelId: before.levelId,
+      countryCode: before.countryCode,
+      currentAmountMinor: before.currentAmountMinor,
+      currentAmountBaseMinor: before.currentAmountBaseMinor,
+    });
+  });
+
+  it('allows an employee to keep their own email', () => {
+    const id = createEmployee(database.db, input(), deps);
+
+    expect(() => updateEmployee(database.db, id, { email: 'asha@acme.test' }, later)).not.toThrow();
+  });
+
+  it('rejects an email another employee has', () => {
+    createEmployee(database.db, input({ email: 'taken@acme.test' }), deps);
+    const id = createEmployee(database.db, input(), deps);
+
+    expect(() => updateEmployee(database.db, id, { email: 'taken@acme.test' }, later)).toThrowError(
+      expect.objectContaining({ statusCode: 409, code: 'EMAIL_TAKEN' }),
+    );
+  });
+
+  it('rejects an unknown department', () => {
+    const id = createEmployee(database.db, input(), deps);
+
+    expect(() => updateEmployee(database.db, id, { departmentId: 99 }, later)).toThrowError(
+      expect.objectContaining({ statusCode: 422 }),
+    );
+  });
+
+  it('throws a 404 for an unknown employee', () => {
+    expect(() => updateEmployee(database.db, 999, { jobTitle: 'x' }, later)).toThrowError(
+      expect.objectContaining({ statusCode: 404, code: 'EMPLOYEE_NOT_FOUND' }),
+    );
+  });
+});
+
+describe('deactivateEmployee and reactivateEmployee', () => {
+  const later = { now: () => '2026-02-01T09:00:00.000Z' };
+
+  it('deactivates without touching the salary history, and reactivates', () => {
+    const id = createEmployee(database.db, input(), deps);
+    applySalaryChanges(
+      database.db,
+      [
+        {
+          employeeId: id,
+          reason: 'raise',
+          amountMinor: 600_000_000,
+          currencyCode: 'INR',
+          effectiveDate: '2022-01-01',
+        },
+      ],
+      deps,
+    );
+
+    deactivateEmployee(database.db, id, later);
+
+    const inactive = database.db.select().from(employees).where(eq(employees.id, id)).get()!;
+    expect(inactive).toMatchObject({
+      status: 'inactive',
+      currentAmountMinor: 600_000_000,
+      updatedAt: '2026-02-01T09:00:00.000Z',
+    });
+    expect(database.db.select().from(salaryHistory).all()).toHaveLength(2);
+
+    reactivateEmployee(database.db, id, later);
+
+    expect(database.db.select().from(employees).where(eq(employees.id, id)).get()?.status).toBe(
+      'active',
+    );
+  });
+
+  it('is idempotent and throws a 404 for an unknown employee', () => {
+    const id = createEmployee(database.db, input(), deps);
+
+    deactivateEmployee(database.db, id, later);
+
+    expect(() => deactivateEmployee(database.db, id, later)).not.toThrow();
+    expect(() => reactivateEmployee(database.db, 999, later)).toThrowError(
+      expect.objectContaining({ statusCode: 404 }),
+    );
   });
 });

@@ -4,10 +4,16 @@ import {
   employeeListQuerySchema,
   employeeListResponseSchema,
   newEmployeeSchema,
+  updateEmployeeSchema,
 } from '@acme/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Database } from '../db/client';
-import { createEmployee } from '../services/employees';
+import {
+  createEmployee,
+  deactivateEmployee,
+  reactivateEmployee,
+  updateEmployee,
+} from '../services/employees';
 import { getEmployeeDetail } from '../services/employee-detail';
 import { listEmployees } from '../services/employee-list';
 
@@ -50,6 +56,39 @@ export const employeeRoutes =
         const id = createEmployee(database.db, request.body, writerDeps);
         void reply.code(201);
         return getEmployeeDetail(database.db, id);
+      },
+    );
+
+    app.patch(
+      '/api/employees/:id',
+      {
+        schema: {
+          params: employeeIdParamsSchema,
+          body: updateEmployeeSchema,
+          response: { 200: employeeDetailSchema },
+        },
+      },
+      (request) => {
+        updateEmployee(database.db, request.params.id, request.body, writerDeps);
+        return getEmployeeDetail(database.db, request.params.id);
+      },
+    );
+
+    app.delete(
+      '/api/employees/:id',
+      { schema: { params: employeeIdParamsSchema, response: { 200: employeeDetailSchema } } },
+      (request) => {
+        deactivateEmployee(database.db, request.params.id, writerDeps);
+        return getEmployeeDetail(database.db, request.params.id);
+      },
+    );
+
+    app.post(
+      '/api/employees/:id/reactivate',
+      { schema: { params: employeeIdParamsSchema, response: { 200: employeeDetailSchema } } },
+      (request) => {
+        reactivateEmployee(database.db, request.params.id, writerDeps);
+        return getEmployeeDetail(database.db, request.params.id);
       },
     );
 

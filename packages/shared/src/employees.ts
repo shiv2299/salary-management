@@ -98,3 +98,15 @@ export const newEmployeeSchema = z.object({
 });
 
 export type NewEmployeeBody = z.infer<typeof newEmployeeSchema>;
+
+/**
+ * Country, level and salary are deliberately absent and the schema is strict, so a request that
+ * tries to change them is rejected: they change only through a salary change.
+ */
+export const updateEmployeeSchema = newEmployeeSchema
+  .pick({ firstName: true, lastName: true, email: true, departmentId: true, jobTitle: true })
+  .partial()
+  .strict()
+  .refine((body) => Object.keys(body).length > 0, { message: 'at least one field is required' });
+
+export type UpdateEmployeeBody = z.infer<typeof updateEmployeeSchema>;

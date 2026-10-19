@@ -177,3 +177,33 @@ export function findEmployeeIdByEmail(db: DbHandle, email: string): number | und
     .where(sql`lower(${employees.email}) = lower(${email})`)
     .get()?.id;
 }
+
+export interface EmployeeProfileFields {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  departmentId?: number;
+  jobTitle?: string;
+}
+
+/** Profile fields only; salary, level and country have their own single writer. */
+export function updateEmployeeProfile(
+  db: DbHandle,
+  id: number,
+  fields: EmployeeProfileFields,
+  updatedAt: string,
+): void {
+  db.update(employees)
+    .set({ ...fields, updatedAt })
+    .where(eq(employees.id, id))
+    .run();
+}
+
+export function setEmployeeStatus(
+  db: DbHandle,
+  id: number,
+  status: EmployeeStatus,
+  updatedAt: string,
+): void {
+  db.update(employees).set({ status, updatedAt }).where(eq(employees.id, id)).run();
+}

@@ -50,8 +50,8 @@ export function fetchConvertedAmount(amountMinor: number, from: string, to: stri
   return apiGet(`/api/reference/fx/convert?${query.toString()}`, fxConvertResponseSchema);
 }
 
-/** "FX rates as of 12 Oct 2026", from the latest rate date; null until the rates have loaded. */
-export function useFxAsOfLabel(): string | null {
+/** The latest rate date, formatted ("12 Oct 2026"); null until the rates have loaded. */
+export function useFxAsOfDate(): string | null {
   const { data } = useFxRates();
   if (!data || data.rates.length === 0) return null;
   const latest =
@@ -59,7 +59,13 @@ export function useFxAsOfLabel(): string | null {
       .map((rate) => rate.asOfDate)
       .sort()
       .at(-1) ?? '';
-  return `FX rates as of ${formatDate(latest)}`;
+  return formatDate(latest);
+}
+
+/** "FX rates as of 12 Oct 2026", shown wherever converted amounts appear. */
+export function useFxAsOfLabel(): string | null {
+  const date = useFxAsOfDate();
+  return date ? `FX rates as of ${date}` : null;
 }
 
 export function formatDate(isoDate: string): string {

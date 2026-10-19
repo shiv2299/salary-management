@@ -14,7 +14,7 @@ export function renderWithQuery(ui: ReactElement) {
 }
 
 type Handler = (url: URL, init: RequestInit) => Response | Promise<Response> | undefined;
-type Route = Handler | Response | Record<string, unknown>;
+type Route = Handler | Response | readonly unknown[] | Record<string, unknown>;
 
 /**
  * Stubs fetch with route handlers matched in order on "METHOD /path". A handler returns a Response,

@@ -226,3 +226,31 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: the static FX table converts INR to USD at a rate that is far from the pay gap between the two labor markets, so a plain conversion left about 100 of 235 relocated employees outside their new peer group's fences. That would have made the outlier insight mostly a list of relocations instead of the deliberately planted ~1% of anomalies. Re-benchmarking mirrors how a real relocation is priced, and the relocation form still pre-fills the plain converted amount for the HR Manager to adjust (see "Relocation" above).
 
+
+## Error statuses and mutation responses
+
+**Chosen**:
+- `400` for a malformed request (Zod: wrong type, unknown or forbidden field, bad date). `PATCH /api/employees/:id` is strict, so sending `countryCode`, `levelId`, `status` or any salary field is a `400`.
+- `422` for a well-formed request that breaks a business rule (a raise that does not increase pay, an effective date in the future, a promotion to a lower level, a change for an inactive employee). The message lists every violation at once.
+- `409` for a conflict with existing data (duplicate email; later, a stale bulk-revision preview).
+- `404` for an unknown employee. Every successful mutation on one employee (`POST`, `PATCH`, `DELETE`, reactivate, salary change) returns the full employee detail, so the client can replace its cached record without a second request.
+
+**Why**: the client needs to tell "fix the form" (`400`, `422`) apart from "someone else changed this" (`409`), and returning the detail keeps the list and drawer consistent after every write.
+
+## Backdated changes are recorded in the currency of the time
+
+**Chosen**: a change backdated to before a relocation is stored in the currency of the country the employee was in on that date. Only a relocation uses the new country's currency.
+
+**Why**: the history row is a statement about what the employee was paid on that date. Using today's currency would label an old rupee amount as euros. The "a raise must increase the current amount" rule still compares against the current amount, so a backdated raise across a relocation is judged by the HR Manager, not guessed at by the system.
+
+## Email: stored lowercase, unique case-insensitively
+
+**Chosen**: emails are trimmed and lowercased at the API boundary, and uniqueness is checked case-insensitively.
+
+**Why**: `Asha@acme.test` and `asha@acme.test` are the same mailbox, and SQLite's `UNIQUE` is case-sensitive, so without this a duplicate could be created by changing the case.
+
+## Mutations accept JSON only, including `text/plain`
+
+**Chosen**: the `text/plain` body parser Fastify installs by default is removed, so form-encoded, multipart and `text/plain` bodies all get `415`.
+
+**Why**: `docs/architecture.md` §4 relies on "JSON only" as a second CSRF layer. A cross-site HTML form can send `text/plain`, which would have reached body-less mutations such as reactivate. Clients must not send a `Content-Type: application/json` header with an empty body on those routes.

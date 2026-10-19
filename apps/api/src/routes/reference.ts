@@ -1,7 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Database } from '../db/client';
-import { getCountries, getDepartments, getFxRates, getLevels } from '../services/reference';
+import {
+  convertAmount,
+  getCountries,
+  getDepartments,
+  getFxRates,
+  getLevels,
+} from '../services/reference';
 
 const countrySchema = z.object({ code: z.string(), name: z.string(), currencyCode: z.string() });
 const departmentSchema = z.object({ id: z.number().int(), name: z.string() });
@@ -20,6 +26,12 @@ const fxRatesSchema = z.object({
       rateToBaseNano: z.number().int(),
     }),
   ),
+});
+
+const convertQuerySchema = z.object({
+  amountMinor: z.coerce.number().int().min(0),
+  from: z.string().length(3),
+  to: z.string().length(3),
 });
 
 export const referenceRoutes =
@@ -42,6 +54,17 @@ export const referenceRoutes =
     );
     app.get('/api/reference/fx-rates', { schema: { response: { 200: fxRatesSchema } } }, () =>
       getFxRates(db),
+    );
+
+    app.get(
+      '/api/reference/fx/convert',
+      {
+        schema: {
+          querystring: convertQuerySchema,
+          response: { 200: z.object({ amountMinor: z.number().int(), currencyCode: z.string() }) },
+        },
+      },
+      ({ query }) => convertAmount(db, query.amountMinor, query.from, query.to),
     );
 
     return Promise.resolve();

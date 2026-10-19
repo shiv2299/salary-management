@@ -298,3 +298,84 @@ describe('DELETE /api/employees/:id and POST /api/employees/:id/reactivate', () 
     }
   });
 });
+
+describe('POST /api/employees/:id/salary-changes', () => {
+  const raise = { reason: 'raise', effectiveDate: '2025-01-01', amountMinor: 11_000_000 };
+
+  it('records the change and returns the detail with the new current salary and history', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees/1/salary-changes', raise);
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      id: 1,
+      salary: { amountMinor: 11_000_000, effectiveDate: '2025-01-01' },
+      history: [{ reason: 'raise' }, { reason: 'hire' }],
+    });
+  });
+
+  it('records a relocation in the new country currency', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees/1/salary-changes', {
+      reason: 'relocation',
+      effectiveDate: '2025-01-01',
+      amountMinor: 9_000_000,
+      newCountryCode: 'DE',
+    });
+
+    expect(response.json()).toMatchObject({
+      countryCode: 'DE',
+      salary: { amountMinor: 9_000_000, currencyCode: 'EUR' },
+    });
+  });
+
+  it('answers a rule violation with 422 and the reasons', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees/1/salary-changes', {
+      ...raise,
+      amountMinor: 5_000_000,
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json<{ error: { code: string; message: string } }>().error).toMatchObject({
+      code: 'INVALID_SALARY_CHANGE',
+      message: expect.stringContaining('raise must increase') as string,
+    });
+  });
+
+  it('rejects a hire reason, an unknown field and a malformed date with 400', async () => {
+    const t = await setup();
+
+    for (const bad of [
+      { ...raise, reason: 'hire' },
+      { ...raise, reason: 'bonus' },
+      { ...raise, currencyCode: 'USD' },
+      { ...raise, effectiveDate: 'yesterday' },
+      { ...raise, amountMinor: -5 },
+    ]) {
+      const response = await send(t, 'POST', '/api/employees/1/salary-changes', bad);
+
+      expect(response.statusCode, JSON.stringify(bad)).toBe(400);
+    }
+  });
+
+  it('answers an unknown employee with 404', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees/999/salary-changes', raise);
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('refuses a change for a deactivated employee', async () => {
+    const t = await setup();
+    await send(t, 'DELETE', '/api/employees/1');
+
+    const response = await send(t, 'POST', '/api/employees/1/salary-changes', raise);
+
+    expect(response.statusCode).toBe(422);
+  });
+});

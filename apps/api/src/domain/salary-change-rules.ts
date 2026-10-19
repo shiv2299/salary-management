@@ -59,6 +59,9 @@ export function validateSalaryChange(
       ) {
         violations.push('a promotion must move to a higher level rank');
       }
+      if (input.newCountryCode !== undefined) {
+        violations.push('only a relocation can change country');
+      }
       break;
     case 'relocation':
       if (input.newCountryCode === undefined) {
@@ -66,8 +69,14 @@ export function validateSalaryChange(
       } else if (input.newCountryCode === context.currentCountryCode) {
         violations.push('a relocation must move to a different country');
       }
+      if (input.newLevelId !== undefined) {
+        violations.push('only a promotion or correction can change level');
+      }
       break;
     case 'correction':
+      if (input.newCountryCode !== undefined) {
+        violations.push('only a relocation can change country');
+      }
       break;
     case 'hire':
       violations.push('hire rows are created only with the employee');

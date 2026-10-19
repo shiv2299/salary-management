@@ -4,6 +4,7 @@ import {
   employeeListQuerySchema,
   employeeListResponseSchema,
   newEmployeeSchema,
+  salaryChangeSchema,
   updateEmployeeSchema,
 } from '@acme/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -14,6 +15,7 @@ import {
   reactivateEmployee,
   updateEmployee,
 } from '../services/employees';
+import { recordSalaryChange } from '../services/salary-changes';
 import { getEmployeeDetail } from '../services/employee-detail';
 import { listEmployees } from '../services/employee-list';
 
@@ -88,6 +90,22 @@ export const employeeRoutes =
       { schema: { params: employeeIdParamsSchema, response: { 200: employeeDetailSchema } } },
       (request) => {
         reactivateEmployee(database.db, request.params.id, writerDeps);
+        return getEmployeeDetail(database.db, request.params.id);
+      },
+    );
+
+    app.post(
+      '/api/employees/:id/salary-changes',
+      {
+        schema: {
+          params: employeeIdParamsSchema,
+          body: salaryChangeSchema,
+          response: { 201: employeeDetailSchema },
+        },
+      },
+      (request, reply) => {
+        recordSalaryChange(database.db, request.params.id, request.body, writerDeps);
+        void reply.code(201);
         return getEmployeeDetail(database.db, request.params.id);
       },
     );

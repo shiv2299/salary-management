@@ -9,6 +9,7 @@ export {
   newEmployeeSchema,
   employeeListQuerySchema,
   employeeListResponseSchema,
+  salaryChangeSchema,
   salaryHistoryEntrySchema,
   updateEmployeeSchema,
   type EmployeeDetail,
@@ -16,6 +17,7 @@ export {
   type NewEmployeeBody,
   type EmployeeListQueryParams,
   type EmployeeListResponse,
+  type SalaryChangeBody,
   type SalaryHistoryEntry,
   type UpdateEmployeeBody,
 } from './employees';

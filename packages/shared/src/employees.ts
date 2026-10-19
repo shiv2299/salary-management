@@ -110,3 +110,17 @@ export const updateEmployeeSchema = newEmployeeSchema
   .refine((body) => Object.keys(body).length > 0, { message: 'at least one field is required' });
 
 export type UpdateEmployeeBody = z.infer<typeof updateEmployeeSchema>;
+
+/** Hire rows are created only with the employee, so `hire` is not an accepted reason here. */
+export const salaryChangeSchema = z
+  .object({
+    reason: z.enum(['raise', 'promotion', 'relocation', 'correction']),
+    effectiveDate: isoDateSchema,
+    /** In the minor units of the currency the employee is paid in from this change on. */
+    amountMinor: z.number().int().positive(),
+    newLevelId: z.number().int().positive().optional(),
+    newCountryCode: z.string().min(1).optional(),
+  })
+  .strict();
+
+export type SalaryChangeBody = z.infer<typeof salaryChangeSchema>;

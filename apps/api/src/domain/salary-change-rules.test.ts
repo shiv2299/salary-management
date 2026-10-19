@@ -167,3 +167,49 @@ describe('validateSalaryChange: hire', () => {
     ).toEqual(['hire rows are created only with the employee']);
   });
 });
+
+describe('validateSalaryChange: only the matching reason moves country or level', () => {
+  it('rejects a promotion that also moves the country', () => {
+    expect(
+      validateSalaryChange(
+        {
+          reason: 'promotion',
+          effectiveDate: '2025-05-01',
+          amountMinor: 120000,
+          newLevelId: 4,
+          newCountryCode: 'DE',
+        },
+        { ...context, newLevelRank: 4 },
+      ),
+    ).toEqual(['only a relocation can change country']);
+  });
+
+  it('rejects a correction that moves the country', () => {
+    expect(
+      validateSalaryChange(
+        {
+          reason: 'correction',
+          effectiveDate: '2025-05-01',
+          amountMinor: 90000,
+          newCountryCode: 'DE',
+        },
+        context,
+      ),
+    ).toEqual(['only a relocation can change country']);
+  });
+
+  it('rejects a relocation that also changes the level', () => {
+    expect(
+      validateSalaryChange(
+        {
+          reason: 'relocation',
+          effectiveDate: '2025-05-01',
+          amountMinor: 90000,
+          newCountryCode: 'DE',
+          newLevelId: 4,
+        },
+        { ...context, newLevelRank: 4 },
+      ),
+    ).toEqual(['only a promotion or correction can change level']);
+  });
+});

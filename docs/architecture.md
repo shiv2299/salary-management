@@ -205,7 +205,7 @@ Test names are plain sentences. Coverage is reported honestly; no arbitrary perc
 
 ## 11. Deployment
 
-The architecture assumes a single Docker image serving the Fastify API and the Next.js standalone build, matching the scaffold (`output: 'standalone'`, `/api` rewrite, `API_URL` env var). The SQLite file must live on a **persistent volume** mounted at `DATABASE_PATH`. Render, Railway, and Fly.io all have ephemeral container filesystems, and seed-on-boot (§6) would silently recreate fresh data after every deploy, hiding the data loss. The specific hosting platform is an operational choice deferred to the deployment phase, and will be recorded in `docs/decisions.md` once made.
+The deployable unit is a single Docker image (`Dockerfile`) serving the Fastify API and the Next.js standalone build in two processes started by `scripts/start.sh`, matching the scaffold (`output: 'standalone'`, `/api` rewrite, `API_URL` baked in at build time). The image ships `apps/api/drizzle/` for the boot-time migrations, runs as a non-root user, and has a `HEALTHCHECK` on `GET /api/health`; configuration is documented in the README. The SQLite file must live on a **persistent volume** mounted at `DATABASE_PATH`. Render, Railway, and Fly.io all have ephemeral container filesystems, and seed-on-boot (§6) would silently recreate fresh data after every deploy, hiding the data loss. The specific hosting platform is an operational choice deferred to the deployment phase, and will be recorded in `docs/decisions.md` once made.
 
 ## 12. Scalability
 

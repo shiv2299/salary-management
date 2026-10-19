@@ -28,3 +28,8 @@ export function createDatabase(path: string) {
 }
 
 export type Database = ReturnType<typeof createDatabase>;
+
+export type Db = Database['db'];
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+/** Either the root database or an open transaction; repositories accept both. */
+export type DbHandle = Db | Tx;

@@ -217,3 +217,12 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 ## Deployment platform: deferred, not decided
 
 **Status**: open. The architecture assumes a single Docker image (`docs/architecture.md` §11); the specific host (Render/Railway/Fly.io) is an operational choice made during the deployment phase, not an architectural one. Whichever is chosen must provide a **persistent volume** for the SQLite file. All three have ephemeral container filesystems, and seed-on-boot would mask the data loss by silently re-seeding. Will be recorded here once chosen, with the reason.
+
+## Seed data: relocations are re-benchmarked to the destination country
+
+**Alternative considered**: carrying the converted salary across a relocation with random variation.
+
+**Chosen**: a relocated employee's new pay is the converted amount rescaled by the ratio of the destination's median pay for their level to the converted source median, with ±5% jitter.
+
+**Why**: the static FX table converts INR to USD at a rate that is far from the pay gap between the two labor markets, so a plain conversion left about 100 of 235 relocated employees outside their new peer group's fences. That would have made the outlier insight mostly a list of relocations instead of the deliberately planted ~1% of anomalies. Re-benchmarking mirrors how a real relocation is priced, and the relocation form still pre-fills the plain converted amount for the HR Manager to adjust (see "Relocation" above).
+

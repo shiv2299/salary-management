@@ -34,4 +34,4 @@ Measured in-process with Fastify `app.inject` (so network and the Next.js rewrit
 | Measure | Value |
 |---|---|
 | Seed time (10,000 employees) | 12.7 s on Node 24, file-backed SQLite, RNG seed 42, reference date 2026-10-19 (measured 2026-10-19): 47,310 `salary_history` rows, 105 revision batches, 1.7% of active employees outside their country + level fences |
-| Full test-suite runtime | 6.8 s wall clock for all 145 tests (API and web), Node 24 (measured 2026-10-19) |
+| Full test-suite runtime | 14.5 s wall clock (median of 3 runs: 13.9, 14.5, 14.9 s) for all 396 tests (307 API, 89 web), Node 24 (measured 2026-10-19) |

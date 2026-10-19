@@ -1,16 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { formatMoney, formatMoneyCompact } from '@/lib/money';
 import { toDistributionChartRows, type DistributionChartRow } from './chart-data';
@@ -86,6 +77,19 @@ export function DistributionPanel() {
         />
       ) : (
         <>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Legend">
+            {[
+              ['Min to p25', 0.25],
+              ['p25 to median', 0.65],
+              ['Median to p75', 1],
+              ['p75 to max', 0.25],
+            ].map(([name, opacity]) => (
+              <li key={name} className="flex items-center gap-1.5">
+                <span className="size-3 bg-primary" style={{ opacity: Number(opacity) }} />
+                {name}
+              </li>
+            ))}
+          </ul>
           <div className="h-72 w-full" role="img" aria-label={`Pay distribution by ${groupBy}`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16, bottom: 24 }}>
@@ -114,7 +118,6 @@ export function DistributionPanel() {
                   }}
                 />
                 <Tooltip content={<DistributionTooltip />} />
-                <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
                 <Bar
                   dataKey="offset"
                   stackId="range"

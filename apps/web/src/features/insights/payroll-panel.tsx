@@ -48,7 +48,7 @@ function PayrollChart({ groupBy, title }: { groupBy: PayrollGroupBy; title: stri
       ) : (
         <div className="h-64 w-full" role="img" aria-label={title}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={toPayrollChartRows(data)} margin={{ left: 8, right: 8, bottom: 24 }}>
+            <BarChart data={toPayrollChartRows(data)} margin={{ left: 16, right: 8, bottom: 24 }}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis
                 dataKey="label"
@@ -62,7 +62,7 @@ function PayrollChart({ groupBy, title }: { groupBy: PayrollGroupBy; title: stri
                 }}
               />
               <YAxis
-                width={64}
+                width={72}
                 tickFormatter={(value: number) => formatMoneyCompact(value, 'USD')}
                 tick={{ fontSize: 12 }}
                 label={{

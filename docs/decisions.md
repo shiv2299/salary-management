@@ -310,3 +310,15 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 **Limits**: one container means no horizontal scaling of the API (SQLite allows a single writer host), and restarting the container restarts both processes. Both are acceptable for one HR user.
 
 **Verified**: the image was built and run with a volume. Login via `/api/auth/login` worked, data survived a container restart, and the restart did not re-seed (`seeded: false`, `hrUser: exists`). The container exits non-zero without `JWT_SECRET`.
+
+## Frontend: bulk-revision total shown per currency, batch rows not expandable
+
+**Chosen**:
+- The bulk preview summary reads "N employees · M overridden · total increase X", where X is the sum of increases within each currency (for example "$12,000.00 + ₹4,50,000.00"), not one USD figure.
+- A bulk revision in the recent-changes list is one row (headcount, percentage, note) that does not expand to list its employees.
+- Detail links carry the list's own query string (`/employees/123?status=all`), and the list reads its filters, sort and page from the URL query only.
+- Dropdowns are native `<select>` elements, not a custom listbox.
+
+**Why**: the preview response carries local amounts only, and the browser never converts currencies, so a single USD total would need either browser FX arithmetic or a new endpoint. Summing integers within one currency is exact and needs neither. The API has no endpoint that lists a batch's members, so the expandable row in `docs/design.md` §5 has nothing to show beyond what the row already says. The intercepted drawer route changes the URL to `/employees/123`, and the list underneath keeps rendering, so without the carried query it would reset its filters while the drawer is open. Native selects are reliable on touch screens and for keyboards, which matters for the 44px mobile targets.
+
+**Revisit if**: HR wants a single USD figure (add USD amounts to the preview response) or a drill-down into a batch (add a batch-members endpoint).

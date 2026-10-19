@@ -288,3 +288,25 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 **Also**: text cells that start with `=`, `+`, `-`, `@`, a tab or a carriage return get a leading apostrophe, so a job title typed as a formula cannot run when the file is opened in a spreadsheet. Amounts are formatted from integer minor units, never through a float.
 
 **Revisit if**: the export must be a consistent snapshot. Wrapping the batches in one read transaction would give that, at the cost of holding a read snapshot (and blocking WAL checkpoints) for the length of the download.
+
+## FX: a static dated table, live rates deliberately not built
+
+**Alternative considered**: fetching live exchange rates from an external provider.
+
+**Chosen**: one static, dated table of integer rates (see "Money and FX" above), with the rate date shown wherever converted amounts appear. Changing a rate is an FX migration that recomputes `current_amount_base_minor`.
+
+**Why**: insights, sorting and outliers must give the same answer for the same data. A live feed would make yesterday's report differ from today's with no salary change, add an external dependency and a failure mode to every insight request, and force a decision about which rate applies to a historical salary row. The cost is that USD figures are a snapshot, which the visible rate date makes explicit.
+
+**Revisit if**: leadership needs rates that track the market. That is a scheduled job writing new dated rows plus an FX migration, not a data-model change (`docs/requirements.md` §4).
+
+## Deployment packaging: one image, two processes, one volume
+
+**Alternative considered**: separate API and web images, or a process manager inside one image.
+
+**Chosen**: a single image (`Dockerfile`, Node 24, multi-stage, non-root `node` user) that runs the Fastify API and the Next.js standalone server from `scripts/start.sh`. The script starts both, and if either exits it stops the other and exits non-zero, so the platform restarts the container. The web server is the only published port (3000) and reaches the API at `127.0.0.1:3001` through the `/api` rewrite. `API_URL` is a build argument because Next.js resolves rewrite destinations during `next build`. The SQLite file is `/data/app.db` on a volume. The image ships `apps/api/drizzle/`, which the API resolves relative to its bundle (`dist/../drizzle`). The `HEALTHCHECK` calls `GET /api/health` through the web server, so it covers the rewrite as well as the API, with a 90-second start period for the first-boot seed.
+
+**Why**: SQLite is a local file, so the API and its database must share a host, and the web app is only a thin proxy in front of one API. Two images would need a network and two deploys for no isolation benefit at this scale, and a single container matches the "deployment is one container" reasoning in the SQLite decision. The shell script is a few lines and has no dependency; a process manager would be one more thing to maintain. Production dependencies are installed in their own stage on the same base image, so native modules (`better-sqlite3`, `argon2`) are built for the platform they run on and dev tooling never reaches the final image.
+
+**Limits**: one container means no horizontal scaling of the API (SQLite allows a single writer host), and restarting the container restarts both processes. Both are acceptable for one HR user.
+
+**Verified**: the image was built and run with a volume. Login via `/api/auth/login` worked, data survived a container restart, and the restart did not re-seed (`seeded: false`, `hrUser: exists`). The container exits non-zero without `JWT_SECRET`.

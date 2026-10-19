@@ -4,6 +4,7 @@ import {
   bulkPreviewBodySchema,
   bulkPreviewResponseSchema,
   employeeDetailSchema,
+  employeeExportQuerySchema,
   employeeIdParamsSchema,
   employeeListQuerySchema,
   employeeListResponseSchema,
@@ -11,6 +12,7 @@ import {
   salaryChangeSchema,
   updateEmployeeSchema,
 } from '@acme/shared';
+import { Readable } from 'node:stream';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Database } from '../db/client';
 import {
@@ -21,6 +23,7 @@ import {
 } from '../services/employees';
 import { confirmBulkRevision, previewBulkRevision } from '../services/bulk-revision';
 import { recordSalaryChange } from '../services/salary-changes';
+import { exportEmployeesCsv } from '../services/employee-export';
 import { getEmployeeDetail } from '../services/employee-detail';
 import { listEmployees } from '../services/employee-list';
 
@@ -76,6 +79,21 @@ export const employeeRoutes =
       (request, reply) => {
         void reply.code(201);
         return confirmBulkRevision(database.db, request.body, writerDeps);
+      },
+    );
+
+    app.get(
+      '/api/employees/export',
+      { schema: { querystring: employeeExportQuerySchema } },
+      (request, reply) => {
+        const today = now().toISOString().slice(0, 10);
+        return reply
+          .type('text/csv; charset=utf-8')
+          .header(
+            'content-disposition',
+            `attachment; filename="employees-${request.query.scope}-${today}.csv"`,
+          )
+          .send(Readable.from(exportEmployeesCsv(database.db, request.query)));
       },
     );
 

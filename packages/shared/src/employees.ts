@@ -27,6 +27,11 @@ export const employeeListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+/** The list's search, filters and sort, without paging, plus which rows to export. */
+export const employeeExportQuerySchema = employeeListQuerySchema
+  .omit({ limit: true, offset: true })
+  .extend({ scope: z.enum(['filtered', 'all']) });
+
 export const employeeListItemSchema = z.object({
   id: z.number().int(),
   firstName: z.string(),
@@ -55,6 +60,7 @@ export const employeeListResponseSchema = z.object({
   offset: z.number().int(),
 });
 
+export type EmployeeExportQueryParams = z.infer<typeof employeeExportQuerySchema>;
 export type EmployeeListQueryParams = z.infer<typeof employeeListQuerySchema>;
 export type EmployeeListItem = z.infer<typeof employeeListItemSchema>;
 export type EmployeeListResponse = z.infer<typeof employeeListResponseSchema>;

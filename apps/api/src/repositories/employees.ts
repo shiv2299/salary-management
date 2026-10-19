@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import {
   departments,
@@ -188,6 +188,25 @@ export function listActiveEmployeeRowsByIds(db: DbHandle, ids: number[]): Employ
   return selectEmployeeRows(db)
     .where(and(inArray(employees.id, ids), eq(employees.status, 'active')))
     .orderBy(...listOrderBy({ sortBy: 'name', sortOrder: 'asc', limit: 0, offset: 0 }))
+    .all()
+    .map(toListRow);
+}
+
+/**
+ * One batch of the rows the filter matches, in id order, starting after `afterId`. Callers walk
+ * the whole set batch by batch, so no cursor stays open between batches (better-sqlite3 rejects
+ * every other statement on the connection while one is).
+ */
+export function listEmployeeRowsAfterId(
+  db: DbHandle,
+  filter: EmployeeListFilter,
+  afterId: number,
+  limit: number,
+): EmployeeListRow[] {
+  return selectEmployeeRows(db)
+    .where(and(listWhere(filter), gt(employees.id, afterId)))
+    .orderBy(asc(employees.id))
+    .limit(limit)
     .all()
     .map(toListRow);
 }

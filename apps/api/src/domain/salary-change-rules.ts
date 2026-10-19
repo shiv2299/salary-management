@@ -1,0 +1,78 @@
+export type SalaryChangeReason = 'raise' | 'promotion' | 'relocation' | 'correction' | 'hire';
+
+export interface SalaryChangeInput {
+  reason: SalaryChangeReason;
+  effectiveDate: string;
+  amountMinor: number;
+  newLevelId?: number;
+  newCountryCode?: string;
+}
+
+export interface SalaryChangeContext {
+  today: string;
+  hireDate: string;
+  status: 'active' | 'inactive';
+  currentAmountMinor: number;
+  currentCountryCode: string;
+  currentLevelRank: number;
+  newLevelRank?: number;
+}
+
+/**
+ * Business rules for one effective-dated salary change (architecture §7).
+ * Returns human-readable violations; an empty list means the change is valid.
+ */
+export function validateSalaryChange(
+  input: SalaryChangeInput,
+  context: SalaryChangeContext,
+): string[] {
+  const violations: string[] = [];
+
+  if (input.effectiveDate > context.today) {
+    violations.push('effective date must not be in the future');
+  }
+  if (input.effectiveDate < context.hireDate) {
+    violations.push('effective date must not be before the hire date');
+  }
+  if (context.status !== 'active') {
+    violations.push('employee must be active');
+  }
+  if (input.amountMinor <= 0) {
+    violations.push('amount must be greater than zero');
+  }
+
+  switch (input.reason) {
+    case 'raise':
+      if (input.amountMinor <= context.currentAmountMinor) {
+        violations.push('a raise must increase the current amount');
+      }
+      if (input.newLevelId !== undefined || input.newCountryCode !== undefined) {
+        violations.push('a raise cannot change level or country');
+      }
+      break;
+    case 'promotion':
+      if (input.newLevelId === undefined) {
+        violations.push('a promotion requires a new level');
+      } else if (
+        context.newLevelRank === undefined ||
+        context.newLevelRank <= context.currentLevelRank
+      ) {
+        violations.push('a promotion must move to a higher level rank');
+      }
+      break;
+    case 'relocation':
+      if (input.newCountryCode === undefined) {
+        violations.push('a relocation requires a new country');
+      } else if (input.newCountryCode === context.currentCountryCode) {
+        violations.push('a relocation must move to a different country');
+      }
+      break;
+    case 'correction':
+      break;
+    case 'hire':
+      violations.push('hire rows are created only with the employee');
+      break;
+  }
+
+  return violations;
+}

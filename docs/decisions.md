@@ -154,7 +154,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: a filter evaluated twice can return a different set of employees the second time, and the overrides are keyed by employee. Committing exactly what was reviewed is the only way the preview means anything. Decreases are rare, individual events and go through `correction`.
 
-**Trade-off**: the preview returns the full matching set (~1 MB at 10,000 rows) so the UI can page through it and hold overrides locally. That's fine at this scale, and selecting tens of thousands of people in one revision isn't a realistic workflow.
+**Trade-off**: the preview returns the full matching set (~2 MB at 10,000 rows) so the UI can page through it and hold overrides locally. That's fine at this scale, and selecting tens of thousands of people in one revision isn't a realistic workflow.
 
 ## Search: substring match, unindexed
 
@@ -276,3 +276,15 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 - `422` for a request that breaks a rule whatever the data: a future or pre-hire effective date, an amount (including a hand override) that does not exceed the current pay, or the same employee listed twice. Every bulk row is a `raise`, so the single-change rule that a raise must increase pay applies to overrides too; a smaller figure is a `correction`.
 
 **Why**: the client reacts differently to each. A `409` is fixed by reloading the preview, a `422` by editing the form, and a `404` means the list itself is wrong. Checking for staleness before the rules means a stale preview is never reported as a form error. Each item's currency is the one in force on the effective date, as for a single change, so a revision backdated to before someone's relocation is not labelled in the wrong currency.
+
+## CSV export: batched keyset reads, not an open database iterator
+
+**Alternative considered**: stream straight from a better-sqlite3 `iterate()` cursor, which is the obvious reading of "stream from the database".
+
+**Chosen**: the export reads 1,000 rows at a time (`WHERE id > last ORDER BY id LIMIT 1000`, with the list's filters), writes each batch to the response, and reads the next when the client is ready. Rows come out in id order, not in the list's sort order.
+
+**Why**: better-sqlite3 has one connection, and while an iterator is open every other statement on it, including every write, throws "This database connection is busy executing a query". A slow download would then make a concurrent request, such as a salary change from a second tab, fail for as long as the download lasts. Batches are complete short queries, so nothing is held open between them, and memory stays bounded at about one batch. Each batch is read in one query, but the export as a whole is not a snapshot: a change committed mid-download can appear in a later batch. For a single-user tool that is acceptable, and the set stays exactly what the filters matched when each batch was read.
+
+**Also**: text cells that start with `=`, `+`, `-`, `@`, a tab or a carriage return get a leading apostrophe, so a job title typed as a formula cannot run when the file is opened in a spreadsheet. Amounts are formatted from integer minor units, never through a float.
+
+**Revisit if**: the export must be a consistent snapshot. Wrapping the batches in one read transaction would give that, at the cost of holding a read snapshot (and blocking WAL checkpoints) for the length of the download.

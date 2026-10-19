@@ -128,14 +128,8 @@ function listOrderBy({ sortBy, sortOrder }: EmployeeListPage): SQL[] {
   }
 }
 
-export function listEmployeeRows(
-  db: DbHandle,
-  filter: EmployeeListFilter,
-  page: EmployeeListPage,
-): { rows: EmployeeListRow[]; total: number } {
-  const where = listWhere(filter);
-  const total = db.select({ value: count() }).from(employees).where(where).get()?.value ?? 0;
-  const rows = db
+function selectEmployeeRows(db: DbHandle) {
+  return db
     .select({
       employee: employees,
       departmentName: departments.name,
@@ -143,12 +137,35 @@ export function listEmployeeRows(
     })
     .from(employees)
     .innerJoin(departments, eq(departments.id, employees.departmentId))
-    .innerJoin(levels, eq(levels.id, employees.levelId))
+    .innerJoin(levels, eq(levels.id, employees.levelId));
+}
+
+function toListRow(row: {
+  employee: Employee;
+  departmentName: string;
+  levelCode: string;
+}): EmployeeListRow {
+  return { ...row.employee, departmentName: row.departmentName, levelCode: row.levelCode };
+}
+
+export function listEmployeeRows(
+  db: DbHandle,
+  filter: EmployeeListFilter,
+  page: EmployeeListPage,
+): { rows: EmployeeListRow[]; total: number } {
+  const where = listWhere(filter);
+  const total = db.select({ value: count() }).from(employees).where(where).get()?.value ?? 0;
+  const rows = selectEmployeeRows(db)
     .where(where)
     .orderBy(...listOrderBy(page))
     .limit(page.limit)
     .offset(page.offset)
     .all()
-    .map(({ employee, departmentName, levelCode }) => ({ ...employee, departmentName, levelCode }));
+    .map(toListRow);
   return { rows, total };
+}
+
+export function findEmployeeListRow(db: DbHandle, id: number): EmployeeListRow | undefined {
+  const row = selectEmployeeRows(db).where(eq(employees.id, id)).get();
+  return row && toListRow(row);
 }

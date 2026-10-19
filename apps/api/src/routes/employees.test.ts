@@ -80,3 +80,35 @@ describe('GET /api/employees', () => {
     expect(response.statusCode).toBe(401);
   });
 });
+
+describe('GET /api/employees/:id', () => {
+  it('returns the employee with the salary history', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/2');
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ firstName: string; history: { reason: string }[] }>();
+    expect(body.firstName).toBe('Bob');
+    expect(body.history.map((h) => h.reason)).toEqual(['hire']);
+  });
+
+  it('answers an unknown employee with 404 in the standard error shape', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/999');
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: { code: 'EMPLOYEE_NOT_FOUND', message: 'Employee 999 not found' },
+    });
+  });
+
+  it('rejects a non-numeric id with a validation error', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/abc');
+
+    expect(response.statusCode).toBe(400);
+  });
+});

@@ -46,3 +46,25 @@ export const employeeListResponseSchema = z.object({
 export type EmployeeListQueryParams = z.infer<typeof employeeListQuerySchema>;
 export type EmployeeListItem = z.infer<typeof employeeListItemSchema>;
 export type EmployeeListResponse = z.infer<typeof employeeListResponseSchema>;
+
+export const salaryHistoryEntrySchema = z.object({
+  id: z.number().int(),
+  amountMinor: z.number().int(),
+  currencyCode: z.string(),
+  effectiveDate: z.string(),
+  reason: z.enum(['hire', 'raise', 'promotion', 'relocation', 'correction']),
+  levelId: z.number().int(),
+  levelCode: z.string(),
+  countryCode: z.string(),
+  batchId: z.number().int().nullable(),
+  createdAt: z.string(),
+});
+
+export const employeeDetailSchema = employeeListItemSchema.extend({
+  history: z.array(salaryHistoryEntrySchema),
+});
+
+export const employeeIdParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+
+export type SalaryHistoryEntry = z.infer<typeof salaryHistoryEntrySchema>;
+export type EmployeeDetail = z.infer<typeof employeeDetailSchema>;

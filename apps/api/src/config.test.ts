@@ -46,4 +46,22 @@ describe('loadConfig', () => {
       'x'.repeat(32),
     );
   });
+
+  it('accepts the HR seed credentials as a pair', () => {
+    const config = loadConfig({ HR_SEED_EMAIL: 'hr@acme.test', HR_SEED_PASSWORD: 'long enough' });
+
+    expect(config.HR_SEED_EMAIL).toBe('hr@acme.test');
+    expect(config.HR_SEED_PASSWORD).toBe('long enough');
+  });
+
+  it('rejects an HR seed email without a password and the other way round', () => {
+    expect(() => loadConfig({ HR_SEED_EMAIL: 'hr@acme.test' })).toThrow(/HR_SEED_PASSWORD/);
+    expect(() => loadConfig({ HR_SEED_PASSWORD: 'long enough' })).toThrow(/HR_SEED_EMAIL/);
+  });
+
+  it('rejects an HR seed password shorter than eight characters', () => {
+    expect(() => loadConfig({ HR_SEED_EMAIL: 'hr@acme.test', HR_SEED_PASSWORD: 'short' })).toThrow(
+      /HR_SEED_PASSWORD/,
+    );
+  });
 });

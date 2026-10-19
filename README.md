@@ -11,9 +11,11 @@ Employee salary management web app for an HR Manager at a multi-country organisa
 
 ```bash
 npm ci
-cp apps/api/.env.example apps/api/.env   # optional, defaults are the same
+cp apps/api/.env.example apps/api/.env   # sets the HR login; edit the password first
 npm run dev
 ```
+
+The first start migrates the database and seeds 10,000 demo employees, which takes about 15 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
 
 - Web: http://localhost:3000 (proxies `/api/*` to the API)
 - API: http://localhost:3001, health at `/api/health`

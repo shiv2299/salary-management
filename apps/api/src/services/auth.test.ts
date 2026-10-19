@@ -3,6 +3,7 @@ import { FIXED_NOW, createTestDb } from '../test/test-db';
 import {
   SESSION_TTL_SECONDS,
   createUser,
+  ensureHrUser,
   hashPassword,
   issueSessionToken,
   login,
@@ -98,5 +99,41 @@ describe('login', () => {
     );
 
     expect(result).toBeNull();
+  });
+});
+
+describe('ensureHrUser', () => {
+  const deps = { jwtSecret: SECRET, now: () => FIXED_NOW };
+  const credentials = { email: 'hr@acme.test', password: 'correct horse' };
+
+  it('creates the HR user when there is none', async () => {
+    const database = createTestDb();
+
+    expect(await ensureHrUser(database.db, credentials, deps)).toBe('created');
+    expect(
+      await login(database.db, credentials, { jwtSecret: SECRET, clock: () => issuedAt }),
+    ).not.toBeNull();
+  });
+
+  it('leaves an existing user untouched, whatever credentials it is given', async () => {
+    const database = createTestDb();
+    await ensureHrUser(database.db, credentials, deps);
+
+    const again = await ensureHrUser(
+      database.db,
+      { email: 'other@acme.test', password: 'another password' },
+      deps,
+    );
+
+    expect(again).toBe('exists');
+    const loginDeps = { jwtSecret: SECRET, clock: () => issuedAt };
+    expect(await login(database.db, credentials, loginDeps)).not.toBeNull();
+    expect(
+      await login(
+        database.db,
+        { email: 'other@acme.test', password: 'another password' },
+        loginDeps,
+      ),
+    ).toBeNull();
   });
 });

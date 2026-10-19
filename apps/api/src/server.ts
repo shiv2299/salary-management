@@ -1,5 +1,6 @@
 import { buildApp } from './app';
-import { loadConfig } from './config';
+import { MIGRATIONS_FOLDER, loadConfig } from './config';
+import { bootstrapDatabase } from './db/bootstrap';
 import { createDatabase } from './db/client';
 
 function readConfig() {
@@ -38,6 +39,31 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
+
+// The one place boot reads the clock: the seed's reference date is today, so the salary-changes
+// window always has recent data.
+const SEED_RNG_SEED = 42;
+
+try {
+  app.log.info('preparing database (first boot also seeds the demo dataset, which takes a while)');
+  const bootstrap = await bootstrapDatabase(database.db, {
+    migrationsFolder: MIGRATIONS_FOLDER,
+    referenceDate: new Date().toISOString().slice(0, 10),
+    rngSeed: SEED_RNG_SEED,
+    now: () => new Date().toISOString(),
+    ...(config.HR_SEED_EMAIL && config.HR_SEED_PASSWORD
+      ? { hrUser: { email: config.HR_SEED_EMAIL, password: config.HR_SEED_PASSWORD } }
+      : {}),
+  });
+  app.log.info({ seeded: !bootstrap.seed.skipped, hrUser: bootstrap.hrUser }, 'database ready');
+  if (bootstrap.hrUser === 'skipped') {
+    app.log.warn('HR_SEED_EMAIL and HR_SEED_PASSWORD are not set; no HR user was created');
+  }
+} catch (error) {
+  app.log.error(error, 'failed to prepare database');
+  database.close();
+  process.exit(1);
+}
 
 try {
   await app.listen({ port: config.PORT, host: config.HOST });

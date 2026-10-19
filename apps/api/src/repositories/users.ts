@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import { users, type NewUser, type User } from '../db/schema';
 
@@ -12,4 +12,8 @@ export function findUserById(db: DbHandle, id: number): User | undefined {
 
 export function insertUser(db: DbHandle, user: NewUser): number {
   return db.insert(users).values(user).returning({ id: users.id }).get().id;
+}
+
+export function countUsers(db: DbHandle): number {
+  return db.select({ value: count() }).from(users).get()?.value ?? 0;
 }

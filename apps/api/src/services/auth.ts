@@ -2,7 +2,7 @@ import argon2 from 'argon2';
 import { SignJWT, jwtVerify } from 'jose';
 import type { DbHandle } from '../db/client';
 import type { User } from '../db/schema';
-import { findUserByEmail, findUserById, insertUser } from '../repositories/users';
+import { countUsers, findUserByEmail, findUserById, insertUser } from '../repositories/users';
 
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
@@ -60,6 +60,20 @@ export async function createUser(
     passwordHash: await hashPassword(input.password),
     createdAt: deps.now(),
   });
+}
+
+/**
+ * Creates the single HR user unless a user already exists. An existing user is never changed, so
+ * restarting with different credentials does not overwrite a password (there is no password reset).
+ */
+export async function ensureHrUser(
+  db: DbHandle,
+  credentials: { email: string; password: string },
+  deps: { now: () => string },
+): Promise<'created' | 'exists'> {
+  if (countUsers(db) > 0) return 'exists';
+  await createUser(db, credentials, deps);
+  return 'created';
 }
 
 // Verified against when the email is unknown, so a miss costs the same as a wrong password.

@@ -10,6 +10,7 @@ import type { Database } from './db/client';
 import { authRoutes, SESSION_COOKIE } from './routes/auth';
 import { employeeRoutes } from './routes/employees';
 import { healthRoutes } from './routes/health';
+import { insightRoutes } from './routes/insights';
 import { referenceRoutes } from './routes/reference';
 import { verifySessionToken } from './services/auth';
 
@@ -111,6 +112,7 @@ export function buildApp({
   void app.register(authRoutes({ database, jwtSecret, secureCookies, now }));
   void app.register(referenceRoutes(database));
   void app.register(employeeRoutes({ database, now }));
+  void app.register(insightRoutes({ database, now }));
 
   return app;
 }

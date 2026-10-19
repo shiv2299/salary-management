@@ -21,3 +21,18 @@ export {
   type SalaryHistoryEntry,
   type UpdateEmployeeBody,
 } from './employees';
+export {
+  distributionQuerySchema,
+  distributionResponseSchema,
+  outliersResponseSchema,
+  payrollQuerySchema,
+  payrollResponseSchema,
+  recentChangeEntrySchema,
+  recentChangesQuerySchema,
+  recentChangesResponseSchema,
+  type DistributionResponse,
+  type OutliersResponse,
+  type PayrollResponse,
+  type RecentChangeEntry,
+  type RecentChangesResponse,
+} from './insights';

@@ -164,7 +164,16 @@ describe('POST /api/auth/logout', () => {
 });
 
 describe('deny by default', () => {
-  it('answers 401 on an api route nobody registered an exemption for', async () => {
+  it('answers 401 on a registered route nobody exempted', async () => {
+    const t = await setup();
+    t.app.get('/api/anything', () => ({ ok: true }));
+
+    const response = await t.app.inject({ method: 'GET', url: '/api/anything' });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('answers an unmatched path with 401 until the caller has a session', async () => {
     const t = await setup();
 
     const response = await t.app.inject({ method: 'GET', url: '/api/employees' });
@@ -191,5 +200,18 @@ describe('deny by default', () => {
     });
 
     expect(response.statusCode).toBe(404);
+  });
+
+  it('cannot be bypassed by percent-encoding part of the path', async () => {
+    const t = await setup();
+    t.app.get('/api/secret', () => ({ secret: true }));
+
+    const plain = await t.app.inject({ method: 'GET', url: '/api/secret' });
+    const encoded = await t.app.inject({ method: 'GET', url: '/%61pi/secret' });
+    const withQuery = await t.app.inject({ method: 'GET', url: '/api/secret?x=/api/health' });
+
+    expect(plain.statusCode).toBe(401);
+    expect(encoded.statusCode).toBe(401);
+    expect(withQuery.statusCode).toBe(401);
   });
 });

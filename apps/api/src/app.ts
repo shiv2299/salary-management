@@ -18,9 +18,9 @@ declare module 'fastify' {
   }
 }
 
-// Every other /api route requires a session, so a new route is protected without anyone
+// Every other route requires a session, so a new route is protected without anyone
 // remembering to add it (architecture §4).
-const PUBLIC_ROUTES = new Set(['POST /api/auth/login', 'GET /api/health']);
+const PUBLIC_ROUTES = new Set(['POST /api/auth/login', 'GET /api/health', 'HEAD /api/health']);
 
 export interface AppDeps {
   database: Database;
@@ -59,15 +59,16 @@ export function buildApp({
   app.decorateRequest('userId', null);
 
   app.addHook('onRequest', async (request, reply) => {
-    const path = request.url.split('?')[0] ?? '';
-    if (!path.startsWith('/api/')) return;
+    // Decide from the route Fastify matched, never from the raw URL: the router decodes the path
+    // (`/%61pi/x` reaches `/api/x`), so a string match on request.url could be bypassed. A request
+    // that matched no route has no pattern, so it is never public and needs a session like the rest.
+    const routeUrl = request.routeOptions.url ?? '';
 
-    // Parsed here rather than via request.cookies, which is not populated yet when this runs.
     const token = fastifyCookie.parse(request.headers.cookie ?? '')[SESSION_COOKIE];
     const session = token ? await verifySessionToken(token, jwtSecret, now()) : null;
     request.userId = session?.userId ?? null;
 
-    if (!session && !PUBLIC_ROUTES.has(`${request.method} ${path}`)) {
+    if (!session && !PUBLIC_ROUTES.has(`${request.method} ${routeUrl}`)) {
       return reply.code(401).send({
         error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
       });

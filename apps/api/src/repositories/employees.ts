@@ -169,3 +169,11 @@ export function findEmployeeListRow(db: DbHandle, id: number): EmployeeListRow |
   const row = selectEmployeeRows(db).where(eq(employees.id, id)).get();
   return row && toListRow(row);
 }
+
+export function findEmployeeIdByEmail(db: DbHandle, email: string): number | undefined {
+  return db
+    .select({ id: employees.id })
+    .from(employees)
+    .where(sql`lower(${employees.email}) = lower(${email})`)
+    .get()?.id;
+}

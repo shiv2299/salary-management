@@ -112,3 +112,91 @@ describe('GET /api/employees/:id', () => {
     expect(response.statusCode).toBe(400);
   });
 });
+
+const newEmployee = {
+  firstName: 'Dina',
+  lastName: 'Shah',
+  email: 'Dina@Acme.test',
+  countryCode: 'DE',
+  departmentId: 1,
+  levelId: 2,
+  jobTitle: 'Designer',
+  hireDate: '2024-05-01',
+  amountMinor: 7_000_000,
+};
+
+async function send(
+  t: TestApp,
+  method: 'POST' | 'PATCH' | 'DELETE',
+  url: string,
+  payload?: object,
+) {
+  return t.app.inject({
+    method,
+    url,
+    headers: { cookie: await t.loginCookie() },
+    ...(payload ? { payload } : {}),
+  });
+}
+
+describe('POST /api/employees', () => {
+  it('creates an employee with its hire salary and returns the detail', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees', newEmployee);
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      firstName: 'Dina',
+      email: 'dina@acme.test',
+      status: 'active',
+      salary: { amountMinor: 7_000_000, currencyCode: 'EUR', amountBaseMinor: 7_560_000 },
+      history: [{ reason: 'hire', effectiveDate: '2024-05-01' }],
+    });
+  });
+
+  it('rejects missing fields, a non-integer amount and a malformed date', async () => {
+    const t = await setup();
+
+    for (const bad of [
+      { ...newEmployee, firstName: undefined },
+      { ...newEmployee, amountMinor: 70.5 },
+      { ...newEmployee, amountMinor: 0 },
+      { ...newEmployee, hireDate: '01/05/2024' },
+      { ...newEmployee, hireDate: '2024-13-45' },
+      { ...newEmployee, email: 'not-an-email' },
+    ]) {
+      const response = await send(t, 'POST', '/api/employees', bad);
+
+      expect(response.statusCode).toBe(400);
+    }
+  });
+
+  it('answers a duplicate email with 409', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees', {
+      ...newEmployee,
+      email: 'ann@acme.test',
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('EMAIL_TAKEN');
+  });
+
+  it('rejects a form-encoded body', async () => {
+    const t = await setup();
+
+    const response = await t.app.inject({
+      method: 'POST',
+      url: '/api/employees',
+      headers: {
+        cookie: await t.loginCookie(),
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: 'firstName=Dina',
+    });
+
+    expect(response.statusCode).toBe(415);
+  });
+});

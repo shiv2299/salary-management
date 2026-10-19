@@ -106,7 +106,7 @@ export function buildApp({
   void app.register(healthRoutes(database));
   void app.register(authRoutes({ database, jwtSecret, secureCookies, now }));
   void app.register(referenceRoutes(database));
-  void app.register(employeeRoutes(database));
+  void app.register(employeeRoutes({ database, now }));
 
   return app;
 }

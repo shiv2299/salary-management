@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { employees, salaryHistory } from '../db/schema';
 import { FIXED_NOW, createTestDb } from '../test/test-db';
-import { createEmployees, type NewEmployeeInput } from './employees';
+import { createEmployee, createEmployees, type NewEmployeeInput } from './employees';
 
 const deps = { now: () => FIXED_NOW };
 
@@ -101,5 +101,57 @@ describe('createEmployees', () => {
     expect(() => createEmployees(database.db, [input({ countryCode: 'ZZ' })], deps)).toThrow(
       'Unknown country: ZZ',
     );
+  });
+});
+
+describe('createEmployee', () => {
+  const today = { now: () => FIXED_NOW };
+
+  function failure(overrides: Partial<NewEmployeeInput>) {
+    try {
+      createEmployee(database.db, input(overrides), today);
+    } catch (error) {
+      return error;
+    }
+    return undefined;
+  }
+
+  it('creates the employee and returns its id', () => {
+    const id = createEmployee(database.db, input(), today);
+
+    const employee = database.db.select().from(employees).where(eq(employees.id, id)).get();
+    expect(employee).toMatchObject({ email: 'asha@acme.test', currentReason: 'hire' });
+  });
+
+  it('rejects a hire date in the future', () => {
+    const error = failure({ hireDate: '2026-01-16' });
+
+    expect(error).toMatchObject({ statusCode: 422, code: 'INVALID_EMPLOYEE' });
+    expect((error as Error).message).toContain('hire date');
+  });
+
+  it('accepts a hire date of today', () => {
+    expect(failure({ hireDate: '2026-01-15' })).toBeUndefined();
+  });
+
+  it('rejects an unknown country, department or level', () => {
+    expect(failure({ countryCode: 'FR' })).toMatchObject({ statusCode: 422 });
+    expect(failure({ departmentId: 99 })).toMatchObject({ statusCode: 422 });
+    expect(failure({ levelId: 99 })).toMatchObject({ statusCode: 422 });
+  });
+
+  it('rejects an email that another employee already has, ignoring case', () => {
+    createEmployee(database.db, input({ email: 'asha@acme.test' }), today);
+
+    expect(failure({ email: 'ASHA@acme.test' })).toMatchObject({
+      statusCode: 409,
+      code: 'EMAIL_TAKEN',
+    });
+  });
+
+  it('creates nothing when the request is rejected', () => {
+    failure({ countryCode: 'FR' });
+
+    expect(database.db.select().from(employees).all()).toHaveLength(0);
   });
 });

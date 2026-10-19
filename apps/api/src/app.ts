@@ -8,6 +8,7 @@ import {
 } from 'fastify-type-provider-zod';
 import type { Database } from './db/client';
 import { authRoutes, SESSION_COOKIE } from './routes/auth';
+import { employeeRoutes } from './routes/employees';
 import { healthRoutes } from './routes/health';
 import { referenceRoutes } from './routes/reference';
 import { verifySessionToken } from './services/auth';
@@ -105,6 +106,7 @@ export function buildApp({
   void app.register(healthRoutes(database));
   void app.register(authRoutes({ database, jwtSecret, secureCookies, now }));
   void app.register(referenceRoutes(database));
+  void app.register(employeeRoutes(database));
 
   return app;
 }

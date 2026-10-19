@@ -1,6 +1,13 @@
-import { count, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
-import { employees, type Employee, type NewEmployee } from '../db/schema';
+import {
+  departments,
+  employees,
+  levels,
+  type Employee,
+  type EmployeeStatus,
+  type NewEmployee,
+} from '../db/schema';
 
 export function findEmployeesByIds(db: DbHandle, ids: number[]): Employee[] {
   if (ids.length === 0) return [];
@@ -63,4 +70,85 @@ export function markEmployeesInactive(db: DbHandle, ids: number[], updatedAt: st
     .set({ status: 'inactive', updatedAt })
     .where(inArray(employees.id, ids))
     .run();
+}
+
+export interface EmployeeListFilter {
+  country?: string;
+  department?: number;
+  level?: number;
+  status: EmployeeStatus | 'all';
+  search?: string;
+}
+
+export interface EmployeeListPage {
+  sortBy: 'name' | 'salary' | 'hireDate';
+  sortOrder: 'asc' | 'desc';
+  limit: number;
+  offset: number;
+}
+
+export type EmployeeListRow = Employee & { departmentName: string; levelCode: string };
+
+const LIKE_ESCAPE = '\\';
+
+/** Makes `%`, `_` and the escape character match themselves inside a LIKE pattern. */
+function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (char) => LIKE_ESCAPE + char);
+}
+
+function listWhere(filter: EmployeeListFilter): SQL | undefined {
+  const conditions: SQL[] = [];
+  if (filter.status !== 'all') conditions.push(eq(employees.status, filter.status));
+  if (filter.country) conditions.push(eq(employees.countryCode, filter.country));
+  if (filter.department !== undefined)
+    conditions.push(eq(employees.departmentId, filter.department));
+  if (filter.level !== undefined) conditions.push(eq(employees.levelId, filter.level));
+  if (filter.search) {
+    // Unindexed substring scan on purpose; see docs/decisions.md ("Search").
+    const pattern = `%${escapeLike(filter.search)}%`;
+    conditions.push(sql`(
+      ${employees.firstName} || ' ' || ${employees.lastName} like ${pattern} escape '\\'
+      or ${employees.email} like ${pattern} escape '\\'
+      or ${employees.jobTitle} like ${pattern} escape '\\'
+    )`);
+  }
+  return and(...conditions);
+}
+
+function listOrderBy({ sortBy, sortOrder }: EmployeeListPage): SQL[] {
+  const direction = sortOrder === 'asc' ? asc : desc;
+  // The trailing id keeps pages stable when the sort values tie.
+  switch (sortBy) {
+    case 'salary':
+      return [direction(employees.currentAmountBaseMinor), asc(employees.id)];
+    case 'hireDate':
+      return [direction(employees.hireDate), asc(employees.id)];
+    case 'name':
+      return [direction(employees.lastName), direction(employees.firstName), asc(employees.id)];
+  }
+}
+
+export function listEmployeeRows(
+  db: DbHandle,
+  filter: EmployeeListFilter,
+  page: EmployeeListPage,
+): { rows: EmployeeListRow[]; total: number } {
+  const where = listWhere(filter);
+  const total = db.select({ value: count() }).from(employees).where(where).get()?.value ?? 0;
+  const rows = db
+    .select({
+      employee: employees,
+      departmentName: departments.name,
+      levelCode: levels.code,
+    })
+    .from(employees)
+    .innerJoin(departments, eq(departments.id, employees.departmentId))
+    .innerJoin(levels, eq(levels.id, employees.levelId))
+    .where(where)
+    .orderBy(...listOrderBy(page))
+    .limit(page.limit)
+    .offset(page.offset)
+    .all()
+    .map(({ employee, departmentName, levelCode }) => ({ ...employee, departmentName, levelCode }));
+  return { rows, total };
 }

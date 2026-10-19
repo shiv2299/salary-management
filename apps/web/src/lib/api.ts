@@ -15,18 +15,33 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet<T>(path: `/api/${string}`, schema: z.ZodType<T>): Promise<T> {
+type ApiPath = `/api/${string}`;
+
+async function request<T>(
+  method: string,
+  path: ApiPath,
+  schema: z.ZodType<T>,
+  body?: unknown,
+): Promise<T> {
+  const init: RequestInit = { method };
+  // The API accepts JSON only and rejects a JSON content type on an empty body, so the header is
+  // sent only when there is a body.
+  if (body !== undefined) {
+    init.headers = { 'content-type': 'application/json' };
+    init.body = JSON.stringify(body);
+  }
+
   let response: Response;
   try {
-    response = await fetch(path);
+    response = await fetch(path, init);
   } catch {
     throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach the server');
   }
 
-  const body: unknown = await response.json().catch(() => undefined);
+  const parsedBody: unknown = await response.json().catch(() => undefined);
 
   if (!response.ok) {
-    const parsed = errorBodySchema.safeParse(body);
+    const parsed = errorBodySchema.safeParse(parsedBody);
     if (parsed.success) {
       throw new ApiError(response.status, parsed.data.error.code, parsed.data.error.message);
     }
@@ -37,5 +52,18 @@ export async function apiGet<T>(path: `/api/${string}`, schema: z.ZodType<T>): P
     );
   }
 
-  return schema.parse(body);
+  return schema.parse(parsedBody);
+}
+
+export function apiGet<T>(path: ApiPath, schema: z.ZodType<T>): Promise<T> {
+  return request('GET', path, schema);
+}
+
+export function apiSend<T>(
+  method: 'POST' | 'PATCH' | 'DELETE',
+  path: ApiPath,
+  schema: z.ZodType<T>,
+  body?: unknown,
+): Promise<T> {
+  return request(method, path, schema, body);
 }

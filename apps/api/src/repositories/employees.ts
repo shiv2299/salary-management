@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import { employees, type Employee, type NewEmployee } from '../db/schema';
 
@@ -50,4 +50,17 @@ export function insertEmployeeWithPlaceholderSalary(
     })
     .returning({ id: employees.id })
     .get().id;
+}
+
+export function countEmployees(db: DbHandle): number {
+  return db.select({ value: count() }).from(employees).get()?.value ?? 0;
+}
+
+/** Status is not a salary column, so it has its own writer; it never touches `current_*`. */
+export function markEmployeesInactive(db: DbHandle, ids: number[], updatedAt: string): void {
+  if (ids.length === 0) return;
+  db.update(employees)
+    .set({ status: 'inactive', updatedAt })
+    .where(inArray(employees.id, ids))
+    .run();
 }

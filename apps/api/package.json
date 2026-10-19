@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx --env-file-if-exists=.env src/db/seed-cli.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",

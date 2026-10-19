@@ -1,0 +1,307 @@
+import { resolve } from 'node:path';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  computeDistribution,
+  isOutlier,
+  MIN_PEER_GROUP_SIZE,
+  outlierFences,
+} from '../domain/stats';
+import { createDatabase } from './client';
+import { seed } from './seed';
+import {
+  countries,
+  departments,
+  employees,
+  fxRates,
+  levels,
+  salaryHistory,
+  salaryRevisionBatches,
+} from './schema';
+
+const REFERENCE_DATE = '2026-06-30';
+const SMALL = 300;
+
+function freshDb() {
+  const database = createDatabase(':memory:');
+  migrate(database.db, { migrationsFolder: resolve(import.meta.dirname, '../../drizzle') });
+  return database.db;
+}
+
+function seeded(options: { rngSeed?: number; employeeCount?: number } = {}) {
+  const db = freshDb();
+  const result = seed(db, {
+    rngSeed: options.rngSeed ?? 42,
+    referenceDate: REFERENCE_DATE,
+    employeeCount: options.employeeCount ?? SMALL,
+  });
+  return { db, result };
+}
+
+function dump(db: ReturnType<typeof freshDb>): string {
+  return JSON.stringify([
+    db.select().from(employees).orderBy(employees.id).all(),
+    db.select().from(salaryHistory).orderBy(salaryHistory.id).all(),
+    db.select().from(salaryRevisionBatches).orderBy(salaryRevisionBatches.id).all(),
+  ]);
+}
+
+function daysBetween(from: string, to: string): number {
+  return (Date.parse(to) - Date.parse(from)) / 86_400_000;
+}
+
+describe('seed', () => {
+  let small: ReturnType<typeof seeded>;
+
+  beforeAll(() => {
+    small = seeded();
+  });
+
+  it('creates 3 countries, 7 departments, 6 levels and one FX rate per non-USD currency', () => {
+    const { db } = small;
+    expect(
+      db
+        .select()
+        .from(countries)
+        .all()
+        .map((c) => [c.code, c.currencyCode]),
+    ).toEqual([
+      ['IN', 'INR'],
+      ['US', 'USD'],
+      ['DE', 'EUR'],
+    ]);
+    expect(db.select().from(departments).all()).toHaveLength(7);
+    expect(
+      db
+        .select()
+        .from(levels)
+        .all()
+        .map((l) => l.rank),
+    ).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(
+      db
+        .select()
+        .from(fxRates)
+        .all()
+        .map((r) => r.currencyCode)
+        .sort(),
+    ).toEqual(['EUR', 'INR']);
+  });
+
+  it('creates the requested number of employees spread over every country, department and level', () => {
+    const rows = small.db.select().from(employees).all();
+    expect(rows).toHaveLength(SMALL);
+    expect(small.result).toMatchObject({ skipped: false, employees: SMALL });
+    expect(new Set(rows.map((e) => e.countryCode))).toEqual(new Set(['IN', 'US', 'DE']));
+    expect(new Set(rows.map((e) => e.departmentId)).size).toBe(7);
+    expect(new Set(rows.map((e) => e.levelId)).size).toBe(6);
+  });
+
+  it('gives every employee a unique email', () => {
+    const emails = small.db
+      .select()
+      .from(employees)
+      .all()
+      .map((e) => e.email);
+    expect(new Set(emails).size).toBe(emails.length);
+  });
+
+  it('reports history and batch counts that match the database', () => {
+    expect(small.result.salaryHistoryRows).toBe(small.db.select().from(salaryHistory).all().length);
+    expect(small.result.revisionBatches).toBe(
+      small.db.select().from(salaryRevisionBatches).all().length,
+    );
+  });
+
+  it('marks a small share of employees inactive', () => {
+    const inactive = small.db
+      .select()
+      .from(employees)
+      .all()
+      .filter((e) => e.status === 'inactive');
+    expect(inactive.length).toBeGreaterThan(0);
+    expect(inactive.length / SMALL).toBeLessThan(0.1);
+    expect(small.result.inactiveEmployees).toBe(inactive.length);
+  });
+
+  it('never dates a salary change after the reference date or before the hire date', () => {
+    const hireDates = new Map(
+      small.db
+        .select()
+        .from(employees)
+        .all()
+        .map((e) => [e.id, e.hireDate]),
+    );
+    const rows = small.db.select().from(salaryHistory).all();
+    for (const row of rows) {
+      expect(row.effectiveDate <= REFERENCE_DATE).toBe(true);
+      expect(row.effectiveDate >= hireDates.get(row.employeeId)!).toBe(true);
+    }
+    for (const hireDate of hireDates.values()) {
+      expect(hireDate <= REFERENCE_DATE).toBe(true);
+      expect(daysBetween(hireDate, REFERENCE_DATE)).toBeLessThanOrEqual(3650);
+    }
+  });
+
+  it('keeps every employee current salary equal to their latest history row', () => {
+    const history = small.db.select().from(salaryHistory).all();
+    const latest = new Map<number, (typeof history)[number]>();
+    for (const row of history) {
+      const best = latest.get(row.employeeId);
+      if (
+        !best ||
+        row.effectiveDate > best.effectiveDate ||
+        (row.effectiveDate === best.effectiveDate && row.id > best.id)
+      ) {
+        latest.set(row.employeeId, row);
+      }
+    }
+    for (const employee of small.db.select().from(employees).all()) {
+      const row = latest.get(employee.id)!;
+      expect(employee).toMatchObject({
+        currentAmountMinor: row.amountMinor,
+        currentCurrencyCode: row.currencyCode,
+        currentEffectiveDate: row.effectiveDate,
+        currentReason: row.reason,
+        levelId: row.levelId,
+        countryCode: row.countryCode,
+      });
+    }
+  });
+
+  it('records each bulk revision as a batch whose employee count equals its member rows', () => {
+    const batches = small.db.select().from(salaryRevisionBatches).all();
+    const members = small.db
+      .select()
+      .from(salaryHistory)
+      .all()
+      .filter((r) => r.batchId !== null);
+    expect(batches.length).toBeGreaterThan(0);
+
+    for (const batch of batches) {
+      const rows = members.filter((r) => r.batchId === batch.id);
+      expect(rows.length).toBe(batch.employeeCount);
+      expect(rows.every((r) => r.reason === 'raise')).toBe(true);
+      expect(rows.every((r) => r.effectiveDate === batch.effectiveDate)).toBe(true);
+      expect(batch.percentageBp).toBeGreaterThan(0);
+      expect(batch.percentageBp).toBeLessThanOrEqual(1000);
+    }
+  });
+
+  it('only gives a bulk revision to employees hired before its effective date', () => {
+    const hireDates = new Map(
+      small.db
+        .select()
+        .from(employees)
+        .all()
+        .map((e) => [e.id, e.hireDate]),
+    );
+    for (const row of small.db.select().from(salaryHistory).all()) {
+      if (row.batchId !== null)
+        expect(hireDates.get(row.employeeId)! < row.effectiveDate).toBe(true);
+    }
+  });
+
+  it('runs one increment cycle per year over the last five years', () => {
+    const dates = new Set(
+      small.db
+        .select()
+        .from(salaryRevisionBatches)
+        .all()
+        .map((b) => b.effectiveDate),
+    );
+    expect(dates.size).toBe(5);
+  });
+
+  it('has salary changes in both the last three years and years three to five', () => {
+    const rows = small.db
+      .select()
+      .from(salaryHistory)
+      .all()
+      .filter((r) => r.reason !== 'hire');
+    const recent = rows.filter((r) => daysBetween(r.effectiveDate, REFERENCE_DATE) <= 3 * 365);
+    const older = rows.filter((r) => {
+      const age = daysBetween(r.effectiveDate, REFERENCE_DATE);
+      return age > 3 * 365 && age <= 5 * 365;
+    });
+    expect(recent.length).toBeGreaterThan(0);
+    expect(older.length).toBeGreaterThan(0);
+  });
+
+  it('includes promotions that raise the level and relocations that change country and currency', () => {
+    const history = small.db.select().from(salaryHistory).orderBy(salaryHistory.id).all();
+    const rankById = new Map(
+      small.db
+        .select()
+        .from(levels)
+        .all()
+        .map((l) => [l.id, l.rank]),
+    );
+    const previous = new Map<number, (typeof history)[number]>();
+    let promotions = 0;
+    let relocations = 0;
+    const ordered = history
+      .slice()
+      .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.id - b.id);
+    for (const row of ordered) {
+      const before = previous.get(row.employeeId);
+      if (before && row.reason === 'promotion') {
+        promotions++;
+        expect(rankById.get(row.levelId)!).toBeGreaterThan(rankById.get(before.levelId)!);
+        expect(row.amountMinor).toBeGreaterThan(before.amountMinor);
+      }
+      if (before && row.reason === 'relocation') {
+        relocations++;
+        expect(row.countryCode).not.toBe(before.countryCode);
+        expect(row.currencyCode).not.toBe(before.currencyCode);
+      }
+      previous.set(row.employeeId, row);
+    }
+    expect(promotions).toBeGreaterThan(0);
+    expect(relocations).toBeGreaterThan(0);
+  });
+
+  it('produces identical database content for the same RNG seed and reference date', () => {
+    expect(dump(seeded().db)).toBe(dump(small.db));
+  });
+
+  it('produces different data for a different RNG seed', () => {
+    expect(dump(seeded({ rngSeed: 43 }).db)).not.toBe(dump(small.db));
+  });
+
+  it('skips and writes nothing when employees already exist', () => {
+    const { db } = seeded();
+    const before = dump(db);
+
+    const result = seed(db, { rngSeed: 7, referenceDate: REFERENCE_DATE, employeeCount: SMALL });
+
+    expect(result.skipped).toBe(true);
+    expect(dump(db)).toBe(before);
+  });
+
+  it('puts between 1% and 2.5% of active employees outside their country and level fences', () => {
+    const { db } = seeded({ employeeCount: 2000 });
+    const active = db
+      .select()
+      .from(employees)
+      .all()
+      .filter((e) => e.status === 'active');
+
+    const groups = new Map<string, number[]>();
+    for (const e of active) {
+      const key = `${e.countryCode}:${e.levelId}`;
+      groups.set(key, [...(groups.get(key) ?? []), e.currentAmountBaseMinor]);
+    }
+
+    let outliers = 0;
+    for (const amounts of groups.values()) {
+      if (amounts.length < MIN_PEER_GROUP_SIZE) continue;
+      const fences = outlierFences(computeDistribution(amounts));
+      outliers += amounts.filter((a) => isOutlier(a, fences)).length;
+    }
+
+    const share = outliers / active.length;
+    expect(share).toBeGreaterThanOrEqual(0.01);
+    expect(share).toBeLessThanOrEqual(0.025);
+  });
+});

@@ -165,6 +165,11 @@ export function listEmployeeRows(
   return { rows, total };
 }
 
+/** Every active employee with the names the insights show. Insights cover active staff only. */
+export function listActiveEmployeeRows(db: DbHandle): EmployeeListRow[] {
+  return selectEmployeeRows(db).where(eq(employees.status, 'active')).all().map(toListRow);
+}
+
 export function findEmployeeListRow(db: DbHandle, id: number): EmployeeListRow | undefined {
   const row = selectEmployeeRows(db).where(eq(employees.id, id)).get();
   return row && toListRow(row);

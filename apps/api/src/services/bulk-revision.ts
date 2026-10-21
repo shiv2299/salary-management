@@ -14,7 +14,7 @@ import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
 export type BulkPreviewInput = {
   percentageBp: number;
 } & (
-  | { filter: { country?: string; department?: number; level?: number; search?: string } }
+  | { filter: { country?: string[]; department?: number[]; level?: number[]; search?: string } }
   | { employeeIds: number[] }
 );
 

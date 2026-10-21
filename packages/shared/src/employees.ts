@@ -15,10 +15,29 @@ export const isoDateSchema = z
 export const MAX_PAGE_SIZE = 200;
 export const DEFAULT_PAGE_SIZE = 50;
 
+/**
+ * A filter that takes several values as `k=a&k=b`, `k=a,b` or both. Blank values are ignored and
+ * a filter left with no values is treated as absent.
+ */
+function splitListParam(raw: unknown): unknown {
+  if (raw === undefined) return undefined;
+  const parts = (Array.isArray(raw) ? raw : [raw]).flatMap((value: unknown) =>
+    typeof value === 'string' ? value.split(',') : [value],
+  );
+  const values = parts.filter((part) => typeof part !== 'string' || part.trim() !== '');
+  return values.length > 0 ? values : undefined;
+}
+
+const MAX_FILTER_VALUES = 100;
+
+function multiValueParam<T extends z.ZodType>(item: T) {
+  return z.preprocess(splitListParam, z.array(item).min(1).max(MAX_FILTER_VALUES).optional());
+}
+
 export const employeeListQuerySchema = z.object({
-  country: z.string().min(1).optional(),
-  department: z.coerce.number().int().positive().optional(),
-  level: z.coerce.number().int().positive().optional(),
+  country: multiValueParam(z.string().min(1)),
+  department: multiValueParam(z.coerce.number().int().positive()),
+  level: multiValueParam(z.coerce.number().int().positive()),
   status: z.enum(['active', 'inactive', 'all']).default('active'),
   search: z.string().trim().min(1).optional(),
   sortBy: z.enum(['name', 'salary', 'hireDate']).default('name'),

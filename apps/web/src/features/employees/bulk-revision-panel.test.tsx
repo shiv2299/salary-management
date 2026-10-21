@@ -30,7 +30,7 @@ function renderPanel(props: Partial<React.ComponentProps<typeof BulkRevisionPane
   const onDone = vi.fn();
   renderWithQuery(
     <BulkRevisionPanel
-      target={{ filter: { country: 'US' } }}
+      target={{ filter: { country: ['US'] } }}
       defaultNote="Engineering L3 United States"
       today="2026-10-19"
       onClose={onClose}
@@ -70,7 +70,7 @@ describe('BulkRevisionPanel', () => {
     requestPreview('7');
 
     await screen.findByText('First1 Last1');
-    expect(calls[0]?.body).toEqual({ filter: { country: 'US' }, percentageBp: 700 });
+    expect(calls[0]?.body).toEqual({ filter: { country: ['US'] }, percentageBp: 700 });
   });
 
   it('summarises the batch and marks a hand-overridden amount', async () => {

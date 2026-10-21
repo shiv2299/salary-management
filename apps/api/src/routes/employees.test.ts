@@ -61,6 +61,28 @@ describe('GET /api/employees', () => {
     expect(body.total).toBe(3);
   });
 
+  it('accepts repeated and comma-separated filter values and ignores blank ones', async () => {
+    const t = await setup();
+
+    for (const query of [
+      'country=US&country=IN',
+      'country=US,IN',
+      'country=&country=US',
+      'level=1,2',
+    ]) {
+      expect((await get(t, `/api/employees?${query}`)).json<{ total: number }>().total).toBe(3);
+    }
+    expect((await get(t, '/api/employees?country=IN')).json<{ total: number }>().total).toBe(0);
+  });
+
+  it('rejects a malformed department or level id with a validation error', async () => {
+    const t = await setup();
+
+    for (const query of ['level=abc', 'department=0', 'level=1,x']) {
+      expect((await get(t, `/api/employees?${query}`)).statusCode).toBe(400);
+    }
+  });
+
   it('rejects an unknown status, an oversized page or a negative offset with a validation error', async () => {
     const t = await setup();
 

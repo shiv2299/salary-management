@@ -73,9 +73,10 @@ export function markEmployeesInactive(db: DbHandle, ids: number[], updatedAt: st
 }
 
 export interface EmployeeListFilter {
-  country?: string;
-  department?: number;
-  level?: number;
+  /** Each list matches any of its values; an empty or missing list is no filter. */
+  country?: string[];
+  department?: number[];
+  level?: number[];
   status: EmployeeStatus | 'all';
   search?: string;
 }
@@ -99,10 +100,10 @@ function escapeLike(term: string): string {
 function listWhere(filter: EmployeeListFilter): SQL | undefined {
   const conditions: SQL[] = [];
   if (filter.status !== 'all') conditions.push(eq(employees.status, filter.status));
-  if (filter.country) conditions.push(eq(employees.countryCode, filter.country));
-  if (filter.department !== undefined)
-    conditions.push(eq(employees.departmentId, filter.department));
-  if (filter.level !== undefined) conditions.push(eq(employees.levelId, filter.level));
+  if (filter.country?.length) conditions.push(inArray(employees.countryCode, filter.country));
+  if (filter.department?.length)
+    conditions.push(inArray(employees.departmentId, filter.department));
+  if (filter.level?.length) conditions.push(inArray(employees.levelId, filter.level));
   if (filter.search) {
     // Unindexed substring scan on purpose; see docs/decisions.md ("Search").
     const pattern = `%${escapeLike(filter.search)}%`;

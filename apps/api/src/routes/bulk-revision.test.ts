@@ -47,7 +47,7 @@ describe('POST /api/employees/bulk-salary-changes/preview', () => {
     const t = await setup();
 
     const response = await post(t, '/api/employees/bulk-salary-changes/preview', {
-      filter: { country: 'US' },
+      filter: { country: ['US'] },
       percentageBp: 1000,
     });
 
@@ -55,6 +55,17 @@ describe('POST /api/employees/bulk-salary-changes/preview', () => {
     const body = response.json<{ items: { proposedAmountMinor: number }[]; total: number }>();
     expect(body.total).toBe(2);
     expect(body.items.map((i) => i.proposedAmountMinor)).toEqual([11_000_000, 22_000_000]);
+  });
+
+  it('rejects a filter value that is not a list with 400', async () => {
+    const t = await setup();
+
+    const response = await post(t, '/api/employees/bulk-salary-changes/preview', {
+      filter: { country: 'IN' },
+      percentageBp: 100,
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('rejects a percentage outside 1 to 10000 basis points with 400', async () => {

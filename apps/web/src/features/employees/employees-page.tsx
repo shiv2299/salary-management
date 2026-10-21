@@ -15,6 +15,7 @@ import { EmployeeTable } from './employee-table';
 import { ExportMenu } from './export-menu';
 import { NewEmployeeSheet } from './new-employee-sheet';
 import {
+  DEFAULT_FILTERS,
   PAGE_SIZE,
   bulkFilterFrom,
   filtersFromParams,
@@ -93,9 +94,9 @@ export function EmployeesPage({ today }: { today?: string }) {
 
   const hasActiveFilters =
     filters.search !== undefined ||
-    filters.country !== undefined ||
-    filters.department !== undefined ||
-    filters.level !== undefined ||
+    filters.country.length > 0 ||
+    filters.department.length > 0 ||
+    filters.level.length > 0 ||
     filters.status !== 'active';
 
   const selectionCount = allMatching ? (data?.total ?? 0) : selectedIds.size;
@@ -129,12 +130,14 @@ export function EmployeesPage({ today }: { today?: string }) {
 
   const defaultNote = allMatching
     ? [
-        departments?.find((department) => department.id === filters.department)?.name,
-        levels?.find((level) => level.id === filters.level)?.code,
-        countries?.find((country) => country.code === filters.country)?.name,
+        ...filters.department.map(
+          (id) => departments?.find((department) => department.id === id)?.name,
+        ),
+        ...filters.level.map((id) => levels?.find((level) => level.id === id)?.code),
+        ...filters.country.map((code) => countries?.find((country) => country.code === code)?.name),
       ]
         .filter(Boolean)
-        .join(' ') || 'All matching employees'
+        .join(', ') || 'All matching employees'
     : 'Selected employees';
 
   if (bulkOpen) {
@@ -248,7 +251,7 @@ export function EmployeesPage({ today }: { today?: string }) {
               variant="link"
               onClick={() => {
                 clearSelection();
-                writeFilters({ status: 'active', sortBy: 'name', sortOrder: 'asc', page: 1 });
+                writeFilters(DEFAULT_FILTERS);
               }}
             >
               Clear filters

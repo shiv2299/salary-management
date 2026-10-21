@@ -52,6 +52,17 @@ describe('GET /api/employees/export', () => {
     expect(response.body).toContain('Ann');
   });
 
+  it('exports the rows matching several values of one filter', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/export?scope=filtered&country=US&country=IN');
+
+    const rows = response.body.trimEnd().split('\r\n');
+    expect(rows).toHaveLength(3);
+    expect(response.body).toContain('Ann');
+    expect(response.body).toContain('Bob');
+  });
+
   it('includes inactive employees with a status column when scope is all', async () => {
     const t = await setup();
 

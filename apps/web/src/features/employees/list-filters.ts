@@ -1,12 +1,13 @@
-import { DEFAULT_PAGE_SIZE, employeeListQuerySchema } from '@acme/shared';
+import { DEFAULT_PAGE_SIZE, employeeListQuerySchema, type BulkPreviewBody } from '@acme/shared';
 
 export const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export interface ListFilters {
   search?: string;
-  country?: string;
-  department?: number;
-  level?: number;
+  /** Empty means no filter; several values match any of them. */
+  country: string[];
+  department: number[];
+  level: number[];
   status: 'active' | 'inactive' | 'all';
   sortBy: 'name' | 'salary' | 'hireDate';
   sortOrder: 'asc' | 'desc';
@@ -14,9 +15,20 @@ export interface ListFilters {
   page: number;
 }
 
-const DEFAULTS = { status: 'active', sortBy: 'name', sortOrder: 'asc', page: 1 } as const;
+export const DEFAULT_FILTERS: ListFilters = {
+  country: [],
+  department: [],
+  level: [],
+  status: 'active',
+  sortBy: 'name',
+  sortOrder: 'asc',
+  page: 1,
+};
 
-function pick<K extends keyof ListFilters>(
+type MultiValueKey = 'country' | 'department' | 'level';
+const MULTI_VALUE_KEYS: MultiValueKey[] = ['country', 'department', 'level'];
+
+function pick<K extends 'status' | 'sortBy' | 'sortOrder' | 'search'>(
   params: URLSearchParams,
   key: K,
   schema: (typeof employeeListQuerySchema)['shape'][K &
@@ -28,44 +40,59 @@ function pick<K extends keyof ListFilters>(
   return result.success ? (result.data as unknown) : undefined;
 }
 
+/** Every repeated or comma-separated value of a param that the shared schema accepts, once each. */
+function pickAll<K extends MultiValueKey>(params: URLSearchParams, key: K): ListFilters[K] {
+  const schema = employeeListQuerySchema.shape[key];
+  const values = new Set<unknown>();
+  for (const raw of params.getAll(key)) {
+    for (const token of raw.split(',')) {
+      const result = schema.safeParse(token);
+      if (result.success) for (const value of result.data ?? []) values.add(value);
+    }
+  }
+  return [...values] as ListFilters[K];
+}
+
 /** Reads the list state out of the URL, falling back to defaults for anything invalid. */
 export function filtersFromParams(params: URLSearchParams): ListFilters {
   const shape = employeeListQuerySchema.shape;
   const filters: ListFilters = {
     status:
       (pick(params, 'status', shape.status) as ListFilters['status'] | undefined) ??
-      DEFAULTS.status,
+      DEFAULT_FILTERS.status,
     sortBy:
       (pick(params, 'sortBy', shape.sortBy) as ListFilters['sortBy'] | undefined) ??
-      DEFAULTS.sortBy,
+      DEFAULT_FILTERS.sortBy,
     sortOrder:
       (pick(params, 'sortOrder', shape.sortOrder) as ListFilters['sortOrder'] | undefined) ??
-      DEFAULTS.sortOrder,
-    page: DEFAULTS.page,
+      DEFAULT_FILTERS.sortOrder,
+    country: pickAll(params, 'country'),
+    department: pickAll(params, 'department'),
+    level: pickAll(params, 'level'),
+    page: DEFAULT_FILTERS.page,
   };
   const search = pick(params, 'search', shape.search) as string | undefined;
-  const country = pick(params, 'country', shape.country) as string | undefined;
-  const department = pick(params, 'department', shape.department) as number | undefined;
-  const level = pick(params, 'level', shape.level) as number | undefined;
   const page = Number(params.get('page'));
   if (search) filters.search = search;
-  if (country) filters.country = country;
-  if (department !== undefined) filters.department = department;
-  if (level !== undefined) filters.level = level;
   if (Number.isInteger(page) && page > 1) filters.page = page;
   return filters;
+}
+
+/** One repeated param per value, e.g. `country=IN&country=DE`. */
+function appendMultiValues(params: URLSearchParams, filters: ListFilters) {
+  for (const key of MULTI_VALUE_KEYS) {
+    for (const value of filters[key]) params.append(key, String(value));
+  }
 }
 
 /** The inverse of filtersFromParams. Defaults are left out so the URL stays short. */
 export function paramsFromFilters(filters: ListFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.search) params.set('search', filters.search);
-  if (filters.country) params.set('country', filters.country);
-  if (filters.department !== undefined) params.set('department', String(filters.department));
-  if (filters.level !== undefined) params.set('level', String(filters.level));
-  if (filters.status !== DEFAULTS.status) params.set('status', filters.status);
-  if (filters.sortBy !== DEFAULTS.sortBy) params.set('sortBy', filters.sortBy);
-  if (filters.sortOrder !== DEFAULTS.sortOrder) params.set('sortOrder', filters.sortOrder);
+  appendMultiValues(params, filters);
+  if (filters.status !== DEFAULT_FILTERS.status) params.set('status', filters.status);
+  if (filters.sortBy !== DEFAULT_FILTERS.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters.sortOrder !== DEFAULT_FILTERS.sortOrder) params.set('sortOrder', filters.sortOrder);
   if (filters.page > 1) params.set('page', String(filters.page));
   return params;
 }
@@ -74,9 +101,7 @@ export function paramsFromFilters(filters: ListFilters): URLSearchParams {
 export function listApiQuery(filters: ListFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.search) params.set('search', filters.search);
-  if (filters.country) params.set('country', filters.country);
-  if (filters.department !== undefined) params.set('department', String(filters.department));
-  if (filters.level !== undefined) params.set('level', String(filters.level));
+  appendMultiValues(params, filters);
   params.set('status', filters.status);
   params.set('sortBy', filters.sortBy);
   params.set('sortOrder', filters.sortOrder);
@@ -99,19 +124,18 @@ export function exportHref(scope: 'filtered' | 'all', filters?: ListFilters): st
       'sortBy',
       'sortOrder',
     ]) {
-      const value = query.get(key);
-      if (value !== null) params.set(key, value);
+      for (const value of query.getAll(key)) params.append(key, value);
     }
   }
   return `/api/employees/export?${params.toString()}`;
 }
 
 /** The part of the list's filters a bulk revision accepts. Inactive staff are always skipped. */
-export function bulkFilterFrom(filters: ListFilters) {
+export function bulkFilterFrom(filters: ListFilters): NonNullable<BulkPreviewBody['filter']> {
   return {
     ...(filters.search ? { search: filters.search } : {}),
-    ...(filters.country ? { country: filters.country } : {}),
-    ...(filters.department !== undefined ? { department: filters.department } : {}),
-    ...(filters.level !== undefined ? { level: filters.level } : {}),
+    ...(filters.country.length > 0 ? { country: filters.country } : {}),
+    ...(filters.department.length > 0 ? { department: filters.department } : {}),
+    ...(filters.level.length > 0 ? { level: filters.level } : {}),
   };
 }

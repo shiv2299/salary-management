@@ -46,7 +46,7 @@ describe('previewBulkRevision', () => {
     add({ levelId: 2 });
 
     const preview = previewBulkRevision(database.db, {
-      filter: { level: 1 },
+      filter: { level: [1] },
       percentageBp: 700,
     });
 
@@ -57,6 +57,19 @@ describe('previewBulkRevision', () => {
       currentAmountMinor: 10_000_000,
       proposedAmountMinor: 10_700_000,
     });
+  });
+
+  it('previews every active employee matching any of the listed countries', () => {
+    const india = add({ countryCode: 'IN' });
+    const germany = add({ countryCode: 'DE' });
+    add({ countryCode: 'US' });
+
+    const preview = previewBulkRevision(database.db, {
+      filter: { country: ['IN', 'DE'] },
+      percentageBp: 100,
+    });
+
+    expect(preview.items.map((i) => i.employeeId).sort()).toEqual([india, germany].sort());
   });
 
   it('skips inactive employees even when the filter asks for them', () => {

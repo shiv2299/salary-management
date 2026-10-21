@@ -73,7 +73,7 @@ describe('exportEmployeesCsv', () => {
     add({ countryCode: 'IN' });
     add({ countryCode: 'US' });
 
-    const rows = lines(csv(listQuery({ country: 'US' }))).slice(1);
+    const rows = lines(csv(listQuery({ country: ['US'] }))).slice(1);
 
     expect(rows).toHaveLength(2);
   });
@@ -90,7 +90,7 @@ describe('exportEmployeesCsv', () => {
     add({ countryCode: 'US' });
     deactivateEmployee(database.db, add({ countryCode: 'IN' }), deps);
 
-    const rows = lines(csv({ ...listQuery({ country: 'US' }), scope: 'all' })).slice(1);
+    const rows = lines(csv({ ...listQuery({ country: ['US'] }), scope: 'all' })).slice(1);
 
     expect(rows).toHaveLength(2);
     expect(rows.some((row) => row.includes(',inactive,'))).toBe(true);

@@ -6,9 +6,9 @@ const percentageBpSchema = z.number().int().min(1).max(10_000);
 
 const bulkFilterSchema = z
   .object({
-    country: z.string().min(1).optional(),
-    department: z.number().int().positive().optional(),
-    level: z.number().int().positive().optional(),
+    country: z.array(z.string().min(1)).min(1).max(100).optional(),
+    department: z.array(z.number().int().positive()).min(1).max(100).optional(),
+    level: z.array(z.number().int().positive()).min(1).max(100).optional(),
     search: z.string().trim().min(1).optional(),
   })
   .strict();

@@ -140,9 +140,42 @@ describe('listEmployees filters', () => {
       amountMinor: 500_000_000,
     });
 
-    const result = list({ country: 'IN', department: 2, level: 3 });
+    const result = list({ country: ['IN'], department: [2], level: [3] });
 
     expect(names(result)).toEqual(['Match A']);
+  });
+});
+
+describe('listEmployees multi-value filters', () => {
+  it('matches any of several countries, departments or levels and all of the groups together', () => {
+    database.db.insert(departments).values({ name: 'Sales' }).run();
+    add({ firstName: 'Match', lastName: 'One', countryCode: 'IN', departmentId: 2, levelId: 3 });
+    add({ firstName: 'Match', lastName: 'Two', countryCode: 'DE', departmentId: 2, levelId: 3 });
+    add({
+      firstName: 'Wrong',
+      lastName: 'Country',
+      countryCode: 'US',
+      departmentId: 2,
+      levelId: 3,
+    });
+    add({
+      firstName: 'Wrong',
+      lastName: 'Department',
+      countryCode: 'IN',
+      departmentId: 1,
+      levelId: 3,
+    });
+    add({ firstName: 'Wrong', lastName: 'Level', countryCode: 'DE', departmentId: 2, levelId: 1 });
+
+    const result = list({ country: ['IN', 'DE'], department: [2], level: [3, 2] });
+
+    expect(names(result)).toEqual(['Match One', 'Match Two']);
+  });
+
+  it('treats an empty list of values as no filter', () => {
+    add({ firstName: 'A', lastName: 'One' });
+
+    expect(list({ country: [], department: [], level: [] }).total).toBe(1);
   });
 });
 

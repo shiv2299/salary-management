@@ -85,9 +85,9 @@ function Dropdowns({ filters, onChange, stacked }: Props & { stacked?: boolean }
         'Country',
         <Select
           aria-label="Country"
-          value={filters.country ?? ''}
+          value={filters.country[0] ?? ''}
           onChange={(event) => {
-            onChange({ country: event.target.value || undefined });
+            onChange({ country: event.target.value ? [event.target.value] : [] });
           }}
         >
           <option value="">All countries</option>
@@ -102,9 +102,9 @@ function Dropdowns({ filters, onChange, stacked }: Props & { stacked?: boolean }
         'Department',
         <Select
           aria-label="Department"
-          value={filters.department ?? ''}
+          value={filters.department[0] ?? ''}
           onChange={(event) => {
-            onChange({ department: event.target.value ? Number(event.target.value) : undefined });
+            onChange({ department: event.target.value ? [Number(event.target.value)] : [] });
           }}
         >
           <option value="">All departments</option>
@@ -119,9 +119,9 @@ function Dropdowns({ filters, onChange, stacked }: Props & { stacked?: boolean }
         'Level',
         <Select
           aria-label="Level"
-          value={filters.level ?? ''}
+          value={filters.level[0] ?? ''}
           onChange={(event) => {
-            onChange({ level: event.target.value ? Number(event.target.value) : undefined });
+            onChange({ level: event.target.value ? [Number(event.target.value)] : [] });
           }}
         >
           <option value="">All levels</option>
@@ -153,9 +153,9 @@ function Dropdowns({ filters, onChange, stacked }: Props & { stacked?: boolean }
 /** The count of non-default dropdown filters, shown on the mobile "Filters" button. */
 function activeFilterCount(filters: ListFilters) {
   return (
-    Number(filters.country !== undefined) +
-    Number(filters.department !== undefined) +
-    Number(filters.level !== undefined) +
+    Number(filters.country.length > 0) +
+    Number(filters.department.length > 0) +
+    Number(filters.level.length > 0) +
     Number(filters.status !== 'active')
   );
 }

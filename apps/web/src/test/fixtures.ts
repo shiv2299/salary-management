@@ -1,4 +1,4 @@
-import type { EmployeeDetail, EmployeeFacets, EmployeeListItem } from '@acme/shared';
+import type { EmployeeDetail, EmployeeFacets, EmployeeListItem, PeerContext } from '@acme/shared';
 
 export function employeeItem(overrides: Partial<EmployeeListItem> = {}): EmployeeListItem {
   return {
@@ -55,6 +55,19 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
         changeBp: null,
       },
     ],
+    ...overrides,
+  };
+}
+
+export function peerContext(overrides: Partial<PeerContext> = {}): PeerContext {
+  return {
+    countryCode: 'IN',
+    levelId: 3,
+    levelCode: 'L3',
+    currencyCode: 'INR',
+    headcount: 214,
+    typical: { p25: 400_000_000, median: 450_000_000, p75: 520_000_000 },
+    position: { typical: 'inside', outlier: null },
     ...overrides,
   };
 }

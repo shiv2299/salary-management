@@ -11,7 +11,7 @@ export function initials(name: string): string {
 const sizes = {
   sm: 'size-6 text-[10px]',
   md: 'size-8 text-xs',
-  lg: 'size-12 text-base',
+  lg: 'size-10 text-sm',
 } as const;
 
 // Decorative: the person's name is always written beside it (docs/design.md §8).

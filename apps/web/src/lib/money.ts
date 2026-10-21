@@ -69,6 +69,23 @@ export function formatPercentageBp(bp: number): string {
   return `${whole}${fraction ? `.${fraction}` : ''}%`;
 }
 
+/** "+11.11%", "-2.5%" or "0%": a signed change in basis points. */
+export function formatChangeBp(bp: number): string {
+  if (bp === 0) return '0%';
+  return `${bp > 0 ? '+' : '-'}${formatPercentageBp(Math.abs(bp))}`;
+}
+
+/** A money change with an explicit sign; zero carries none. */
+export function formatSignedMoney(
+  amountMinor: number,
+  currencyCode: string,
+  options: { fraction?: boolean } = {},
+): string {
+  if (amountMinor === 0) return formatMoney(0, currencyCode, options);
+  const sign = amountMinor > 0 ? '+' : '-';
+  return `${sign}${formatMoney(Math.abs(amountMinor), currencyCode, options)}`;
+}
+
 /** Plain-text amount for an input's default value, e.g. 9000050 USD -> "90000.50". */
 export function toInputAmount(amountMinor: number, currencyCode: string): string {
   return toDecimalString(amountMinor, minorExponent(currencyCode));

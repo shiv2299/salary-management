@@ -1,5 +1,6 @@
 import {
   employeeDetailSchema,
+  peerContextSchema,
   type EmployeeDetail,
   type NewEmployeeBody,
   type SalaryChangeBody,
@@ -15,11 +16,19 @@ export function useEmployee(id: number) {
   });
 }
 
+export function usePeerContext(id: number) {
+  return useQuery({
+    queryKey: ['employees', 'peer-context', id],
+    queryFn: () => apiGet(`/api/employees/${id}/peer-context`, peerContextSchema),
+  });
+}
+
 /** Every write returns the full detail, so the cache is replaced without a second request. */
 function useDetailCache() {
   const queryClient = useQueryClient();
   return (detail: EmployeeDetail) => {
     queryClient.setQueryData(['employees', 'detail', detail.id], detail);
+    void queryClient.invalidateQueries({ queryKey: ['employees', 'peer-context', detail.id] });
     void queryClient.invalidateQueries({ queryKey: ['employees', 'list'] });
     void queryClient.invalidateQueries({ queryKey: ['insights'] });
   };

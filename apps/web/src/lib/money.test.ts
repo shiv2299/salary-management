@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, formatPercentageBp, parseMajorToMinor, parsePercentageToBp } from './money';
+import {
+  formatChangeBp,
+  formatMoney,
+  formatPercentageBp,
+  formatSignedMoney,
+  parseMajorToMinor,
+  parsePercentageToBp,
+} from './money';
 
 describe('formatMoney', () => {
   it('formats US dollars from integer cents', () => {
@@ -58,5 +65,21 @@ describe('percentages in basis points', () => {
     expect(formatPercentageBp(700)).toBe('7%');
     expect(formatPercentageBp(725)).toBe('7.25%');
     expect(formatPercentageBp(50)).toBe('0.5%');
+  });
+});
+
+describe('signed changes', () => {
+  it('formats a percentage change with its sign', () => {
+    expect([formatChangeBp(1111), formatChangeBp(-250), formatChangeBp(0)]).toEqual([
+      '+11.11%',
+      '-2.5%',
+      '0%',
+    ]);
+  });
+
+  it('formats a money change with its sign', () => {
+    expect(formatSignedMoney(50_000_000, 'INR')).toBe('+₹5,00,000.00');
+    expect(formatSignedMoney(-100_000, 'USD')).toBe('-$1,000.00');
+    expect(formatSignedMoney(0, 'INR')).toBe('₹0.00');
   });
 });

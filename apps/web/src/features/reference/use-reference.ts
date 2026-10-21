@@ -20,6 +20,11 @@ export function useCountries() {
   });
 }
 
+/** The country's name, falling back to its code until the reference data has loaded. */
+export function useCountryName(code: string): string {
+  return useCountries().data?.find((country) => country.code === code)?.name ?? code;
+}
+
 export function useDepartments() {
   return useQuery({
     queryKey: ['reference', 'departments'],

@@ -76,6 +76,7 @@ function useDetailCache() {
     void queryClient.invalidateQueries({ queryKey: ['employees', 'peer-context', detail.id] });
     void queryClient.invalidateQueries({ queryKey: ['employees', 'salary-preview', detail.id] });
     void queryClient.invalidateQueries({ queryKey: ['employees', 'list'] });
+    void queryClient.invalidateQueries({ queryKey: ['employees', 'facets'] });
     void queryClient.invalidateQueries({ queryKey: ['insights'] });
   };
 }

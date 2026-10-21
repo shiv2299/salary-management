@@ -29,7 +29,7 @@ export function CheckboxGroup<T extends string | number>({
               key={option.value}
               className={cn(
                 'flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-1 text-sm md:min-h-8',
-                checked ? 'bg-accent-tint' : 'hover:bg-surface',
+                checked ? 'bg-accent-tint' : 'hover:bg-border/60',
                 option.count === 0 && !checked ? 'text-text-secondary' : 'text-text-primary',
               )}
             >

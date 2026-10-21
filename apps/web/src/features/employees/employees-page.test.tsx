@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { employeeItem, REFERENCE_ROUTES } from '@/test/fixtures';
+import { employeeFacets, employeeItem, REFERENCE_ROUTES } from '@/test/fixtures';
 import { renderWithQuery, stubApi } from '@/test/render';
 import { EmployeesPage } from './employees-page';
 
@@ -14,9 +14,10 @@ vi.mock('next/link', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const replace = vi.fn();
+const push = vi.fn();
 let search = '';
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace, push: vi.fn() }),
+  useRouter: () => ({ replace, push }),
   useSearchParams: () => new URLSearchParams(search),
 }));
 
@@ -32,6 +33,7 @@ function listResponse(total = 2) {
 function stubList(total?: number) {
   return stubApi({
     ...REFERENCE_ROUTES,
+    'GET /api/employees/facets': employeeFacets(),
     'GET /api/employees': () => Response.json(listResponse(total)),
   });
 }
@@ -39,11 +41,13 @@ function stubList(total?: number) {
 describe('EmployeesPage', () => {
   beforeEach(() => {
     search = '';
+    localStorage.clear();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     replace.mockClear();
+    push.mockClear();
   });
 
   it('lists active employees by default, asking the server for the first page', async () => {
@@ -56,23 +60,85 @@ describe('EmployeesPage', () => {
     expect(list?.url.searchParams.get('offset')).toBe('0');
   });
 
-  it('reads search, filters, sort and page from the URL', async () => {
-    search = 'search=ann&country=IN&department=1&status=all&sortBy=salary&sortOrder=desc&page=2';
-    const { calls } = stubList(120);
+  it('reads repeated filters, sort, page and page size from the URL', async () => {
+    search = 'country=IN&country=DE&level=3&sortBy=level&sortOrder=desc&page=2&pageSize=100';
+    const { calls } = stubList(300);
     renderWithQuery(<EmployeesPage today="2026-10-19" />);
-
     await screen.findByRole('link', { name: 'Asha Rao' });
+    const params = calls.find((c) => c.url.pathname === '/api/employees')!.url.searchParams;
+    expect(params.getAll('country')).toEqual(['IN', 'DE']);
+    expect([params.get('sortBy'), params.get('limit'), params.get('offset')]).toEqual([
+      'level',
+      '100',
+      '100',
+    ]);
+  });
 
-    const params = calls.find((call) => call.url.pathname === '/api/employees')?.url.searchParams;
-    expect(Object.fromEntries(params ?? [])).toMatchObject({
-      search: 'ann',
-      country: 'IN',
-      department: '1',
-      status: 'all',
-      sortBy: 'salary',
-      sortOrder: 'desc',
-      offset: '50',
+  it('shows the selected filters as chips and removes one', async () => {
+    search = 'country=IN&country=DE';
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove filter India' }));
+    expect(replace).toHaveBeenCalledWith('/employees?country=DE', { scroll: false });
+  });
+
+  it('clears every filter and the search at once', async () => {
+    search = 'search=ann&country=IN&level=3';
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear all' }));
+    expect(replace).toHaveBeenCalledWith('/employees', { scroll: false });
+  });
+
+  it('keeps a chosen page size when clearing every filter', async () => {
+    search = 'country=IN&pageSize=100';
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear all' }));
+    expect(replace).toHaveBeenCalledWith('/employees?pageSize=100', { scroll: false });
+  });
+
+  it('says how many employees match out of everyone in the chosen status', async () => {
+    search = 'country=IN';
+    stubList(2914);
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    expect(await screen.findByText('2,914 of 9,577')).toBeDefined();
+  });
+
+  it('says how many employees there are when nothing is filtered', async () => {
+    stubList(9577);
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    expect(await screen.findByText('9,577 employees')).toBeDefined();
+  });
+
+  it('opens the drawer with the list query when a row is clicked', async () => {
+    search = 'country=IN';
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    const row = (await screen.findByRole('link', { name: 'Ravi Menon' })).closest('tr')!;
+    fireEvent.click(within(row).getByText('Engineering'));
+    expect(push).toHaveBeenCalledWith('/employees/2?country=IN', { scroll: false });
+  });
+
+  it('changes the rows per page and returns to the first page', async () => {
+    search = 'page=3';
+    stubList(300);
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    fireEvent.change(await screen.findByLabelText('Rows per page'), { target: { value: '100' } });
+    expect(replace).toHaveBeenCalledWith('/employees?pageSize=100', { scroll: false });
+  });
+
+  it('hides a column chosen in the columns menu', async () => {
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    await screen.findByRole('link', { name: 'Asha Rao' });
+    expect(screen.queryByRole('columnheader', { name: /Salary/ })).not.toBeNull();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Columns' }), {
+      button: 0,
+      ctrlKey: false,
     });
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Salary' }));
+    expect(screen.queryByRole('columnheader', { name: /Salary/ })).toBeNull();
   });
 
   it('writes a changed filter to the URL and returns to the first page', async () => {
@@ -81,9 +147,9 @@ describe('EmployeesPage', () => {
     renderWithQuery(<EmployeesPage today="2026-10-19" />);
     await screen.findByRole('link', { name: 'Asha Rao' });
 
-    fireEvent.change(await screen.findByLabelText('Status'), { target: { value: 'inactive' } });
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Inactive' }));
 
-    expect(replace).toHaveBeenCalledWith('/employees?status=inactive', { scroll: false });
+    expect(replace).toHaveBeenCalledWith('/employees?status=all', { scroll: false });
   });
 
   it('offers the export of exactly the current filters and of everyone', async () => {
@@ -127,6 +193,22 @@ describe('EmployeesPage', () => {
       within(bar).getByRole('button', { name: 'Select all 120 matching this filter' }),
     );
     expect(within(bar).getByText('All 120 matching selected')).toBeDefined();
+  });
+
+  it('keeps the rest of the page selected, and the count right, after unticking one row of all matching', async () => {
+    stubList(120);
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    await screen.findByRole('link', { name: 'Asha Rao' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Asha Rao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select all 120 matching this filter' }));
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Asha Rao' }));
+
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    expect(within(bar).getByText('1 selected')).toBeDefined();
+    expect(
+      within(bar).getByRole('button', { name: 'Select all 120 matching this filter' }),
+    ).toBeDefined();
   });
 
   it('previews a bulk revision for the selected employee ids', async () => {

@@ -25,6 +25,7 @@ import {
 import { SalaryComparison } from './salary-comparison';
 import {
   fetchSalaryPreview,
+  sameComparisonContext,
   usePeerContext,
   useSalaryChange,
   useSalaryPreview,
@@ -121,6 +122,8 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
   );
   const comparison = useSalaryPreview(employee.id, debouncedBody);
   const currentPeer = usePeerContext(employee.id).data;
+  // Until the debounce catches up, the answer on hand may be for another reason, country or level.
+  const settled = sameComparisonContext(comparisonBody, debouncedBody);
 
   if (employee.status === 'inactive') {
     return (
@@ -194,6 +197,7 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
       setAmountText(toInputAmount(result.proposed.amountMinor, result.proposed.currencyCode));
     } catch {
       if (ticket !== latestConversion.current) return;
+      setPressed((now) => (typeof now === 'number' ? null : now));
       setQuickError('Could not work out that percentage. Enter the amount instead.');
     }
   }
@@ -405,6 +409,7 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
               <QuickButton
                 pressed={pressed === 'custom'}
                 onClick={() => {
+                  latestConversion.current++;
                   setPressed('custom');
                   setCustomOpen(true);
                 }}
@@ -422,6 +427,7 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
                 aria-invalid={customError ? true : undefined}
                 onChange={(event) => {
                   setCustomText(event.target.value);
+                  setCustomError(null);
                 }}
                 onKeyDown={onCustomKeyDown}
                 className="w-24 text-right tabular-nums"
@@ -449,7 +455,7 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
 
       <SalaryComparison
         employee={employee}
-        preview={comparisonBody ? comparison.data : null}
+        preview={comparisonBody ? (settled ? comparison.data : undefined) : null}
         currentPeer={currentPeer}
         countryName={destination?.name ?? ownCountryName}
         failed={comparison.isError}

@@ -510,6 +510,133 @@ describe('SalaryChangeForm', () => {
     });
   });
 
+  it("never shows the previous reason's figures under a new reason or country", async () => {
+    renderForm({
+      routes: {
+        'GET /api/reference/fx/convert': { amountMinor: 6_000_000, currencyCode: 'EUR' },
+        'POST /api/employees/1/salary-changes/preview': async (_url, init) => {
+          const body = JSON.parse(init.body as string) as { reason: string };
+          if (body.reason !== 'relocation') return Response.json(salaryPreview());
+          await tick(100);
+          return Response.json(
+            salaryPreview({
+              proposed: { amountMinor: 6_000_000, currencyCode: 'EUR', amountBaseMinor: 6_480_000 },
+              changeBaseMinor: 490_000,
+              changeBp: 818,
+              peer: peerContext({ countryCode: 'DE', currencyCode: 'EUR' }),
+            }),
+          );
+        },
+      },
+    });
+    const box = screen.getByRole('region', { name: 'Comparison' });
+    await waitFor(() => {
+      expect(within(box).getByText('+₹5,00,000.00 (+10%)')).toBeDefined();
+    });
+
+    chooseReason('Relocation');
+    expect(within(box).queryByText('+₹5,00,000.00 (+10%)')).toBeNull();
+    await screen.findByRole('option', { name: 'Germany' });
+    fireEvent.change(screen.getByLabelText('New country'), { target: { value: 'DE' } });
+    await waitFor(() => {
+      expect(amountValue()).toBe('60000.00');
+    });
+    // The new amount has arrived but the comparison for it has not: nothing from the raise remains.
+    expect(within(box).queryByText('+₹5,00,000.00 (+10%)')).toBeNull();
+    expect(within(box).getByText('Comparing…')).toBeDefined();
+    await tick(350);
+    expect(within(box).queryByText('+₹5,00,000.00 (+10%)')).toBeNull();
+    expect(within(box).getByText('Comparing…')).toBeDefined();
+
+    await waitFor(() => {
+      expect(within(box).getByText('+8.18%')).toBeDefined();
+    });
+  });
+
+  it('does not request a comparison for an amount that does not parse or a relocation without a country', async () => {
+    const { calls } = renderForm();
+    await tick(50);
+    typeAmount('abc');
+    await tick(400);
+    chooseReason('Relocation');
+    await tick(400);
+
+    expect(previewBodies(calls)).toEqual([{ reason: 'raise', amountMinor: 500_000_000 }]);
+  });
+
+  describe('a late quick percentage', () => {
+    function renderSlowQuick() {
+      return renderForm({
+        routes: {
+          'POST /api/employees/1/salary-changes/preview': async (_url, init) => {
+            const body = JSON.parse(init.body as string) as { percentageBp?: number };
+            if (body.percentageBp === undefined) return Response.json(salaryPreview());
+            await tick(50);
+            return Response.json(
+              salaryPreview({
+                proposed: { amountMinor: 525_000_000, currencyCode: 'INR', amountBaseMinor: 0 },
+              }),
+            );
+          },
+        },
+      });
+    }
+
+    it('is dropped after the reason changes', async () => {
+      renderSlowQuick();
+
+      fireEvent.click(screen.getByRole('button', { name: '+5%' }));
+      chooseReason('Correction');
+      await tick(100);
+
+      expect(amountValue()).toBe('5000000.00');
+    });
+
+    it('is dropped once Custom % is pressed', async () => {
+      renderSlowQuick();
+
+      fireEvent.click(screen.getByRole('button', { name: '+5%' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Custom %' }));
+      await tick(100);
+
+      expect(amountValue()).toBe('5000000.00');
+      expect(screen.getByRole('button', { name: '+5%' }).getAttribute('aria-pressed')).toBe(
+        'false',
+      );
+    });
+  });
+
+  it('leaves no quick percentage pressed when the server cannot work it out', async () => {
+    renderForm({
+      routes: {
+        'POST /api/employees/1/salary-changes/preview': (_url, init) => {
+          const body = JSON.parse(init.body as string) as { percentageBp?: number };
+          return body.percentageBp === undefined
+            ? Response.json(salaryPreview())
+            : apiError(500, 'INTERNAL', 'boom');
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '+5%' }));
+
+    expect(await screen.findByText(/Could not work out that percentage/)).toBeDefined();
+    expect(screen.getByRole('button', { name: '+5%' }).getAttribute('aria-pressed')).toBe('false');
+    expect(amountValue()).toBe('5000000.00');
+  });
+
+  it('clears the percentage error once the percentage is edited', async () => {
+    renderForm();
+    fireEvent.click(screen.getByRole('button', { name: 'Custom %' }));
+    fireEvent.change(screen.getByLabelText('Custom percentage'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    await screen.findByText('Enter a percentage from 0.01 to 100');
+
+    fireEvent.change(screen.getByLabelText('Custom percentage'), { target: { value: '5' } });
+
+    expect(screen.queryByText('Enter a percentage from 0.01 to 100')).toBeNull();
+  });
+
   describe('a late currency conversion', () => {
     function renderSlowConversion() {
       let release = () => {};

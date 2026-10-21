@@ -8,7 +8,7 @@ import {
   type SalaryChangeBody,
   type UpdateEmployeeBody,
 } from '@acme/shared';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiSend } from '@/lib/api';
 
 export function useEmployee(id: number) {
@@ -35,6 +35,24 @@ export function fetchSalaryPreview(id: number, body: SalaryChangePreviewBody) {
   );
 }
 
+/** What a preview is about besides the amount: a figure for one context is never shown for another. */
+export function sameComparisonContext(
+  a: SalaryChangePreviewBody | null | undefined,
+  b: SalaryChangePreviewBody | null | undefined,
+): boolean {
+  return (
+    !!a &&
+    !!b &&
+    a.reason === b.reason &&
+    a.newCountryCode === b.newCountryCode &&
+    a.newLevelId === b.newLevelId
+  );
+}
+
+/**
+ * The previous answer stays on screen while only the amount changes, so typing does not flicker;
+ * once the reason, country or level differs it is dropped.
+ */
 export function useSalaryPreview(id: number, body: SalaryChangePreviewBody | null) {
   return useQuery({
     queryKey: ['employees', 'salary-preview', id, body],
@@ -43,7 +61,10 @@ export function useSalaryPreview(id: number, body: SalaryChangePreviewBody | nul
       return fetchSalaryPreview(id, body);
     },
     enabled: body !== null,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, previousQuery) => {
+      const previousBody = previousQuery?.queryKey[3] as SalaryChangePreviewBody | null | undefined;
+      return sameComparisonContext(previousBody, body) ? previous : undefined;
+    },
   });
 }
 

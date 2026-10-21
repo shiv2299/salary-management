@@ -337,7 +337,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: several options in one group are OR-ed, and groups are AND-ed. In Status, Active and Inactive both ticked means all, and neither ticked means the default (active). A group's counts apply the search and every other group's selection but not its own.
 
-**Why**: "India and Germany" is a normal question, and single-select cannot ask it. Counts over the whole table would say 3,200 for an option that returns 40 once another filter is on. Leaving a group's own selection out of its counts shows what ticking each option would give, so the counts of a ticked group's siblings stay meaningful instead of dropping to zero.
+**Why**: "India and Germany" is a normal question, and single-select cannot ask it. Counts over the whole table would say 3,200 for an option that returns 40 once another filter is on. Leaving a group's own selection out of its counts shows how many employees each option matches by itself, so the counts of a ticked group's siblings stay meaningful instead of dropping to zero. A count is therefore not the size of the result after ticking that option: with India ticked, Germany's count is Germany's employees, and ticking it returns India plus Germany.
 
 ## Employee table: TanStack Table, headless, sorting and paging on the server
 

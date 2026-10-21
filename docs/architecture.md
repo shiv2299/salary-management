@@ -133,7 +133,7 @@ Peer grouping for outliers is country + level, not + department: at 10,000 emplo
 |---|---|
 | `POST /api/auth/login` \| `/logout`, `GET /api/auth/me` | Session cookie lifecycle (§4) |
 | `GET /api/employees` | Paginated list; filters: `country`, `department`, `level` (each multi-valued: repeated or comma-separated; OR within a filter, AND across filters), `status` (default `active`; also `inactive`, `all`), `search`; `sortBy` one of name, `jobTitle`, `department`, `level` (by rank), `country`, hire date, salary (salary sorts by `current_amount_base_minor`); offset pagination |
-| `GET /api/employees/facets?<list filters>` | Per-group option counts for the filter panel (`country`, `department`, `level`, `status`) plus `statusTotal`. Each group's counts apply the search and every other group's selection but not its own, so a count is what ticking that option would return |
+| `GET /api/employees/facets?<list filters>` | Per-group option counts for the filter panel (`country`, `department`, `level`, `status`) plus `statusTotal`. Each group's counts apply the search and every other group's selection but not its own, so each option's count is how many employees match that option under the search and the other groups' selections (with a sibling already ticked in the same group, ticking another adds to the result rather than narrowing it) |
 | `GET /api/employees/:id` | Employee record + current salary + full salary history. Each history row carries `changeBp`, the % change from the previous row in basis points (across a relocation, compared in USD at the current static rates) |
 | `GET /api/employees/:id/peer-context` | The employee's peer group from `getPeerGroups` (§5): typical range (local p25–p75), median, headcount, and whether the employee is above, below, or inside the range; no range when the group is under the minimum size. Read-only |
 | `POST /api/employees/:id/salary-changes/preview` | `{ reason, amountMinor \| percentageBp, newLevelId?, newCountryCode? }` → `current` and `proposed` (local + USD), `changeBaseMinor`, `changeBp`, and `peer` (the peer sentence's data). Read-only; nothing is written. The amount for a percentage is computed here in `domain/`, so the browser never multiplies money |
@@ -181,7 +181,7 @@ src/features/
   auth/       # login form, useSession hook (wraps /api/auth/me), route guard
   employees/  # query hooks, table columns, filter panel, drawer tabs, forms, bulk-revision preview state (pagination + overrides)
   insights/   # query hooks, chart components
-src/components/ui/  # shared building blocks named in docs/design.md §5: card, stat tile, segmented control, chip, checkbox group, tabs, avatar, country flag, level badge, data table, menus
+src/components/ui/  # shared building blocks named in docs/design.md §5: card, stat tile, segmented control, chip, checkbox group, tabs, avatar, country flag, level badge, menus
 src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), throws a typed error on non-2xx; on 401 redirects to /login
 ```
 

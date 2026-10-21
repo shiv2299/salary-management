@@ -52,4 +52,14 @@ describe('LoginForm', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Invalid email or password');
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it('shows and hides the password', () => {
+    renderWithQuery(<LoginForm />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Password').type).toBe('text');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Password').type).toBe('password');
+  });
 });

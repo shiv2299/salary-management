@@ -3,6 +3,7 @@
 import { cn } from 'cn';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { AppMark } from '@/components/ui/app-mark';
 import { UserMenu } from './user-menu';
 
 const links = [
@@ -15,10 +16,8 @@ export function TopBar() {
   return (
     <header className="border-b border-border bg-background">
       <div className="flex h-14 items-center gap-4 px-4 md:h-12 md:px-8">
-        <span className="hidden text-base font-semibold text-text-primary sm:inline">
-          Salary Management
-        </span>
-        <nav aria-label="Main" className="flex items-center gap-1">
+        <AppMark nameClassName="hidden sm:inline" />
+        <nav aria-label="Main" className="flex items-stretch gap-4 self-stretch">
           {links.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
@@ -27,8 +26,10 @@ export function TopBar() {
                 href={link.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'inline-flex h-11 items-center rounded-sm px-2.5 text-sm font-medium md:h-8',
-                  active ? 'bg-primary/10 text-primary' : 'text-text-primary hover:bg-surface',
+                  'inline-flex items-center border-b-2 px-0.5 text-sm font-medium',
+                  active
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary',
                 )}
               >
                 {link.label}

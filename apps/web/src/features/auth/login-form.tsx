@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { sessionSchema } from './use-session';
 export function LoginForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const login = useMutation({
@@ -59,14 +61,30 @@ export function LoginForm() {
       </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={errors.password ? true : undefined}
-          aria-describedby={errors.password ? 'password-error' : undefined}
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            aria-invalid={errors.password ? true : undefined}
+            aria-describedby={errors.password ? 'password-error' : undefined}
+            className="pr-12 md:pr-9"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-pressed={showPassword}
+            onClick={() => {
+              setShowPassword((shown) => !shown);
+            }}
+            className="absolute top-0 right-0 text-text-secondary md:size-8"
+          >
+            {showPassword ? <EyeOff /> : <Eye />}
+          </Button>
+        </div>
         {errors.password && (
           <p id="password-error" className="text-xs text-negative">
             {errors.password}
@@ -78,7 +96,7 @@ export function LoginForm() {
           {login.error.message}
         </p>
       )}
-      <Button type="submit" disabled={login.isPending}>
+      <Button type="submit" disabled={login.isPending} className="w-full">
         {login.isPending ? 'Signing in...' : 'Sign in'}
       </Button>
     </form>

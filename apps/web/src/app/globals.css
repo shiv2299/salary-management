@@ -14,9 +14,15 @@
   --negative: #b91c1c;
   --warning: #b45309;
   --inactive: #6b7280;
+  --canvas: #f9fafb;
+  --accent-tint: #eff6ff;
+  --accent-tint-border: #bfdbfe;
+  --series-secondary: #93c5fd;
+  --series-promotion: #7c3aed;
+  --brand-panel: #0b1f4d;
 
   --foreground: var(--text-primary);
-  --card: var(--surface);
+  --card: var(--background);
   --card-foreground: var(--text-primary);
   --popover: var(--background);
   --popover-foreground: var(--text-primary);
@@ -45,6 +51,12 @@
   --color-negative: var(--negative);
   --color-warning: var(--warning);
   --color-inactive: var(--inactive);
+  --color-canvas: var(--canvas);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-tint-border: var(--accent-tint-border);
+  --color-series-secondary: var(--series-secondary);
+  --color-series-promotion: var(--series-promotion);
+  --color-brand-panel: var(--brand-panel);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);

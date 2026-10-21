@@ -7,21 +7,19 @@ interface SegmentedControlProps<T extends string | number> {
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
+  size?: 'sm' | 'md';
 }
 
-/** A small radio-style toggle, used for "3 years / 5 years" and the grouping choices. */
+/** A radio-style toggle, used for "3 years / 5 years", the grouping choices and the salary change reason. */
 export function SegmentedControl<T extends string | number>({
   label,
   value,
   options,
   onChange,
+  size = 'sm',
 }: SegmentedControlProps<T>) {
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="inline-flex rounded-sm border border-border bg-background p-0.5"
-    >
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-sm bg-surface p-0.5">
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -34,10 +32,11 @@ export function SegmentedControl<T extends string | number>({
               onChange(option.value);
             }}
             className={cn(
-              'h-10 rounded-sm px-3 text-sm font-medium md:h-6 md:px-2.5 md:text-xs',
+              'rounded-sm border px-3 font-medium',
+              size === 'md' ? 'h-11 text-sm md:h-9' : 'h-10 text-sm md:h-7 md:px-2.5 md:text-xs',
               selected
-                ? 'bg-primary text-primary-foreground'
-                : 'text-text-primary hover:bg-surface',
+                ? 'border-border bg-background text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary',
             )}
           >
             {option.label}

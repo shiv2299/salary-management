@@ -42,6 +42,11 @@ describe('DropdownMenu', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'Open' }), { key: 'ArrowDown' });
     const item = await screen.findByRole('menuitemcheckbox', { name: 'Active only' });
     expect(item.getAttribute('aria-checked')).toBe('true');
+    // The box is filled from its ancestor's state, so the item must be a `group` carrying data-state.
+    const box = item.querySelector('[data-slot="checkbox-box"]');
+    expect(item.getAttribute('data-state')).toBe('checked');
+    expect(item.classList.contains('group')).toBe(true);
+    expect(box?.classList.contains('group-data-[state=checked]:bg-primary')).toBe(true);
     fireEvent.click(item);
     expect(onCheckedChange).toHaveBeenCalledWith(false);
   });

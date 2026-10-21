@@ -65,6 +65,21 @@ describe('building blocks', () => {
     expect(screen.getByRole('group', { name: 'Country' })).toBeDefined();
   });
 
+  it('groups the thousands in a count', () => {
+    render(
+      <CheckboxGroup
+        legend="Country"
+        selected={[]}
+        onChange={vi.fn()}
+        options={[{ value: 'IN', label: 'India', count: 3355 }]}
+      />,
+    );
+    const india = screen.getByRole('checkbox', { name: 'India' });
+    expect(document.getElementById(india.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      '3,355',
+    );
+  });
+
   it('tints the ticked options with the accent fill and leaves the others plain', () => {
     render(
       <CheckboxGroup

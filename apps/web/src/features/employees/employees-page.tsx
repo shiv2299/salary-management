@@ -265,12 +265,14 @@ export function EmployeesPage({ today }: { today?: string }) {
             <div className="ml-auto flex items-center gap-3">
               {data && (
                 <span className="text-sm text-text-secondary tabular-nums">
-                  {filtered && facets
+                  {filtered && facets && data.total !== facets.statusTotal
                     ? `${data.total.toLocaleString('en-US')} of ${facets.statusTotal.toLocaleString('en-US')}`
                     : `${data.total.toLocaleString('en-US')} employees`}
                 </span>
               )}
-              <ColumnsMenu visibility={columnVisibility} onChange={setColumnVisibility} />
+              {isDesktop && (
+                <ColumnsMenu visibility={columnVisibility} onChange={setColumnVisibility} />
+              )}
             </div>
           </div>
 

@@ -35,7 +35,7 @@ export function Pagination({
               onChange={(event) => {
                 onPageSize(Number(event.target.value));
               }}
-              className="h-8 rounded-sm border border-border bg-background px-1 text-text-primary"
+              className="h-11 rounded-sm border border-border bg-background px-1 text-sm text-text-primary md:h-8 md:text-xs"
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>

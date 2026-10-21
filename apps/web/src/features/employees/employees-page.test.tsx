@@ -128,6 +128,25 @@ describe('EmployeesPage', () => {
     expect(replace).toHaveBeenCalledWith('/employees?pageSize=100', { scroll: false });
   });
 
+  it('says how many employees there are when only the status is changed', async () => {
+    search = 'status=all';
+    stubList(9577);
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    expect(await screen.findByText('9,577 employees')).toBeDefined();
+  });
+
+  it('leaves out the columns menu on a narrow screen, where the list has no columns', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    await screen.findByText('Asha Rao');
+    expect(screen.queryByRole('button', { name: 'Columns' })).toBeNull();
+  });
+
   it('hides a column chosen in the columns menu', async () => {
     stubList();
     renderWithQuery(<EmployeesPage today="2026-10-19" />);

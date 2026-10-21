@@ -51,4 +51,18 @@ describe('historyChangeBp', () => {
 
     expect(result.get(2)).toBe(818);
   });
+
+  it('leaves a row empty when the previous amount is zero in USD', () => {
+    const rates = { INR: 11_980_000 };
+
+    const result = historyChangeBp(
+      [
+        { id: 1, effectiveDate: '2020-01-01', amountMinor: 1, currencyCode: 'INR' }, // under half a cent
+        { id: 2, effectiveDate: '2021-01-01', amountMinor: 6_000_000, currencyCode: 'USD' },
+      ],
+      rates,
+    );
+
+    expect(result.get(2)).toBeNull();
+  });
 });

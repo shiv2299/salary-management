@@ -1,5 +1,5 @@
 import { BASE_CURRENCY, convert, type FxRates } from './fx';
-import { percentChangeBp } from './revision';
+import { percentChangeBpOrNull } from './revision';
 
 export interface HistoryChangeRow {
   id: number;
@@ -11,7 +11,8 @@ export interface HistoryChangeRow {
 /**
  * The percentage change of each history row from the row before it by effective date (ties by
  * id), in basis points. The first row has none. Rows in the same currency are compared in that
- * currency; across a change of currency both amounts are compared in USD at the given rates.
+ * currency; across a change of currency both amounts are compared in USD at the given rates. A row
+ * whose previous amount is zero in USD (a tiny salary rounded down) has no percentage either.
  */
 export function historyChangeBp(
   rows: HistoryChangeRow[],
@@ -26,11 +27,11 @@ export function historyChangeBp(
     if (!previous) {
       result.set(row.id, null);
     } else if (previous.currencyCode === row.currencyCode) {
-      result.set(row.id, percentChangeBp(previous.amountMinor, row.amountMinor));
+      result.set(row.id, percentChangeBpOrNull(previous.amountMinor, row.amountMinor));
     } else {
       result.set(
         row.id,
-        percentChangeBp(
+        percentChangeBpOrNull(
           convert(previous.amountMinor, previous.currencyCode, BASE_CURRENCY, rates),
           convert(row.amountMinor, row.currencyCode, BASE_CURRENCY, rates),
         ),

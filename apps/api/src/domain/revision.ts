@@ -27,3 +27,11 @@ export function percentChangeBp(fromMinor: number, toMinor: number): number {
   const scaled = (BigInt(toMinor) - BigInt(fromMinor)) * BASIS_POINTS_PER_WHOLE;
   return Number(divideRoundHalfAwayFromZero(scaled, BigInt(fromMinor)));
 }
+
+/**
+ * Like `percentChangeBp`, but `null` when there is no meaningful starting amount: a USD-converted
+ * amount can round down to zero for a very small salary, and a percentage of nothing is undefined.
+ */
+export function percentChangeBpOrNull(fromMinor: number, toMinor: number): number | null {
+  return fromMinor <= 0 ? null : percentChangeBp(fromMinor, toMinor);
+}

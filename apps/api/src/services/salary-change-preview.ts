@@ -2,7 +2,7 @@ import type { SalaryChangePreview, SalaryChangePreviewBody } from '@acme/shared'
 import type { DbHandle } from '../db/client';
 import { BASE_CURRENCY, convert } from '../domain/fx';
 import { peerGroupKey } from '../domain/peer-groups';
-import { percentChangeBp, proposedAmount } from '../domain/revision';
+import { percentChangeBpOrNull, proposedAmount } from '../domain/revision';
 import { notFound, unprocessable } from '../errors';
 import { listCountries } from '../repositories/countries';
 import { findEmployeeListRow } from '../repositories/employees';
@@ -43,10 +43,12 @@ export function previewSalaryChange(
     body.amountMinor ?? proposedAmount(employee.currentAmountMinor, body.percentageBp!);
   const amountBaseMinor = convert(amountMinor, currencyCode, BASE_CURRENCY, rates);
 
+  // `changeBp` is a number in the API; a current salary that is zero in USD has no percentage, so
+  // it reads as no change rather than failing the preview.
   const changeBp =
-    currencyCode === currentCurrency
-      ? percentChangeBp(employee.currentAmountMinor, amountMinor)
-      : percentChangeBp(employee.currentAmountBaseMinor, amountBaseMinor);
+    (currencyCode === currentCurrency
+      ? percentChangeBpOrNull(employee.currentAmountMinor, amountMinor)
+      : percentChangeBpOrNull(employee.currentAmountBaseMinor, amountBaseMinor)) ?? 0;
 
   const key = { countryCode: targetCountryCode, levelId: targetLevelId };
   const group: PeerGroup = getPeerGroups(db, [key]).get(

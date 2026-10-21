@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { percentChangeBp, proposedAmount } from './revision';
+import { percentChangeBp, percentChangeBpOrNull, proposedAmount } from './revision';
 
 describe('proposedAmount', () => {
   it('applies a 7% increase to a whole amount', () => {
@@ -56,5 +56,17 @@ describe('percentChangeBp', () => {
 
   it('refuses to compare against a zero amount', () => {
     expect(() => percentChangeBp(0, 5)).toThrow();
+  });
+});
+
+describe('percentChangeBpOrNull', () => {
+  it('gives the same percentage as percentChangeBp when there is a starting amount', () => {
+    expect(percentChangeBpOrNull(100, 105)).toBe(500);
+    expect(percentChangeBpOrNull(100, 95)).toBe(-500);
+  });
+
+  it('gives null instead of failing when the starting amount is zero or negative', () => {
+    expect(percentChangeBpOrNull(0, 5)).toBeNull();
+    expect(percentChangeBpOrNull(-1, 5)).toBeNull();
   });
 });

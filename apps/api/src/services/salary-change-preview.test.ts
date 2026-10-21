@@ -113,6 +113,21 @@ describe('previewSalaryChange', () => {
     );
   });
 
+  it('reads a relocation as no change instead of failing when the current salary is zero in USD', () => {
+    const [tiny] = createEmployees(database.db, [input('tiny@acme.test', 1, 1)], {
+      now: () => FIXED_NOW,
+    }) as [number];
+
+    const p = previewSalaryChange(database.db, tiny, {
+      reason: 'relocation',
+      amountMinor: 6_000_000,
+      newCountryCode: 'DE',
+    });
+
+    expect(p.current.amountBaseMinor).toBe(0);
+    expect(p.changeBp).toBe(0);
+  });
+
   it('does not write anything', () => {
     const before = historyRows();
 

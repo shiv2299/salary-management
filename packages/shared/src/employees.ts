@@ -123,6 +123,11 @@ export const salaryHistoryEntrySchema = z.object({
   countryCode: z.string(),
   batchId: z.number().int().nullable(),
   createdAt: z.string(),
+  /**
+   * Change from the previous row by effective date, in basis points; null on the first row.
+   * Compared in USD when the currency changed.
+   */
+  changeBp: z.number().int().nullable(),
 });
 
 export const employeeDetailSchema = employeeListItemSchema.extend({
@@ -200,3 +205,49 @@ export const salaryChangeSchema = z
   .strict();
 
 export type SalaryChangeBody = z.infer<typeof salaryChangeSchema>;
+
+const salaryChangeReasonSchema = z.enum(['raise', 'promotion', 'relocation', 'correction']);
+
+/**
+ * A proposed change, for a preview only: no effective date, and either an amount or a percentage
+ * of the current salary. Business rules are checked when the change is submitted, not here.
+ */
+export const salaryChangePreviewBodySchema = z
+  .object({
+    reason: salaryChangeReasonSchema,
+    /** In the minor units of the currency the employee would be paid in. */
+    amountMinor: z.number().int().positive().optional(),
+    /** An increase on the current salary, 1 to 10,000 basis points. */
+    percentageBp: z.number().int().min(1).max(10_000).optional(),
+    newLevelId: z.number().int().positive().optional(),
+    newCountryCode: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine((body) => (body.amountMinor === undefined) !== (body.percentageBp === undefined), {
+    message: 'provide exactly one of amountMinor or percentageBp',
+  })
+  .refine((body) => !(body.reason === 'relocation' && body.percentageBp !== undefined), {
+    message: 'a relocation takes an amount, not a percentage',
+  });
+
+const moneySchema = z.object({
+  amountMinor: z.number().int(),
+  currencyCode: z.string(),
+  amountBaseMinor: z.number().int(),
+});
+
+/**
+ * The proposed salary next to the current one. `changeBp` is compared in local amounts when the
+ * currency stays the same and in USD when it changes; `changeBaseMinor` is always USD. `peer` places
+ * the proposed amount against the peers of the target country and level.
+ */
+export const salaryChangePreviewSchema = z.object({
+  current: moneySchema,
+  proposed: moneySchema,
+  changeBaseMinor: z.number().int(),
+  changeBp: z.number().int(),
+  peer: peerContextSchema,
+});
+
+export type SalaryChangePreviewBody = z.infer<typeof salaryChangePreviewBodySchema>;
+export type SalaryChangePreview = z.infer<typeof salaryChangePreviewSchema>;

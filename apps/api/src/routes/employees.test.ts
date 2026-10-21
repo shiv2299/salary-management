@@ -206,6 +206,63 @@ async function send(
   });
 }
 
+describe('POST /api/employees/:id/salary-changes/preview', () => {
+  const url = '/api/employees/1/salary-changes/preview';
+
+  it('returns the proposed amount for a percentage', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', url, { reason: 'raise', percentageBp: 1000 });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      current: { amountMinor: 10_000_000, currencyCode: 'USD' },
+      proposed: { amountMinor: 11_000_000, currencyCode: 'USD' },
+      changeBp: 1000,
+      changeBaseMinor: 1_000_000,
+      peer: { countryCode: 'US', levelCode: 'L1', headcount: 3 },
+    });
+  });
+
+  it('rejects both an amount and a percentage, or neither, with 400', async () => {
+    const t = await setup();
+
+    const both = await send(t, 'POST', url, {
+      reason: 'raise',
+      amountMinor: 11_000_000,
+      percentageBp: 1000,
+    });
+    const neither = await send(t, 'POST', url, { reason: 'raise' });
+
+    expect(both.statusCode).toBe(400);
+    expect(neither.statusCode).toBe(400);
+  });
+
+  it('rejects a percentage for a relocation with 400', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', url, {
+      reason: 'relocation',
+      percentageBp: 1000,
+      newCountryCode: 'DE',
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('requires a session', async () => {
+    const t = await setup();
+
+    const response = await t.app.inject({
+      method: 'POST',
+      url,
+      payload: { reason: 'raise', percentageBp: 1000 },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
 describe('POST /api/employees', () => {
   it('creates an employee with its hire salary and returns the detail', async () => {
     const t = await setup();

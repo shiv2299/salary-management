@@ -12,6 +12,8 @@ import {
   employeeListResponseSchema,
   newEmployeeSchema,
   peerContextSchema,
+  salaryChangePreviewBodySchema,
+  salaryChangePreviewSchema,
   salaryChangeSchema,
   updateEmployeeSchema,
 } from '@acme/shared';
@@ -25,6 +27,7 @@ import {
   updateEmployee,
 } from '../services/employees';
 import { confirmBulkRevision, previewBulkRevision } from '../services/bulk-revision';
+import { previewSalaryChange } from '../services/salary-change-preview';
 import { recordSalaryChange } from '../services/salary-changes';
 import { exportEmployeesCsv } from '../services/employee-export';
 import { getEmployeeDetail } from '../services/employee-detail';
@@ -176,6 +179,18 @@ export const employeeRoutes =
         reactivateEmployee(database.db, request.params.id, writerDeps);
         return getEmployeeDetail(database.db, request.params.id);
       },
+    );
+
+    app.post(
+      '/api/employees/:id/salary-changes/preview',
+      {
+        schema: {
+          params: employeeIdParamsSchema,
+          body: salaryChangePreviewBodySchema,
+          response: { 200: salaryChangePreviewSchema },
+        },
+      },
+      (request) => previewSalaryChange(database.db, request.params.id, request.body),
     );
 
     app.post(

@@ -17,3 +17,13 @@ export function proposedAmount(currentMinor: number, percentageBp: number): numb
   }
   return result;
 }
+
+/**
+ * Percentage change from one amount to another in basis points:
+ * round_half_away_from_zero((to - from) * 10000 / from), in integer arithmetic.
+ */
+export function percentChangeBp(fromMinor: number, toMinor: number): number {
+  if (fromMinor <= 0) throw new Error('Cannot compare against a zero or negative amount');
+  const scaled = (BigInt(toMinor) - BigInt(fromMinor)) * BASIS_POINTS_PER_WHOLE;
+  return Number(divideRoundHalfAwayFromZero(scaled, BigInt(fromMinor)));
+}

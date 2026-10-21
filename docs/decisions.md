@@ -363,7 +363,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 ## Peer context: one peer-group service, typical range in local currency, outlier test in USD
 
-**Chosen**: the typical range shown in the drawer is the p25 to p75, with the median, of active employees in the same country and level, in the local currency. Whether someone is an outlier uses the existing USD Tukey fences, so the drawer and FR-8 always agree. With fewer than 10 peers no range is shown. One function, `getPeerGroups`, serves the drawer, the bulk revision and the insights.
+**Chosen**: the typical range shown in the drawer is the p25 to p75, with the median, of active employees in the same country and level, in the local currency. Whether someone is an outlier uses the existing USD Tukey fences, so the drawer and FR-8 always agree. With fewer than 10 peers no range is shown. One function, `getPeerGroups`, serves the drawer, the bulk revision and the insights. This assumes every employee is paid in their country's currency (creation and relocation both set it), so a peer group's typical range is computed from local amounts; a group in which nobody is paid in the country's currency is not summarised, and so is not evaluated for outliers.
 
 **Why**: a range in local currency is what the HR Manager can compare with the salary in front of them, and because peers share one country, conversion cannot change anyone's rank. The outlier verdict must not depend on which screen asks, so it keeps the fences it already had rather than a second rule in local currency. A single peer service keeps the three screens from drifting apart.
 

@@ -13,6 +13,8 @@ export {
   peerContextSchema,
   employeeListQuerySchema,
   employeeListResponseSchema,
+  salaryChangePreviewBodySchema,
+  salaryChangePreviewSchema,
   salaryChangeSchema,
   salaryHistoryEntrySchema,
   updateEmployeeSchema,
@@ -26,6 +28,8 @@ export {
   type EmployeeListQueryParams,
   type EmployeeListResponse,
   type SalaryChangeBody,
+  type SalaryChangePreview,
+  type SalaryChangePreviewBody,
   type SalaryHistoryEntry,
   type UpdateEmployeeBody,
 } from './employees';

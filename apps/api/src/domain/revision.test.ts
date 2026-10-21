@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { proposedAmount } from './revision';
+import { percentChangeBp, proposedAmount } from './revision';
 
 describe('proposedAmount', () => {
   it('applies a 7% increase to a whole amount', () => {
@@ -42,5 +42,19 @@ describe('proposedAmount', () => {
     expect(() => proposedAmount(100000, 1.5)).toThrow(
       'percentageBp must be an integer from 1 to 10000',
     );
+  });
+});
+
+describe('percentChangeBp', () => {
+  it('gives the percentage change in basis points, rounded half away from zero', () => {
+    expect(percentChangeBp(100, 105)).toBe(500);
+    expect(percentChangeBp(3, 4)).toBe(3333);
+    expect(percentChangeBp(20_000, 20_001)).toBe(1);
+    expect(percentChangeBp(20_000, 19_999)).toBe(-1);
+    expect(percentChangeBp(100, 95)).toBe(-500);
+  });
+
+  it('refuses to compare against a zero amount', () => {
+    expect(() => percentChangeBp(0, 5)).toThrow();
   });
 });

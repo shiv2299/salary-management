@@ -39,6 +39,7 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
         countryCode: 'IN',
         batchId: null,
         createdAt: '2025-04-01T09:00:00.000Z',
+        changeBp: 1111,
       },
       {
         id: 1,
@@ -51,6 +52,7 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
         countryCode: 'IN',
         batchId: null,
         createdAt: '2021-04-12T09:00:00.000Z',
+        changeBp: null,
       },
     ],
     ...overrides,

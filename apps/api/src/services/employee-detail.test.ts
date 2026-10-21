@@ -106,4 +106,25 @@ describe('getEmployeeDetail', () => {
       expect.objectContaining({ statusCode: 404, code: 'EMPLOYEE_NOT_FOUND' }),
     );
   });
+
+  it('gives each history row its percentage change from the row before it', () => {
+    const id = addAsha();
+    applySalaryChanges(
+      database.db,
+      [
+        {
+          employeeId: id,
+          reason: 'raise',
+          amountMinor: 525_000_000,
+          currencyCode: 'INR',
+          effectiveDate: '2022-04-01',
+        },
+      ],
+      deps,
+    );
+
+    const detail = getEmployeeDetail(database.db, id);
+
+    expect(detail.history.map((h) => h.changeBp)).toEqual([500, null]);
+  });
 });

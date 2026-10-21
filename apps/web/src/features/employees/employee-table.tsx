@@ -302,7 +302,6 @@ function DesktopTable({
           <TableRow
             key={row.id}
             className={cn('cursor-pointer', row.original.status === 'inactive' && 'text-inactive')}
-            aria-selected={row.getIsSelected()}
             onClick={(event) => {
               if ((event.target as Element).closest('a, button, input, label')) return;
               onOpen(row.original.id);

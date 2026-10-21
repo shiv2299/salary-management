@@ -100,6 +100,26 @@ describe('building blocks', () => {
     );
   });
 
+  it('hovers an unticked option as a white fill with an inset outline, and a ticked one not at all', () => {
+    render(
+      <CheckboxGroup
+        legend="Level"
+        selected={[1]}
+        onChange={() => {}}
+        options={[
+          { value: 1, label: 'L1' },
+          { value: 2, label: 'L2' },
+        ]}
+      />,
+    );
+    const unticked = screen.getByRole('checkbox', { name: 'L2' }).closest('label')?.className;
+    expect(unticked).toContain('hover:bg-background');
+    expect(unticked).toContain('hover:shadow-[inset_0_0_0_1px_var(--border)]');
+    expect(screen.getByRole('checkbox', { name: 'L1' }).closest('label')?.className).not.toContain(
+      'hover:',
+    );
+  });
+
   it('keeps zero-count options enabled', () => {
     render(
       <CheckboxGroup

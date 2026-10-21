@@ -1,16 +1,18 @@
 import {
   DEFAULT_PAGE_SIZE,
   employeeListQuerySchema,
+  MAX_FILTER_VALUES,
   type BulkPreviewBody,
   type Country,
   type Department,
+  type EmployeeListQueryParams,
   type Level,
 } from '@acme/shared';
 
 export const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
-export type SortKey =
-  'name' | 'jobTitle' | 'department' | 'level' | 'country' | 'hireDate' | 'salary';
+/** The sort columns the API accepts; taken from its schema so the two cannot drift. */
+export type SortKey = EmployeeListQueryParams['sortBy'];
 
 export const PAGE_SIZES = [25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
@@ -56,7 +58,10 @@ function pick<K extends 'status' | 'sortBy' | 'sortOrder' | 'search'>(
   return result.success ? (result.data as unknown) : undefined;
 }
 
-/** Every repeated or comma-separated value of a param that the shared schema accepts, once each. */
+/**
+ * Every repeated or comma-separated value of a param that the shared schema accepts, once each, up
+ * to the number the API takes (it rejects more with a 400, which would blank the list).
+ */
 function pickAll<K extends MultiValueKey>(params: URLSearchParams, key: K): ListFilters[K] {
   const schema = employeeListQuerySchema.shape[key];
   const values = new Set<unknown>();
@@ -66,7 +71,7 @@ function pickAll<K extends MultiValueKey>(params: URLSearchParams, key: K): List
       if (result.success) for (const value of result.data ?? []) values.add(value);
     }
   }
-  return [...values] as ListFilters[K];
+  return [...values].slice(0, MAX_FILTER_VALUES) as ListFilters[K];
 }
 
 /** Reads the list state out of the URL, falling back to defaults for anything invalid. */

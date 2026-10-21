@@ -1,6 +1,7 @@
 export { healthResponseSchema, type HealthResponse } from './health';
 export {
   DEFAULT_PAGE_SIZE,
+  MAX_FILTER_VALUES,
   MAX_PAGE_SIZE,
   employeeDetailSchema,
   employeeExportQuerySchema,

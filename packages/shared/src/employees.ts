@@ -28,7 +28,8 @@ function splitListParam(raw: unknown): unknown {
   return values.length > 0 ? values : undefined;
 }
 
-const MAX_FILTER_VALUES = 100;
+/** The most values one list filter accepts. */
+export const MAX_FILTER_VALUES = 100;
 
 function multiValueParam<T extends z.ZodType>(item: T) {
   return z.preprocess(splitListParam, z.array(item).min(1).max(MAX_FILTER_VALUES).optional());

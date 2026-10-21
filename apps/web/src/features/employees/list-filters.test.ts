@@ -69,6 +69,20 @@ describe('filtersFromParams', () => {
     expect(filters).toMatchObject({ country: ['IN', 'DE', 'US'], level: [3], department: [] });
   });
 
+  it('keeps at most as many values per filter as the API accepts', () => {
+    const many = Array.from({ length: 150 }, (_, index) => index + 1);
+    const filters = filtersFromParams(
+      new URLSearchParams(
+        `department=${many.join(',')}&level=${many.join(',')}&country=${many.map((n) => `C${n}`).join(',')}`,
+      ),
+    );
+
+    expect(filters.department).toEqual(many.slice(0, 100));
+    expect(filters.level).toHaveLength(100);
+    expect(filters.country).toHaveLength(100);
+    expect(listApiQuery(filters).getAll('department')).toHaveLength(100);
+  });
+
   it('ignores values that are not valid instead of failing', () => {
     const filters = filtersFromParams(
       new URLSearchParams('status=bogus&sortBy=nope&page=-2&department=abc'),

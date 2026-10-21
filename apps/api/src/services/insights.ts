@@ -1,15 +1,12 @@
 import type { DbHandle } from '../db/client';
 import { BASE_CURRENCY } from '../domain/fx';
-import {
-  MIN_PEER_GROUP_SIZE,
-  computeDistribution,
-  isOutlier,
-  outlierFences,
-} from '../domain/stats';
+import { peerGroupKey } from '../domain/peer-groups';
+import { computeDistribution, isOutlier } from '../domain/stats';
 import { listCountries } from '../repositories/countries';
 import { listDepartments } from '../repositories/departments';
 import { listActiveEmployeeRows, type EmployeeListRow } from '../repositories/employees';
 import { listLevels } from '../repositories/levels';
+import { getPeerGroups } from './peer-groups';
 
 export type DistributionGroupBy = 'country' | 'department' | 'level';
 export type PayrollGroupBy = 'country' | 'department';
@@ -89,29 +86,22 @@ export function getPayroll(db: DbHandle, groupBy: PayrollGroupBy) {
 
 /**
  * Employees paid outside Tukey's fences for their country and level peers. A peer group needs at
- * least `MIN_PEER_GROUP_SIZE` active employees to be evaluated. The fences are shown rounded to a
+ * least `MIN_PEER_GROUP_SIZE` (see `getPeerGroups`) active employees to be evaluated. The fences are shown rounded to a
  * minor unit; the comparison itself uses the exact values.
  */
 export function getOutliers(db: DbHandle) {
   const countryOrder = new Map(listCountries(db).map((c, index) => [c.code, index]));
   const levelOrder = new Map(listLevels(db).map((l, index) => [l.code, index]));
+  const peerGroups = getPeerGroups(db);
 
-  const peerGroups = new Map<string, EmployeeListRow[]>();
-  for (const row of listActiveEmployeeRows(db)) {
-    const key = `${row.countryCode}:${row.levelId}`;
-    const group = peerGroups.get(key);
-    if (group) group.push(row);
-    else peerGroups.set(key, [row]);
-  }
-
-  const items = [...peerGroups.values()]
-    .filter((rows) => rows.length >= MIN_PEER_GROUP_SIZE)
-    .flatMap((rows) => {
-      const distribution = computeDistribution(rows.map((row) => row.currentAmountBaseMinor));
-      const fences = outlierFences(distribution);
-      return rows
-        .filter((row) => isOutlier(row.currentAmountBaseMinor, fences))
-        .map((row) => ({
+  const items = listActiveEmployeeRows(db)
+    .flatMap((row) => {
+      const summary = peerGroups.get(peerGroupKey(row.countryCode, row.levelId))?.summary;
+      if (!summary) return [];
+      const { base, fences } = summary;
+      if (!isOutlier(row.currentAmountBaseMinor, fences)) return [];
+      return [
+        {
           employeeId: row.id,
           firstName: row.firstName,
           lastName: row.lastName,
@@ -127,14 +117,15 @@ export function getOutliers(db: DbHandle) {
           direction:
             row.currentAmountBaseMinor > fences.upper ? ('above' as const) : ('below' as const),
           peerGroup: {
-            headcount: distribution.headcount,
-            p25: distribution.p25,
-            median: distribution.median,
-            p75: distribution.p75,
+            headcount: base.headcount,
+            p25: base.p25,
+            median: base.median,
+            p75: base.p75,
             lowerFence: Math.round(fences.lower),
             upperFence: Math.round(fences.upper),
           },
-        }));
+        },
+      ];
     })
     .sort(
       (a, b) =>

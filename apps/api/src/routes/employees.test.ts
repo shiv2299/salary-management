@@ -152,6 +152,34 @@ describe('GET /api/employees/:id', () => {
   });
 });
 
+describe('GET /api/employees/:id/peer-context', () => {
+  it("returns the peer context in the employee's local currency", async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/1/peer-context');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      countryCode: 'US',
+      levelId: 1,
+      levelCode: 'L1',
+      currencyCode: 'USD',
+      headcount: 3,
+      typical: null,
+      position: null,
+    });
+  });
+
+  it('answers an unknown employee with 404', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/999/peer-context');
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ error: { code: 'EMPLOYEE_NOT_FOUND' } });
+  });
+});
+
 const newEmployee = {
   firstName: 'Dina',
   lastName: 'Shah',

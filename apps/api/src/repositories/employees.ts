@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, or, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import {
   countries,
@@ -211,6 +211,39 @@ export function listEmployeeRows(
 /** Every active employee with the names the insights show. Insights cover active staff only. */
 export function listActiveEmployeeRows(db: DbHandle): EmployeeListRow[] {
   return selectEmployeeRows(db).where(eq(employees.status, 'active')).all().map(toListRow);
+}
+
+export interface PeerAmountRow {
+  countryCode: string;
+  levelId: number;
+  amountMinor: number;
+  currencyCode: string;
+  amountBaseMinor: number;
+}
+
+/**
+ * The pay of every active employee, with their country and level, for peer-group statistics.
+ * With `keys`, only those country and level pairs are read (served by `employees_country_level_idx`).
+ */
+export function listActivePeerAmounts(
+  db: DbHandle,
+  keys?: { countryCode: string; levelId: number }[],
+): PeerAmountRow[] {
+  if (keys?.length === 0) return [];
+  const peers = keys?.map((k) =>
+    and(eq(employees.countryCode, k.countryCode), eq(employees.levelId, k.levelId)),
+  );
+  return db
+    .select({
+      countryCode: employees.countryCode,
+      levelId: employees.levelId,
+      amountMinor: employees.currentAmountMinor,
+      currencyCode: employees.currentCurrencyCode,
+      amountBaseMinor: employees.currentAmountBaseMinor,
+    })
+    .from(employees)
+    .where(and(eq(employees.status, 'active'), peers && or(...peers)))
+    .all();
 }
 
 /** Active employees matching the list's filters, in the list's default name order. */

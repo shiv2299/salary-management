@@ -131,6 +131,29 @@ export const employeeDetailSchema = employeeListItemSchema.extend({
 
 export const employeeIdParamsSchema = z.object({ id: z.coerce.number().int().positive() });
 
+/**
+ * Where an employee's pay sits among active peers of the same country and level. The typical
+ * range is in the group's local currency; `typical` and `position` are null when the group has
+ * too few active members to judge.
+ */
+export const peerContextSchema = z.object({
+  countryCode: z.string(),
+  levelId: z.number().int(),
+  levelCode: z.string(),
+  currencyCode: z.string(),
+  headcount: z.number().int(),
+  typical: z
+    .object({ p25: z.number().int(), median: z.number().int(), p75: z.number().int() })
+    .nullable(),
+  position: z
+    .object({
+      typical: z.enum(['below', 'inside', 'above']),
+      outlier: z.enum(['below', 'above']).nullable(),
+    })
+    .nullable(),
+});
+
+export type PeerContext = z.infer<typeof peerContextSchema>;
 export type SalaryHistoryEntry = z.infer<typeof salaryHistoryEntrySchema>;
 export type EmployeeDetail = z.infer<typeof employeeDetailSchema>;
 

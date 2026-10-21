@@ -11,6 +11,7 @@ import {
   employeeListQuerySchema,
   employeeListResponseSchema,
   newEmployeeSchema,
+  peerContextSchema,
   salaryChangeSchema,
   updateEmployeeSchema,
 } from '@acme/shared';
@@ -29,6 +30,7 @@ import { exportEmployeesCsv } from '../services/employee-export';
 import { getEmployeeDetail } from '../services/employee-detail';
 import { getEmployeeFacets } from '../services/employee-facets';
 import { listEmployees } from '../services/employee-list';
+import { getPeerContext } from '../services/peer-groups';
 
 export interface EmployeeRoutesDeps {
   database: Database;
@@ -120,6 +122,17 @@ export const employeeRoutes =
         },
       },
       (request) => getEmployeeDetail(database.db, request.params.id),
+    );
+
+    app.get(
+      '/api/employees/:id/peer-context',
+      {
+        schema: {
+          params: employeeIdParamsSchema,
+          response: { 200: peerContextSchema },
+        },
+      },
+      (request) => getPeerContext(database.db, request.params.id),
     );
 
     app.post(

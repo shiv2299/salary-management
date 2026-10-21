@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { parseMajorToMinor, toInputAmount } from '@/lib/money';
 import {
   fetchConvertedAmount,
@@ -24,6 +25,13 @@ const REASONS: { value: Reason; label: string }[] = [
   { value: 'correction', label: 'Correction' },
 ];
 
+const SUBMIT_LABELS: Record<Reason, string> = {
+  raise: 'Record raise',
+  promotion: 'Record promotion',
+  relocation: 'Record relocation',
+  correction: 'Record correction',
+};
+
 interface Props {
   employee: EmployeeDetail;
   /** Today (UTC, yyyy-mm-dd), injected for deterministic tests. */
@@ -41,7 +49,9 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
 
   const [reason, setReason] = useState<Reason>('raise');
   const [effectiveDate, setEffectiveDate] = useState(today);
-  const [amountText, setAmountText] = useState('');
+  const [amountText, setAmountText] = useState(() =>
+    toInputAmount(employee.salary.amountMinor, employee.salary.currencyCode),
+  );
   const [newLevelId, setNewLevelId] = useState('');
   const [newCountryCode, setNewCountryCode] = useState('');
   const [converted, setConverted] = useState<'idle' | 'loading' | 'done' | 'failed'>('idle');
@@ -66,14 +76,23 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
   const currencyCode =
     reason === 'relocation' && destination ? destination.currencyCode : current.currencyCode;
 
-  function chooseReason(next: Reason) {
+  /** A relocation waits for a country, then holds the converted amount; every other reason starts from the current salary. */
+  function chooseReason(next: Reason, salary = current) {
+    latestConversion.current++;
     setReason(next);
     setErrors({});
     setServerError(null);
-    setAmountText('');
+    setAmountText(
+      next === 'relocation' ? '' : toInputAmount(salary.amountMinor, salary.currencyCode),
+    );
     setNewLevelId('');
     setNewCountryCode('');
     setConverted('idle');
+  }
+
+  function reset(salary = current) {
+    chooseReason('raise', salary);
+    setEffectiveDate(today);
   }
 
   async function chooseCountry(code: string) {
@@ -129,10 +148,9 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
       ...(reason === 'relocation' ? { newCountryCode } : {}),
     };
     mutation.mutate(body, {
-      onSuccess: () => {
+      onSuccess: (updated) => {
         toast.success('Salary change recorded');
-        chooseReason('raise');
-        setEffectiveDate(today);
+        reset(updated.salary);
         onSaved?.();
       },
       onError: (error) => {
@@ -152,21 +170,15 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="sc-reason">Reason</Label>
-          <Select
-            id="sc-reason"
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <span className="text-xs font-medium text-text-secondary">Reason</span>
+          <SegmentedControl
+            label="Reason"
+            size="md"
             value={reason}
-            onChange={(event) => {
-              chooseReason(event.target.value as Reason);
-            }}
-          >
-            {REASONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+            options={REASONS}
+            onChange={chooseReason}
+          />
         </div>
 
         <div className="flex flex-col gap-1">
@@ -290,9 +302,21 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
         </p>
       )}
 
-      <Button type="submit" className="self-start" disabled={mutation.isPending}>
-        Record change
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={mutation.isPending}>
+          {SUBMIT_LABELS[reason]}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={mutation.isPending}
+          onClick={() => {
+            reset();
+          }}
+        >
+          Reset
+        </Button>
+      </div>
     </form>
   );
 }

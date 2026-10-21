@@ -1,5 +1,6 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deferredResponse } from '@/test/deferred';
 import { employeeDetail, peerContext, REFERENCE_ROUTES, salaryPreview } from '@/test/fixtures';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
 import { toInputAmount } from '@/lib/money';
@@ -41,9 +42,16 @@ function quickLabels() {
     : [];
 }
 
-function tick(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Moves the fake clock, so the comparison debounce fires exactly when the test says. */
+async function advance(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
 }
+
+const COMPARISON_DELAY_MS = 300;
+const percentageOf = (init: RequestInit) =>
+  (JSON.parse(init.body as string) as { percentageBp?: number }).percentageBp;
 
 function chooseReason(label: string) {
   fireEvent.click(screen.getByRole('radio', { name: label }));
@@ -60,7 +68,16 @@ function save(label = 'Record raise') {
 const saved = () => Response.json(employeeDetail(), { status: 201 });
 
 describe('SalaryChangeForm', () => {
+  beforeEach(() => {
+    // Only timers are faked; the clock also ticks on its own so Testing Library's waitFor can poll.
+    vi.useFakeTimers({
+      shouldAdvanceTime: true,
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    });
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -349,47 +366,47 @@ describe('SalaryChangeForm', () => {
   });
 
   it('keeps the figure for the last quick percentage clicked when answers arrive out of order', async () => {
-    const withProposed = (amountMinor: number) =>
-      Response.json(
-        salaryPreview({
-          proposed: { amountMinor, currencyCode: 'INR', amountBaseMinor: 0 },
-        }),
-      );
+    const answers = new Map([
+      [300, deferredResponse()],
+      [1000, deferredResponse()],
+    ]);
     renderForm({
       routes: {
-        'POST /api/employees/1/salary-changes/preview': async (_url, init) => {
-          const body = JSON.parse(init.body as string) as { percentageBp?: number };
-          if (body.percentageBp === 300) {
-            await tick(50);
-            return withProposed(515_000_000);
-          }
-          if (body.percentageBp === 1000) return withProposed(550_000_000);
-          return Response.json(salaryPreview());
+        'POST /api/employees/1/salary-changes/preview': (_url, init) => {
+          const bp = percentageOf(init);
+          return bp === undefined ? Response.json(salaryPreview()) : answers.get(bp)?.promise;
         },
       },
     });
+    const proposed = (amountMinor: number) =>
+      salaryPreview({ proposed: { amountMinor, currencyCode: 'INR', amountBaseMinor: 0 } });
 
     fireEvent.click(screen.getByRole('button', { name: '+3%' }));
     fireEvent.click(screen.getByRole('button', { name: '+10%' }));
-    await tick(120);
+    await answers.get(1000)?.answer(proposed(550_000_000));
+    expect(amountValue()).toBe('5500000.00');
+
+    await answers.get(300)?.answer(proposed(515_000_000));
 
     expect(amountValue()).toBe('5500000.00');
   });
 
   it('does not let a quick percentage overwrite an amount typed after the click', async () => {
+    const answer = deferredResponse();
     renderForm({
       routes: {
-        'POST /api/employees/1/salary-changes/preview': async (_url, init) => {
-          const body = JSON.parse(init.body as string) as { percentageBp?: number };
-          if (body.percentageBp !== undefined) await tick(40);
-          return Response.json(salaryPreview());
-        },
+        'POST /api/employees/1/salary-changes/preview': (_url, init) =>
+          percentageOf(init) === undefined ? Response.json(salaryPreview()) : answer.promise,
       },
     });
 
     fireEvent.click(screen.getByRole('button', { name: '+10%' }));
     typeAmount('5600000');
-    await tick(100);
+    await answer.answer(
+      salaryPreview({
+        proposed: { amountMinor: 550_000_000, currencyCode: 'INR', amountBaseMinor: 0 },
+      }),
+    );
 
     expect(amountValue()).toBe('5600000');
   });
@@ -433,6 +450,7 @@ describe('SalaryChangeForm', () => {
     const { calls } = renderForm();
 
     typeAmount('5500000');
+    await advance(COMPARISON_DELAY_MS);
     const box = screen.getByRole('region', { name: 'Comparison' });
 
     await waitFor(() => {
@@ -452,6 +470,7 @@ describe('SalaryChangeForm', () => {
 
     typeAmount('5500000');
     typeAmount('5600000');
+    await advance(COMPARISON_DELAY_MS);
 
     await waitFor(() => {
       expect(previewBodies(calls)).toContainEqual({ reason: 'raise', amountMinor: 560_000_000 });
@@ -493,6 +512,7 @@ describe('SalaryChangeForm', () => {
     await waitFor(() => {
       expect(amountValue()).toBe('60000.00');
     });
+    await advance(COMPARISON_DELAY_MS);
 
     const box = screen.getByRole('region', { name: 'Comparison' });
 
@@ -511,21 +531,15 @@ describe('SalaryChangeForm', () => {
   });
 
   it("never shows the previous reason's figures under a new reason or country", async () => {
+    const relocationAnswer = deferredResponse();
     renderForm({
       routes: {
         'GET /api/reference/fx/convert': { amountMinor: 6_000_000, currencyCode: 'EUR' },
-        'POST /api/employees/1/salary-changes/preview': async (_url, init) => {
+        'POST /api/employees/1/salary-changes/preview': (_url, init) => {
           const body = JSON.parse(init.body as string) as { reason: string };
-          if (body.reason !== 'relocation') return Response.json(salaryPreview());
-          await tick(100);
-          return Response.json(
-            salaryPreview({
-              proposed: { amountMinor: 6_000_000, currencyCode: 'EUR', amountBaseMinor: 6_480_000 },
-              changeBaseMinor: 490_000,
-              changeBp: 818,
-              peer: peerContext({ countryCode: 'DE', currencyCode: 'EUR' }),
-            }),
-          );
+          return body.reason === 'relocation'
+            ? relocationAnswer.promise
+            : Response.json(salaryPreview());
         },
       },
     });
@@ -544,60 +558,98 @@ describe('SalaryChangeForm', () => {
     // The new amount has arrived but the comparison for it has not: nothing from the raise remains.
     expect(within(box).queryByText('+₹5,00,000.00 (+10%)')).toBeNull();
     expect(within(box).getByText('Comparing…')).toBeDefined();
-    await tick(350);
+    await advance(COMPARISON_DELAY_MS);
     expect(within(box).queryByText('+₹5,00,000.00 (+10%)')).toBeNull();
     expect(within(box).getByText('Comparing…')).toBeDefined();
 
-    await waitFor(() => {
-      expect(within(box).getByText('+8.18%')).toBeDefined();
+    await relocationAnswer.answer(
+      salaryPreview({
+        proposed: { amountMinor: 6_000_000, currencyCode: 'EUR', amountBaseMinor: 6_480_000 },
+        changeBaseMinor: 490_000,
+        changeBp: 818,
+        peer: peerContext({ countryCode: 'DE', currencyCode: 'EUR' }),
+      }),
+    );
+
+    expect(within(box).getByText('+8.18%')).toBeDefined();
+  });
+
+  it('does not report a failed comparison from the previous reason while the new one is pending', async () => {
+    const correctionAnswer = deferredResponse();
+    renderForm({
+      routes: {
+        'POST /api/employees/1/salary-changes/preview': (_url, init) => {
+          const body = JSON.parse(init.body as string) as { reason: string };
+          return body.reason === 'correction'
+            ? correctionAnswer.promise
+            : apiError(500, 'INTERNAL', 'boom');
+        },
+      },
     });
+    const box = screen.getByRole('region', { name: 'Comparison' });
+    await waitFor(() => {
+      expect(within(box).getByText('Could not compare this change')).toBeDefined();
+    });
+
+    chooseReason('Correction');
+
+    expect(within(box).queryByText('Could not compare this change')).toBeNull();
+    expect(within(box).getByText('Comparing…')).toBeDefined();
+    await advance(COMPARISON_DELAY_MS);
+    expect(within(box).getByText('Comparing…')).toBeDefined();
+    await correctionAnswer.answer(salaryPreview());
+    expect(within(box).getByText('+₹5,00,000.00 (+10%)')).toBeDefined();
   });
 
   it('does not request a comparison for an amount that does not parse or a relocation without a country', async () => {
     const { calls } = renderForm();
-    await tick(50);
+    await waitFor(() => {
+      expect(previewBodies(calls)).toHaveLength(1);
+    });
+
     typeAmount('abc');
-    await tick(400);
+    await advance(COMPARISON_DELAY_MS * 2);
     chooseReason('Relocation');
-    await tick(400);
+    await advance(COMPARISON_DELAY_MS * 2);
 
     expect(previewBodies(calls)).toEqual([{ reason: 'raise', amountMinor: 500_000_000 }]);
   });
 
   describe('a late quick percentage', () => {
     function renderSlowQuick() {
-      return renderForm({
+      const answer = deferredResponse();
+      renderForm({
         routes: {
-          'POST /api/employees/1/salary-changes/preview': async (_url, init) => {
-            const body = JSON.parse(init.body as string) as { percentageBp?: number };
-            if (body.percentageBp === undefined) return Response.json(salaryPreview());
-            await tick(50);
-            return Response.json(
-              salaryPreview({
-                proposed: { amountMinor: 525_000_000, currencyCode: 'INR', amountBaseMinor: 0 },
-              }),
-            );
-          },
+          'POST /api/employees/1/salary-changes/preview': (_url, init) =>
+            percentageOf(init) === undefined ? Response.json(salaryPreview()) : answer.promise,
         },
       });
+      return {
+        lateAnswer: () =>
+          answer.answer(
+            salaryPreview({
+              proposed: { amountMinor: 525_000_000, currencyCode: 'INR', amountBaseMinor: 0 },
+            }),
+          ),
+      };
     }
 
     it('is dropped after the reason changes', async () => {
-      renderSlowQuick();
+      const { lateAnswer } = renderSlowQuick();
 
       fireEvent.click(screen.getByRole('button', { name: '+5%' }));
       chooseReason('Correction');
-      await tick(100);
+      await lateAnswer();
 
       expect(amountValue()).toBe('5000000.00');
     });
 
     it('is dropped once Custom % is pressed', async () => {
-      renderSlowQuick();
+      const { lateAnswer } = renderSlowQuick();
 
       fireEvent.click(screen.getByRole('button', { name: '+5%' }));
       fireEvent.click(screen.getByRole('button', { name: 'Custom %' }));
-      await tick(100);
+      await lateAnswer();
 
       expect(amountValue()).toBe('5000000.00');
       expect(screen.getByRole('button', { name: '+5%' }).getAttribute('aria-pressed')).toBe(
@@ -639,20 +691,12 @@ describe('SalaryChangeForm', () => {
 
   describe('a late currency conversion', () => {
     function renderSlowConversion() {
-      let release = () => {};
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      renderForm({
-        routes: {
-          'GET /api/reference/fx/convert': async () => {
-            await gate;
-            return Response.json({ amountMinor: 5_990_000, currencyCode: 'USD' });
-          },
-        },
-      });
+      const answer = deferredResponse();
+      renderForm({ routes: { 'GET /api/reference/fx/convert': () => answer.promise } });
       chooseReason('Relocation');
-      return { release, gate };
+      return {
+        lateAnswer: () => answer.answer({ amountMinor: 5_990_000, currencyCode: 'USD' }),
+      };
     }
 
     async function chooseUnitedStates() {
@@ -661,35 +705,32 @@ describe('SalaryChangeForm', () => {
     }
 
     it('does not overwrite the amount after the reason changes', async () => {
-      const { release } = renderSlowConversion();
+      const { lateAnswer } = renderSlowConversion();
       await chooseUnitedStates();
 
       chooseReason('Correction');
-      release();
-      await tick(30);
+      await lateAnswer();
 
       expect(amountValue()).toBe('5000000.00');
       expect(screen.queryByText(/Converted at FX rate/)).toBeNull();
     });
 
     it('does not overwrite the amount after a reset', async () => {
-      const { release } = renderSlowConversion();
+      const { lateAnswer } = renderSlowConversion();
       await chooseUnitedStates();
 
       fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
-      release();
-      await tick(30);
+      await lateAnswer();
 
       expect(amountValue()).toBe('5000000.00');
     });
 
     it('does not fill the amount after the country is cleared', async () => {
-      const { release } = renderSlowConversion();
+      const { lateAnswer } = renderSlowConversion();
       await chooseUnitedStates();
 
       fireEvent.change(screen.getByLabelText('New country'), { target: { value: '' } });
-      release();
-      await tick(30);
+      await lateAnswer();
 
       expect(amountValue()).toBe('');
       expect(screen.queryByText(/Converted at FX rate/)).toBeNull();

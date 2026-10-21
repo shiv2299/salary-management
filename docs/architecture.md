@@ -58,6 +58,7 @@ Indexes:
 - `employees(country_code, level_id)` — outlier peer groups (§5) and the country filter
 - `employees(department_id)`, `employees(level_id)` — single-column filters
 - `employees(last_name, first_name)` — default list sort
+- `employees(status, job_title)` — job-title sort, like the salary sort; the department, country, and level sorts read the joined name or rank and have no index of their own (`docs/decisions.md`)
 - `salary_history(employee_id, effective_date, id)` — current-row selection and history lookups
 - `salary_history(effective_date)` — salary-changes window (FR-10)
 - `salary_history(batch_id)` — grouping
@@ -112,6 +113,8 @@ SQLite has no percentile functions, so the service layer fetches the filtered se
 | Total payroll by country/department | `GET /api/insights/payroll?groupBy=country\|department` | Sum of current USD salaries per group |
 | What changed, when | `GET /api/insights/recent-changes?years=3\|5&limit=&offset=` (default `years=3`) | `salary_history` rows whose `effective_date` falls in the trailing window, newest first, joined to employee name, country, and status (inactive employees are included and marked). Rows sharing a `batch_id` collapse into a single entry (e.g. "47 people, +7%, Engineering L3 India") rather than one row per employee. Offset-paginated over the grouped entries |
 
+**Peer groups.** `getPeerGroups(db, keys?)` in `services/peer-groups.ts` is the single source of country + level peer statistics for active employees: the local-currency p25, median and p75, and the USD distribution and Tukey fences. A group with fewer than `MIN_PEER_GROUP_SIZE` (10) members has no summary. The outliers endpoint and the employee drawer's peer context both read it, so the drawer's "above the usual range" sentence and the outliers list (FR-8) always agree.
+
 Peer grouping for outliers is country + level, not + department: at 10,000 employees across 7 departments × 3 countries × 6 levels, many department-scoped peer groups would fall below the 10-person minimum, so their quartiles (and therefore their fences) wouldn't be reliable.
 
 ## 6. Seed data generation
@@ -129,12 +132,15 @@ Peer grouping for outliers is country + level, not + department: at 10,000 emplo
 | Endpoint | Purpose |
 |---|---|
 | `POST /api/auth/login` \| `/logout`, `GET /api/auth/me` | Session cookie lifecycle (§4) |
-| `GET /api/employees` | Paginated list; filters: `country`, `department`, `level`, `status` (default `active`; also `inactive`, `all`), `search`; sort (salary sorts by `current_amount_base_minor`); offset pagination |
-| `GET /api/employees/:id` | Employee record + current salary + full salary history |
+| `GET /api/employees` | Paginated list; filters: `country`, `department`, `level` (each multi-valued: repeated or comma-separated; OR within a filter, AND across filters), `status` (default `active`; also `inactive`, `all`), `search`; `sortBy` one of name, `jobTitle`, `department`, `level` (by rank), `country`, hire date, salary (salary sorts by `current_amount_base_minor`); offset pagination |
+| `GET /api/employees/facets?<list filters>` | Per-group option counts for the filter panel (`country`, `department`, `level`, `status`) plus `statusTotal`. Each group's counts apply the search and every other group's selection but not its own, so a count is what ticking that option would return |
+| `GET /api/employees/:id` | Employee record + current salary + full salary history. Each history row carries `changeBp`, the % change from the previous row in basis points (across a relocation, compared in USD at the current static rates) |
+| `GET /api/employees/:id/peer-context` | The employee's peer group from `getPeerGroups` (§5): typical range (local p25–p75), median, headcount, and whether the employee is above, below, or inside the range; no range when the group is under the minimum size. Read-only |
+| `POST /api/employees/:id/salary-changes/preview` | `{ reason, amountMinor \| percentageBp, newLevelId?, newCountryCode? }` → `current` and `proposed` (local + USD), `changeBaseMinor`, `changeBp`, and `peer` (the peer sentence's data). Read-only; nothing is written. The amount for a percentage is computed here in `domain/`, so the browser never multiplies money |
 | `POST /api/employees` | Create employee + initial (hire) salary row, via `createEmployees` (§6) |
 | `PATCH /api/employees/:id` | Edit name, email, department, job title. Requests that change `country_code`, `level_id`, or salary fields are rejected with a 400 — those change only through `salary-changes` |
 | `POST /api/employees/:id/salary-changes` | One effective-dated change: `{ reason, effectiveDate, amountMinor, newLevelId?, newCountryCode? }`. See the validation rules below |
-| `POST /api/employees/bulk-salary-changes/preview` | `{ filter \| employeeIds, percentageBp }` → every matching **active** employee with `currentAmountMinor`, currency, and `proposedAmountMinor`. Read-only. Returns the full set (not paginated) so the UI can page through it and hold overrides locally; at 10,000 rows that is roughly 2 MB |
+| `POST /api/employees/bulk-salary-changes/preview` | `{ filter \| employeeIds, percentageBp }` (`filter` takes arrays for `country`, `department`, `level`) → every matching **active** employee with `currentAmountMinor`, currency, and `proposedAmountMinor`. Read-only. Returns the full set (not paginated) so the UI can page through it and hold overrides locally; at 10,000 rows that is roughly 2 MB |
 | `POST /api/employees/bulk-salary-changes` | Confirm: `{ percentageBp, effectiveDate, note, items: [{ employeeId, expectedCurrentAmountMinor, newAmountMinor }] }`. Always an explicit list from the preview, never a filter, so the committed set is exactly the set the HR Manager reviewed. If any employee's current amount no longer matches `expectedCurrentAmountMinor`, or any employee is now inactive, the whole request fails with `409` and nothing is written. Otherwise it creates one `salary_revision_batches` row and calls the single writer once with every item, in one transaction |
 | `DELETE /api/employees/:id` | Soft delete (`status: inactive`); never a hard delete, to preserve salary history |
 | `POST /api/employees/:id/reactivate` | Sets `status: active` |
@@ -167,14 +173,15 @@ src/app/
   login/page.tsx                          # public
   (app)/layout.tsx                        # auth guard (GET /api/auth/me) + top bar; renders {children} and {drawer}
   (app)/insights/page.tsx                 # default landing page post-login: distribution charts, payroll summary, outliers, recent changes
-  (app)/employees/page.tsx                # list: table, inline filter row, pagination, export, bulk-revision action bar
+  (app)/employees/page.tsx                # list: left filter panel + TanStack Table, toolbar, pagination, export, bulk-revision action bar
   (app)/employees/[id]/page.tsx           # full-page detail (direct navigation / refresh)
   (app)/@drawer/default.tsx               # renders nothing when no drawer is open
   (app)/@drawer/(.)employees/[id]/page.tsx  # intercepted route: same detail rendered in a slide-over drawer over the list
 src/features/
   auth/       # login form, useSession hook (wraps /api/auth/me), route guard
-  employees/  # query hooks, table columns, forms, bulk-revision preview state (pagination + overrides)
+  employees/  # query hooks, table columns, filter panel, drawer tabs, forms, bulk-revision preview state (pagination + overrides)
   insights/   # query hooks, chart components
+src/components/ui/  # shared building blocks named in docs/design.md §5: card, stat tile, segmented control, chip, checkbox group, tabs, avatar, country flag, level badge, data table, menus
 src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), throws a typed error on non-2xx; on 401 redirects to /login
 ```
 
@@ -183,7 +190,7 @@ src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), 
 - Employee detail uses a Next.js parallel route slot (`@drawer`) plus an intercepting route, so it opens as a slide-over drawer while keeping the list's scroll position and filters. On direct navigation or refresh, the same URL renders the full page instead. Both render the same detail component from `features/employees`.
 - The relocation form fetches the converted amount from `/api/reference/fx/convert` to pre-fill the salary field; the HR Manager can then edit it.
 - CSV export is a plain `<a href="/api/employees/export?...">` built from the current URL's filter params (or `scope=all`); the session cookie authenticates it.
-- Components: shadcn/ui (Table, Sheet, Dialog, Form, Select, Badge, Toast) as the base, themed per `docs/design.md`; Recharts for the insights dashboard.
+- Components: shadcn/ui (Table, Sheet, Dialog, Form, Select, Badge, Toast) as the base, themed per `docs/design.md`; the shared building blocks live in `components/ui/`. The employee list is a TanStack Table (headless, `manualSorting` and `manualPagination`, so the server stays the only place data is sorted and paged) beside a collapsible left filter panel whose state lives in the URL. The employee drawer has three tabs: Change salary, Details, and History. Recharts for the insights dashboard.
 - All data fetching via TanStack Query, through the existing Next.js `/api` rewrite; no server-side API calls.
 - Fully responsive per the breakpoint rules in `docs/design.md` §7 — there is one implementation, not a separate mobile build.
 

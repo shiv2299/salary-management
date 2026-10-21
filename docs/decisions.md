@@ -317,8 +317,88 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 - The bulk preview summary reads "N employees · M overridden · total increase X", where X is the sum of increases within each currency (for example "$12,000.00 + ₹4,50,000.00"), not one USD figure.
 - A bulk revision in the recent-changes list is one row (headcount, percentage, note) that does not expand to list its employees.
 - Detail links carry the list's own query string (`/employees/123?status=all`), and the list reads its filters, sort and page from the URL query only.
-- Dropdowns are native `<select>` elements, not a custom listbox.
+- Form pickers and the rows-per-page choice are native `<select>` elements, not a custom listbox. List filters are checkbox groups instead (see "Employee filters: a left panel of checkbox groups, not an inline dropdown row").
 
 **Why**: the preview response carries local amounts only, and the browser never converts currencies, so a single USD total would need either browser FX arithmetic or a new endpoint. Summing integers within one currency is exact and needs neither. The API has no endpoint that lists a batch's members, so the expandable row in `docs/design.md` §5 has nothing to show beyond what the row already says. The intercepted drawer route changes the URL to `/employees/123`, and the list underneath keeps rendering, so without the carried query it would reset its filters while the drawer is open. Native selects are reliable on touch screens and for keyboards, which matters for the 44px mobile targets.
 
 **Revisit if**: HR wants a single USD figure (add USD amounts to the preview response) or a drill-down into a batch (add a batch-members endpoint).
+
+## Employee filters: a left panel of checkbox groups, not an inline dropdown row
+
+**Alternative considered**: keep the inline row of dropdowns above the table.
+
+**Chosen**: a left filter panel with a group each for Status, Country, Department and Level, every option a checkbox with a count. The panel collapses, and the collapsed state is remembered per browser.
+
+**Why**: ticking several options with a count beside each needs more room than a dropdown gives, and a row of open dropdowns would cover the table it filters. Making the panel collapsible gives the full table width back when the HR Manager is only reading. Below `md` it becomes a bottom sheet.
+
+## Filters: multi-select within a group, AND across groups, with faceted counts
+
+**Alternative considered**: single-select dropdowns, with counts taken over the whole table.
+
+**Chosen**: several options in one group are OR-ed, and groups are AND-ed. In Status, Active and Inactive both ticked means all, and neither ticked means the default (active). A group's counts apply the search and every other group's selection but not its own.
+
+**Why**: "India and Germany" is a normal question, and single-select cannot ask it. Counts over the whole table would say 3,200 for an option that returns 40 once another filter is on. Leaving a group's own selection out of its counts shows what ticking each option would give, so the counts of a ticked group's siblings stay meaningful instead of dropping to zero.
+
+## Employee table: TanStack Table, headless, sorting and paging on the server
+
+**Alternative considered**: the hand-rolled table.
+
+**Chosen**: `@tanstack/react-table` v8 with `manualSorting` and `manualPagination`, so it holds column definitions, sort state, column visibility and row selection but never processes data in the browser. The server stays the only place rows are sorted and paged.
+
+**Why**: column visibility, sort state and selection are the parts that grow bespoke code and bugs in a hand-rolled table. Version 8 is pinned because its API is stable and documented, while v9 is recent.
+
+## Menus are non-modal
+
+**Chosen**: every dropdown menu (export, columns, row and drawer menus, the user menu) is non-modal. Dialogs and sheets stay modal.
+
+**Why**: a modal Radix menu locks page scroll and removes the scrollbar, which shifted the layout by 15px while the export menu was open. A menu holds no state worth trapping focus for, so nothing is lost by leaving the rest of the page interactive.
+
+## Country flags: `country-flag-icons`, imported per country, code as fallback
+
+**Alternative considered**: emoji flags, or bundling all 250 flags.
+
+**Chosen**: `country-flag-icons`, with one SVG imported per supported country (three today). A country with no imported flag shows its code.
+
+**Why**: emoji flags are not rendered on Windows, where the HR Manager is likely to be. Three SVGs add almost nothing to the bundle, adding a country is one import line, and an unknown code still reads correctly.
+
+## Peer context: one peer-group service, typical range in local currency, outlier test in USD
+
+**Chosen**: the typical range shown in the drawer is the p25 to p75, with the median, of active employees in the same country and level, in the local currency. Whether someone is an outlier uses the existing USD Tukey fences, so the drawer and FR-8 always agree. With fewer than 10 peers no range is shown. One function, `getPeerGroups`, serves the drawer, the bulk revision and the insights.
+
+**Why**: a range in local currency is what the HR Manager can compare with the salary in front of them, and because peers share one country, conversion cannot change anyone's rank. The outlier verdict must not depend on which screen asks, so it keeps the fences it already had rather than a second rule in local currency. A single peer service keeps the three screens from drifting apart.
+
+## Salary change preview: the server computes amounts, % and USD
+
+**Alternative considered**: computing the proposed amount, the change and its USD value in the browser.
+
+**Chosen**: `POST /api/employees/:id/salary-changes/preview` returns the amounts, the % and the USD change for a given percentage or amount. One endpoint serves the quick-% buttons and the comparison box.
+
+**Why**: the browser never applies a percentage to money or converts a currency (`AGENTS.md`), so the rounding rule and the FX table exist in one place. The only arithmetic left in the browser is subtracting two integers in the same currency.
+
+## Sorting by department, country and level: by joined name or rank, no extra index
+
+**Alternative considered**: denormalised sort columns on `employees`.
+
+**Chosen**: these sorts read the joined department or country name, or the level rank, with no index of their own. Job title gets an `employees(status, job_title)` index, like salary.
+
+**Why**: the sort runs over a filtered set of at most 10,000 rows in a join, and it measured well inside the 300 ms target (figure to be filled in from the phase 1 measurement in `docs/performance.md`). Denormalised columns would add a second copy of data that must be kept in step.
+
+**Revisit if**: the list grows to 100,000 or more and the measured latency of these sorts approaches the target.
+
+## Rows per page: 25, 50 or 100, in the URL
+
+**Chosen**: the list offers 25, 50 or 100 rows per page, default 50 (`DEFAULT_PAGE_SIZE`), and the choice is a query param like the other list state.
+
+**Why**: 50 keeps a page about one screen tall for a dense table, while 25 and 100 cover the people who want less scrolling or fewer pages. Being in the URL means a bookmarked or back-navigated list shows the same page.
+
+## History % change: computed by the API; across a relocation, in USD at today's static rates
+
+**Chosen**: each salary-history row in the employee detail carries `changeBp`, the % change from the previous row in basis points, computed by the API. When the previous row is in another currency (after a relocation), both amounts are compared in USD at the current static rates.
+
+**Why**: the browser does not do money arithmetic. A relocation changes the currency, so comparing the raw numbers would show a meaningless jump. Comparing in USD at one static rate means the % reflects the change in pay rather than the exchange rate.
+
+## Login: a dark brand panel with no copy
+
+**Chosen**: the login screen has a solid `brand-panel` navy panel carrying only the app mark and name and a faint bar-chart pattern. It is the app's only dark surface, and an exception to the no-dark-mode rule in `docs/design.md`.
+
+**Why**: the panel gives the first screen some identity without a second theme to maintain. It carries no pitch or feature list because the only user is already an employee who knows what the tool is for.

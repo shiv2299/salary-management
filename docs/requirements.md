@@ -12,7 +12,7 @@ Replace ACME's Excel-based salary management for 10,000 employees across multipl
 
 ### Employee records
 
-- **FR-1**: Maintain a searchable, filterable, sortable, paginated list of employees (server-side). Search matches the term anywhere in an employee's full name, email, or job title (substring, case-insensitive), not just at the start. Sorting by salary compares amounts in the base currency, so employees paid in different currencies sort correctly against each other. The list shows active employees by default; the status filter can switch to inactive or all.
+- **FR-1**: Maintain a searchable, filterable, sortable, paginated list of employees (server-side). Search matches the term anywhere in an employee's full name, email, or job title (substring, case-insensitive), not just at the start. Sorting by salary compares amounts in the base currency, so employees paid in different currencies sort correctly against each other. The country, department, and level filters each accept several values (OR within a filter, AND across filters), and each option shows how many employees ticking it would match. The list sorts by name, job title, department, level (by rank), country, hire date, or salary. The list shows active employees by default; the status filter can switch to inactive or all.
 - **FR-2**: Create, edit, deactivate (soft delete), and reactivate employee records. Deactivation preserves salary history; employees are never hard-deleted. Country and level are not edited directly — they change only through a relocation or promotion (FR-3), because both affect pay.
 
 ### Compensation
@@ -86,7 +86,7 @@ Each FR is done when the behavior below is covered by tests at the layer named i
 
 | FR | Accepted when |
 |---|---|
-| FR-1 | Searching "ann" matches "Joanne", "ann@acme.test", and "Channel Manager"; salary sort places a $90,000 employee above a ₹50,00,000 one (≈ $60,000); inactive employees are hidden unless the status filter includes them. |
+| FR-1 | Searching "ann" matches "Joanne", "ann@acme.test", and "Channel Manager"; salary sort places a $90,000 employee above a ₹50,00,000 one (≈ $60,000); inactive employees are hidden unless the status filter includes them. Filtering by India and Germany at L3 returns exactly the L3 employees of both countries; sorting by level orders by rank; each filter option's count equals the rows ticking it would return. |
 | FR-2 | A deactivated employee keeps their full salary history, disappears from the default list and from insights, and can be reactivated. Editing country or level directly is rejected. |
 | FR-3 | A promotion that doesn't raise the level is rejected; a relocation stores the new salary in the new country's currency and updates the employee's country in the same transaction; a future effective date is rejected; a correction dated the same day as the row it fixes becomes the current salary. |
 | FR-4 | Confirming a 7% revision for N previewed employees writes exactly N rows sharing one batch, applies overrides exactly as entered, and is rejected entirely (no rows written) if any employee's salary changed after the preview. |

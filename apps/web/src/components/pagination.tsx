@@ -6,12 +6,17 @@ export function Pagination({
   pageSize,
   total,
   onPage,
+  pageSizeOptions,
+  onPageSize,
 }: {
   /** 1-based. */
   page: number;
   pageSize: number;
   total: number;
   onPage: (page: number) => void;
+  /** With `onPageSize`, adds a "Rows per page" select. */
+  pageSizeOptions?: readonly number[];
+  onPageSize?: (size: number) => void;
 }) {
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(total, page * pageSize);
@@ -21,29 +26,49 @@ export function Pagination({
         {first.toLocaleString('en-US')}–{last.toLocaleString('en-US')} of{' '}
         {total.toLocaleString('en-US')}
       </span>
-      <span className="flex gap-1">
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Previous page"
-          disabled={page <= 1}
-          onClick={() => {
-            onPage(page - 1);
-          }}
-        >
-          <ChevronLeft />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Next page"
-          disabled={page * pageSize >= total}
-          onClick={() => {
-            onPage(page + 1);
-          }}
-        >
-          <ChevronRight />
-        </Button>
+      <span className="flex items-center gap-3">
+        {pageSizeOptions && onPageSize && (
+          <label className="flex items-center gap-2">
+            Rows per page
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                onPageSize(Number(event.target.value));
+              }}
+              className="h-8 rounded-sm border border-border bg-background px-1 text-text-primary"
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <span className="flex gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Previous page"
+            disabled={page <= 1}
+            onClick={() => {
+              onPage(page - 1);
+            }}
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Next page"
+            disabled={page * pageSize >= total}
+            onClick={() => {
+              onPage(page + 1);
+            }}
+          >
+            <ChevronRight />
+          </Button>
+        </span>
       </span>
     </div>
   );

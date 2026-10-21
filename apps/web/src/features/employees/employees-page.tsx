@@ -11,12 +11,11 @@ import { todayUtc } from '@/lib/clock';
 import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
 import { BulkRevisionPanel, type BulkTarget } from './bulk-revision-panel';
 import { EmployeeFilters } from './employee-filters';
-import { EmployeeTable } from './employee-table';
+import { ALL_COLUMNS_VISIBLE, EmployeeTable, detailHref } from './employee-table';
 import { ExportMenu } from './export-menu';
 import { NewEmployeeSheet } from './new-employee-sheet';
 import {
   DEFAULT_FILTERS,
-  PAGE_SIZE,
   bulkFilterFrom,
   filtersFromParams,
   paramsFromFilters,
@@ -101,27 +100,9 @@ export function EmployeesPage({ today }: { today?: string }) {
 
   const selectionCount = allMatching ? (data?.total ?? 0) : selectedIds.size;
 
-  function toggle(id: number) {
+  function changeSelection(next: ReadonlySet<number>) {
     setAllMatching(false);
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function togglePage(ids: number[]) {
-    setAllMatching(false);
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      const allIn = ids.every((id) => next.has(id));
-      for (const id of ids) {
-        if (allIn) next.delete(id);
-        else next.add(id);
-      }
-      return next;
-    });
+    setSelectedIds(next);
   }
 
   const bulkTarget: BulkTarget = allMatching
@@ -268,8 +249,11 @@ export function EmployeesPage({ today }: { today?: string }) {
             selectable
             selectMode={selectMode}
             selectedIds={allMatching ? new Set(data.items.map((item) => item.id)) : selectedIds}
-            onToggle={toggle}
-            onTogglePage={togglePage}
+            onSelectionChange={changeSelection}
+            columnVisibility={ALL_COLUMNS_VISIBLE}
+            onOpen={(id) => {
+              router.push(detailHref(id, paramsText), { scroll: false });
+            }}
             detailQuery={paramsText}
           />
         </div>
@@ -278,7 +262,7 @@ export function EmployeesPage({ today }: { today?: string }) {
       {data && data.total > 0 && (
         <Pagination
           page={filters.page}
-          pageSize={PAGE_SIZE}
+          pageSize={filters.pageSize}
           total={data.total}
           onPage={(page) => {
             update({ page });

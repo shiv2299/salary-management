@@ -26,6 +26,7 @@
   "dependencies": {
     "@acme/shared": "*",
     "@tanstack/react-query": "5.104.4",
+    "@tanstack/react-table": "8.21.3",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
     "country-flag-icons": "1.6.20",

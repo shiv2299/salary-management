@@ -418,3 +418,36 @@ describe('POST /api/employees/:id/salary-changes', () => {
     expect(response.statusCode).toBe(422);
   });
 });
+
+describe('GET /api/employees/facets', () => {
+  it('returns the counts for the filters in the query string', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/facets?country=US&level=1');
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{
+      statusTotal: number;
+      level: { value: number; count: number }[];
+    }>();
+    expect(body.statusTotal).toBe(3);
+    expect(body.level).toEqual([{ value: 1, count: 3 }]);
+  });
+
+  it('is not mistaken for an employee id', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/facets');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ statusTotal: number }>()).toHaveProperty('statusTotal');
+  });
+
+  it('requires a session', async () => {
+    const t = await setup();
+
+    const response = await t.app.inject({ method: 'GET', url: '/api/employees/facets' });
+
+    expect(response.statusCode).toBe(401);
+  });
+});

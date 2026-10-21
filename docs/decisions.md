@@ -381,7 +381,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: these sorts read the joined department or country name, or the level rank, with no index of their own. Job title gets an `employees(status, job_title)` index, like salary.
 
-**Why**: the sort runs over a filtered set of at most 10,000 rows in a join, and it measured well inside the 300 ms target (figure to be filled in from the phase 1 measurement in `docs/performance.md`). Denormalised columns would add a second copy of data that must be kept in step.
+**Why**: the sort runs over a filtered set of at most 10,000 rows in a join, and it measured well inside the 300 ms target on the full 10,000-employee seed: p95 of 5.5 ms for department, 5.7 ms for level and 4.9 ms for country (2026-10-21, `docs/performance.md`). Denormalised columns would add a second copy of data that must be kept in step.
 
 **Revisit if**: the list grows to 100,000 or more and the measured latency of these sorts approaches the target.
 

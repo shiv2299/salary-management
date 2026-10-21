@@ -164,13 +164,40 @@ function toListRow(row: {
   return { ...row.employee, departmentName: row.departmentName, levelCode: row.levelCode };
 }
 
+export function countEmployeeRows(db: DbHandle, filter: EmployeeListFilter): number {
+  return db.select({ value: count() }).from(employees).where(listWhere(filter)).get()?.value ?? 0;
+}
+
+const FACET_COLUMNS = {
+  status: employees.status,
+  countryCode: employees.countryCode,
+  departmentId: employees.departmentId,
+  levelId: employees.levelId,
+} as const;
+
+/** How many rows the filter matches for each distinct value of `column`, in value order. */
+export function countEmployeesGroupedBy(
+  db: DbHandle,
+  filter: EmployeeListFilter,
+  column: keyof typeof FACET_COLUMNS,
+): { value: string | number; count: number }[] {
+  const target = FACET_COLUMNS[column];
+  return db
+    .select({ value: target, count: count() })
+    .from(employees)
+    .where(listWhere(filter))
+    .groupBy(target)
+    .orderBy(asc(target))
+    .all();
+}
+
 export function listEmployeeRows(
   db: DbHandle,
   filter: EmployeeListFilter,
   page: EmployeeListPage,
 ): { rows: EmployeeListRow[]; total: number } {
   const where = listWhere(filter);
-  const total = db.select({ value: count() }).from(employees).where(where).get()?.value ?? 0;
+  const total = countEmployeeRows(db, filter);
   const rows = selectEmployeeRows(db)
     .where(where)
     .orderBy(...listOrderBy(page))

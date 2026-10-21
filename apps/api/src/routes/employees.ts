@@ -5,6 +5,8 @@ import {
   bulkPreviewResponseSchema,
   employeeDetailSchema,
   employeeExportQuerySchema,
+  employeeFacetsQuerySchema,
+  employeeFacetsResponseSchema,
   employeeIdParamsSchema,
   employeeListQuerySchema,
   employeeListResponseSchema,
@@ -25,6 +27,7 @@ import { confirmBulkRevision, previewBulkRevision } from '../services/bulk-revis
 import { recordSalaryChange } from '../services/salary-changes';
 import { exportEmployeesCsv } from '../services/employee-export';
 import { getEmployeeDetail } from '../services/employee-detail';
+import { getEmployeeFacets } from '../services/employee-facets';
 import { listEmployees } from '../services/employee-list';
 
 export interface EmployeeRoutesDeps {
@@ -95,6 +98,17 @@ export const employeeRoutes =
           )
           .send(Readable.from(exportEmployeesCsv(database.db, request.query)));
       },
+    );
+
+    app.get(
+      '/api/employees/facets',
+      {
+        schema: {
+          querystring: employeeFacetsQuerySchema,
+          response: { 200: employeeFacetsResponseSchema },
+        },
+      },
+      (request) => getEmployeeFacets(database.db, request.query),
     );
 
     app.get(

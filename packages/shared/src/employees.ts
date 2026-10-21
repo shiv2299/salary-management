@@ -53,6 +53,30 @@ export const employeeExportQuerySchema = employeeListQuerySchema
   .omit({ limit: true, offset: true })
   .extend({ scope: z.enum(['filtered', 'all']) });
 
+/** The list's search and filters, without sort or paging, for the filter options' counts. */
+export const employeeFacetsQuerySchema = employeeListQuerySchema.omit({
+  sortBy: true,
+  sortOrder: true,
+  limit: true,
+  offset: true,
+});
+
+const facetCount = <T extends z.ZodType>(value: T) =>
+  z.array(z.object({ value, count: z.number().int() }));
+
+/**
+ * How many employees each filter option would match. A group's counts apply the search and every
+ * other group's selection but not its own; options nobody matches are left out.
+ */
+export const employeeFacetsResponseSchema = z.object({
+  /** Employees in the chosen status, before any other filter or search. */
+  statusTotal: z.number().int(),
+  status: facetCount(z.enum(['active', 'inactive'])),
+  country: facetCount(z.string()),
+  department: facetCount(z.number().int()),
+  level: facetCount(z.number().int()),
+});
+
 export const employeeListItemSchema = z.object({
   id: z.number().int(),
   firstName: z.string(),
@@ -81,6 +105,8 @@ export const employeeListResponseSchema = z.object({
   offset: z.number().int(),
 });
 
+export type EmployeeFacetsQuery = z.infer<typeof employeeFacetsQuerySchema>;
+export type EmployeeFacets = z.infer<typeof employeeFacetsResponseSchema>;
 export type EmployeeExportQueryParams = z.infer<typeof employeeExportQuerySchema>;
 export type EmployeeListQueryParams = z.infer<typeof employeeListQuerySchema>;
 export type EmployeeListItem = z.infer<typeof employeeListItemSchema>;

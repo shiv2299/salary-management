@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --env-file-if-exists=.env src/db/seed-cli.ts"
+    "db:seed": "tsx --env-file-if-exists=.env src/db/seed-cli.ts",
+    "perf:latency": "tsx --env-file-if-exists=.env src/perf/measure-latency.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",

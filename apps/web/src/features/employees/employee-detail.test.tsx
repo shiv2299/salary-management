@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { employeeDetail, peerContext, REFERENCE_ROUTES, salaryPreview } from '@/test/fixtures';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
@@ -14,8 +14,8 @@ function renderDetail(extra: Parameters<typeof stubApi>[0] = {}) {
     'POST /api/employees/1/salary-changes/preview': () => Response.json(salaryPreview()),
     ...extra,
   });
-  renderWithQuery(<EmployeeDetailView id={1} today="2026-10-19" />);
-  return stub;
+  const { queryClient } = renderWithQuery(<EmployeeDetailView id={1} today="2026-10-19" />);
+  return { ...stub, queryClient };
 }
 
 function showTab(name: string) {
@@ -210,6 +210,31 @@ describe('EmployeeDetailView', () => {
     });
     const call = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
     expect((call?.[1] as RequestInit).body).toBeUndefined();
+  });
+
+  it('starts the salary form again from the new pay when it changes under the open drawer', async () => {
+    const { queryClient } = renderDetail();
+    const amount = async () =>
+      (await screen.findByLabelText<HTMLInputElement>('New annual salary')).value;
+    expect(await amount()).toBe('5000000.00');
+
+    act(() => {
+      queryClient.setQueryData(
+        ['employees', 'detail', 1],
+        employeeDetail({
+          salary: {
+            amountMinor: 560_000_000,
+            currencyCode: 'INR',
+            amountBaseMinor: 6_708_800,
+            effectiveDate: '2026-10-19',
+          },
+        }),
+      );
+    });
+
+    await waitFor(async () => {
+      expect(await amount()).toBe('5600000.00');
+    });
   });
 
   it('does not offer salary changes for an inactive employee', async () => {

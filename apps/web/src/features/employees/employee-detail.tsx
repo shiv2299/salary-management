@@ -132,7 +132,11 @@ export function EmployeeDetailView({ id, today }: { id: number; today?: string }
           <TabsTrigger value="history">History ({employee.history.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="change">
-          <SalaryChangeForm employee={employee} today={today ?? todayUtc()} />
+          <SalaryChangeForm
+            key={`${employee.id}:${employee.salary.effectiveDate}:${employee.salary.amountMinor}`}
+            employee={employee}
+            today={today ?? todayUtc()}
+          />
         </TabsContent>
         <TabsContent value="details">
           <Details employee={employee} />

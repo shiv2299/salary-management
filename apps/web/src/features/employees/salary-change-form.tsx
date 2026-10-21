@@ -458,7 +458,7 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
         preview={comparisonBody ? (settled ? comparison.data : undefined) : null}
         currentPeer={currentPeer}
         countryName={destination?.name ?? ownCountryName}
-        failed={comparison.isError}
+        failed={settled && comparison.isError}
       />
 
       {serverError && (
@@ -504,7 +504,7 @@ function QuickButton({
       aria-pressed={pressed}
       onClick={onClick}
       className={cn(
-        'h-10 rounded-sm border px-2.5 text-xs font-medium md:h-7',
+        'h-11 rounded-sm border px-2.5 text-xs font-medium md:h-7',
         pressed
           ? 'border-accent-tint-border bg-accent-tint text-primary'
           : 'border-border bg-background text-text-secondary hover:bg-surface hover:text-text-primary',

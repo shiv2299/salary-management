@@ -19,7 +19,14 @@ export function SegmentedControl<T extends string | number>({
   size = 'sm',
 }: SegmentedControlProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-sm bg-surface p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn(
+        'rounded-sm bg-surface p-0.5',
+        size === 'md' ? 'flex w-full sm:inline-flex sm:w-auto' : 'inline-flex',
+      )}
+    >
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -32,8 +39,10 @@ export function SegmentedControl<T extends string | number>({
               onChange(option.value);
             }}
             className={cn(
-              'rounded-sm border px-3 font-medium',
-              size === 'md' ? 'h-11 text-sm md:h-9' : 'h-10 text-sm md:h-7 md:px-2.5 md:text-xs',
+              'rounded-sm border font-medium',
+              size === 'md'
+                ? 'h-11 flex-1 px-1.5 text-sm sm:flex-none sm:px-3 md:h-9'
+                : 'h-11 px-3 text-sm md:h-7 md:px-2.5 md:text-xs',
               selected
                 ? 'border-border bg-background text-primary'
                 : 'border-transparent text-text-secondary hover:text-text-primary',

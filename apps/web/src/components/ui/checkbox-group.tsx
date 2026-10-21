@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { cn } from 'cn';
 
 export function CheckboxGroup<T extends string | number>({
@@ -8,7 +8,7 @@ export function CheckboxGroup<T extends string | number>({
   onChange,
 }: {
   legend: string;
-  options: { value: T; label: string; count?: number }[];
+  options: { value: T; label: ReactNode; count?: number }[];
   selected: readonly T[];
   onChange: (next: T[]) => void;
 }) {
@@ -28,8 +28,9 @@ export function CheckboxGroup<T extends string | number>({
             <label
               key={option.value}
               className={cn(
-                'flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-1 text-sm hover:bg-surface md:min-h-8',
-                option.count === 0 ? 'text-text-secondary' : 'text-text-primary',
+                'flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-1 text-sm md:min-h-8',
+                checked ? 'bg-accent-tint' : 'hover:bg-surface',
+                option.count === 0 && !checked ? 'text-text-secondary' : 'text-text-primary',
               )}
             >
               <input

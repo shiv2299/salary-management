@@ -65,6 +65,26 @@ describe('building blocks', () => {
     expect(screen.getByRole('group', { name: 'Country' })).toBeDefined();
   });
 
+  it('tints the ticked options with the accent fill and leaves the others plain', () => {
+    render(
+      <CheckboxGroup
+        legend="Level"
+        selected={[1]}
+        onChange={() => {}}
+        options={[
+          { value: 1, label: 'L1' },
+          { value: 2, label: 'L2' },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'L1' }).closest('label')?.className).toContain(
+      'bg-accent-tint',
+    );
+    expect(screen.getByRole('checkbox', { name: 'L2' }).closest('label')?.className).not.toContain(
+      'bg-accent-tint',
+    );
+  });
+
   it('keeps zero-count options enabled', () => {
     render(
       <CheckboxGroup

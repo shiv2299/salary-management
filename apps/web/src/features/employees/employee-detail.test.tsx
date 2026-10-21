@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { employeeDetail, peerContext, REFERENCE_ROUTES } from '@/test/fixtures';
+import { employeeDetail, peerContext, REFERENCE_ROUTES, salaryPreview } from '@/test/fixtures';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
 import { EmployeeDetailView } from './employee-detail';
 
@@ -11,6 +11,7 @@ function renderDetail(extra: Parameters<typeof stubApi>[0] = {}) {
     ...REFERENCE_ROUTES,
     'GET /api/employees/1': () => Response.json(employeeDetail()),
     'GET /api/employees/1/peer-context': () => Response.json(peerContext()),
+    'POST /api/employees/1/salary-changes/preview': () => Response.json(salaryPreview()),
     ...extra,
   });
   renderWithQuery(<EmployeeDetailView id={1} today="2026-10-19" />);

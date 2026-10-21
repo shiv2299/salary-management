@@ -1,4 +1,10 @@
-import type { EmployeeDetail, EmployeeFacets, EmployeeListItem, PeerContext } from '@acme/shared';
+import type {
+  EmployeeDetail,
+  EmployeeFacets,
+  EmployeeListItem,
+  PeerContext,
+  SalaryChangePreview,
+} from '@acme/shared';
 
 export function employeeItem(overrides: Partial<EmployeeListItem> = {}): EmployeeListItem {
   return {
@@ -68,6 +74,17 @@ export function peerContext(overrides: Partial<PeerContext> = {}): PeerContext {
     headcount: 214,
     typical: { p25: 400_000_000, median: 450_000_000, p75: 520_000_000 },
     position: { typical: 'inside', outlier: null },
+    ...overrides,
+  };
+}
+
+export function salaryPreview(overrides: Partial<SalaryChangePreview> = {}): SalaryChangePreview {
+  return {
+    current: { amountMinor: 500_000_000, currencyCode: 'INR', amountBaseMinor: 5_990_000 },
+    proposed: { amountMinor: 550_000_000, currencyCode: 'INR', amountBaseMinor: 6_589_000 },
+    changeBaseMinor: 599_000,
+    changeBp: 1000,
+    peer: peerContext(),
     ...overrides,
   };
 }

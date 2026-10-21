@@ -1,4 +1,4 @@
-import type { EmployeeDetail, EmployeeListItem } from '@acme/shared';
+import type { EmployeeDetail, EmployeeFacets, EmployeeListItem } from '@acme/shared';
 
 export function employeeItem(overrides: Partial<EmployeeListItem> = {}): EmployeeListItem {
   return {
@@ -54,6 +54,32 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
         createdAt: '2021-04-12T09:00:00.000Z',
         changeBp: null,
       },
+    ],
+    ...overrides,
+  };
+}
+
+export function employeeFacets(overrides: Partial<EmployeeFacets> = {}): EmployeeFacets {
+  return {
+    statusTotal: 9577,
+    status: [
+      { value: 'active', count: 9577 },
+      { value: 'inactive', count: 423 },
+    ],
+    country: [
+      { value: 'IN', count: 6000 },
+      { value: 'DE', count: 2000 },
+      { value: 'US', count: 1577 },
+    ],
+    department: [
+      { value: 1, count: 5000 },
+      { value: 2, count: 4577 },
+    ],
+    level: [
+      { value: 1, count: 3000 },
+      { value: 2, count: 3000 },
+      { value: 3, count: 2500 },
+      { value: 4, count: 1077 },
     ],
     ...overrides,
   };

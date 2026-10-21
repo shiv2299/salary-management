@@ -1,6 +1,19 @@
-import { DEFAULT_PAGE_SIZE, employeeListQuerySchema, type BulkPreviewBody } from '@acme/shared';
+import {
+  DEFAULT_PAGE_SIZE,
+  employeeListQuerySchema,
+  type BulkPreviewBody,
+  type Country,
+  type Department,
+  type Level,
+} from '@acme/shared';
 
 export const PAGE_SIZE = DEFAULT_PAGE_SIZE;
+
+export type SortKey =
+  'name' | 'jobTitle' | 'department' | 'level' | 'country' | 'hireDate' | 'salary';
+
+export const PAGE_SIZES = [25, 50, 100] as const;
+export type PageSize = (typeof PAGE_SIZES)[number];
 
 export interface ListFilters {
   search?: string;
@@ -9,8 +22,10 @@ export interface ListFilters {
   department: number[];
   level: number[];
   status: 'active' | 'inactive' | 'all';
-  sortBy: 'name' | 'salary' | 'hireDate';
+  sortBy: SortKey;
   sortOrder: 'asc' | 'desc';
+  /** Rows per page; only the supported sizes are accepted from the URL. */
+  pageSize: PageSize;
   /** 1-based page number as it appears in the URL. */
   page: number;
 }
@@ -22,6 +37,7 @@ export const DEFAULT_FILTERS: ListFilters = {
   status: 'active',
   sortBy: 'name',
   sortOrder: 'asc',
+  pageSize: DEFAULT_PAGE_SIZE,
   page: 1,
 };
 
@@ -69,10 +85,13 @@ export function filtersFromParams(params: URLSearchParams): ListFilters {
     country: pickAll(params, 'country'),
     department: pickAll(params, 'department'),
     level: pickAll(params, 'level'),
+    pageSize: DEFAULT_FILTERS.pageSize,
     page: DEFAULT_FILTERS.page,
   };
   const search = pick(params, 'search', shape.search) as string | undefined;
   const page = Number(params.get('page'));
+  const pageSize = PAGE_SIZES.find((size) => size === Number(params.get('pageSize')));
+  if (pageSize) filters.pageSize = pageSize;
   if (search) filters.search = search;
   if (Number.isInteger(page) && page > 1) filters.page = page;
   return filters;
@@ -93,6 +112,9 @@ export function paramsFromFilters(filters: ListFilters): URLSearchParams {
   if (filters.status !== DEFAULT_FILTERS.status) params.set('status', filters.status);
   if (filters.sortBy !== DEFAULT_FILTERS.sortBy) params.set('sortBy', filters.sortBy);
   if (filters.sortOrder !== DEFAULT_FILTERS.sortOrder) params.set('sortOrder', filters.sortOrder);
+  if (filters.pageSize !== DEFAULT_FILTERS.pageSize) {
+    params.set('pageSize', String(filters.pageSize));
+  }
   if (filters.page > 1) params.set('page', String(filters.page));
   return params;
 }
@@ -105,9 +127,92 @@ export function listApiQuery(filters: ListFilters): URLSearchParams {
   params.set('status', filters.status);
   params.set('sortBy', filters.sortBy);
   params.set('sortOrder', filters.sortOrder);
-  params.set('limit', String(PAGE_SIZE));
-  params.set('offset', String((filters.page - 1) * PAGE_SIZE));
+  params.set('limit', String(filters.pageSize));
+  params.set('offset', String((filters.page - 1) * filters.pageSize));
   return params;
+}
+
+/** Query string for GET /api/employees/facets: the search and filters, with no sort or paging. */
+export function facetsApiQuery(filters: ListFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.search) params.set('search', filters.search);
+  appendMultiValues(params, filters);
+  params.set('status', filters.status);
+  return params;
+}
+
+type StatusCheck = 'active' | 'inactive';
+
+/** The status filter as two checkboxes: both ticked is "all". */
+export function statusChecks(status: ListFilters['status']): StatusCheck[] {
+  return status === 'all' ? ['active', 'inactive'] : [status];
+}
+
+/** Both ticked is all statuses; none ticked falls back to the default active list. */
+export function statusFromChecks(checks: readonly StatusCheck[]): ListFilters['status'] {
+  const active = checks.includes('active');
+  const inactive = checks.includes('inactive');
+  if (active && inactive) return 'all';
+  return inactive ? 'inactive' : 'active';
+}
+
+export interface FilterChip {
+  key: string;
+  label: string;
+  /** The filter change that drops just this chip. */
+  remove: Partial<ListFilters>;
+}
+
+/** One removable chip per selected value, then the status when it is not the default. */
+export function filterChips(
+  filters: ListFilters,
+  ref: { countries: Country[]; departments: Department[]; levels: Level[] },
+): FilterChip[] {
+  const chips: FilterChip[] = [];
+  for (const code of filters.country) {
+    chips.push({
+      key: `country:${code}`,
+      label: ref.countries.find((country) => country.code === code)?.name ?? code,
+      remove: { country: filters.country.filter((value) => value !== code) },
+    });
+  }
+  for (const id of filters.department) {
+    chips.push({
+      key: `department:${id}`,
+      label: ref.departments.find((department) => department.id === id)?.name ?? String(id),
+      remove: { department: filters.department.filter((value) => value !== id) },
+    });
+  }
+  for (const id of filters.level) {
+    chips.push({
+      key: `level:${id}`,
+      label: ref.levels.find((level) => level.id === id)?.code ?? String(id),
+      remove: { level: filters.level.filter((value) => value !== id) },
+    });
+  }
+  if (filters.status !== DEFAULT_FILTERS.status) {
+    chips.push({
+      key: 'status',
+      label: filters.status === 'inactive' ? 'Inactive' : 'Active and inactive',
+      remove: { status: DEFAULT_FILTERS.status },
+    });
+  }
+  return chips;
+}
+
+/** Selected values across the three filters, plus one when the status is not the default. */
+export function activeFilterCount(filters: ListFilters): number {
+  return (
+    filters.country.length +
+    filters.department.length +
+    filters.level.length +
+    Number(filters.status !== DEFAULT_FILTERS.status)
+  );
+}
+
+/** True when a chip or a search narrows the list. */
+export function hasActiveFilters(filters: ListFilters): boolean {
+  return activeFilterCount(filters) > 0 || Boolean(filters.search);
 }
 
 /** A plain download link: `filtered` matches the list's search, filters and sort; `all` is everyone. */

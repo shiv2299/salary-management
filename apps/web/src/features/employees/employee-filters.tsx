@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { useIsDesktop } from '@/hooks/use-is-desktop';
 import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
-import type { ListFilters } from './list-filters';
+import { activeFilterCount, type ListFilters } from './list-filters';
 
 interface Props {
   filters: ListFilters;
@@ -147,16 +147,6 @@ function Dropdowns({ filters, onChange, stacked }: Props & { stacked?: boolean }
         </Select>,
       )}
     </>
-  );
-}
-
-/** The count of non-default dropdown filters, shown on the mobile "Filters" button. */
-function activeFilterCount(filters: ListFilters) {
-  return (
-    Number(filters.country.length > 0) +
-    Number(filters.department.length > 0) +
-    Number(filters.level.length > 0) +
-    Number(filters.status !== 'active')
   );
 }
 

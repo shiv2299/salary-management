@@ -1,0 +1,1 @@
+CREATE INDEX `employees_status_job_title_idx` ON `employees` (`status`,`job_title`);

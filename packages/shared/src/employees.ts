@@ -40,7 +40,9 @@ export const employeeListQuerySchema = z.object({
   level: multiValueParam(z.coerce.number().int().positive()),
   status: z.enum(['active', 'inactive', 'all']).default('active'),
   search: z.string().trim().min(1).optional(),
-  sortBy: z.enum(['name', 'salary', 'hireDate']).default('name'),
+  sortBy: z
+    .enum(['name', 'jobTitle', 'department', 'level', 'country', 'hireDate', 'salary'])
+    .default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   offset: z.coerce.number().int().min(0).default(0),

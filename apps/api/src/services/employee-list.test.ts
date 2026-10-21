@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { departments, employees } from '../db/schema';
+import { countries, departments, employees, levels } from '../db/schema';
 import { FIXED_NOW, createTestDb } from '../test/test-db';
 import { createEmployees, type NewEmployeeInput } from './employees';
 import { listEmployees, type EmployeeListQuery } from './employee-list';
@@ -211,6 +211,54 @@ describe('listEmployees sorting', () => {
     add({ firstName: 'Old', lastName: 'Hire', hireDate: '2015-01-01' });
 
     expect(names(list({ sortBy: 'hireDate' }))).toEqual(['Old Hire', 'New Hire']);
+  });
+
+  it('sorts by job title, then by name', () => {
+    add({ firstName: 'B', lastName: 'Two', jobTitle: 'Analyst' });
+    add({ firstName: 'A', lastName: 'One', jobTitle: 'Writer' });
+    add({ firstName: 'C', lastName: 'Three', jobTitle: 'Analyst' });
+
+    expect(names(list({ sortBy: 'jobTitle' }))).toEqual(['C Three', 'B Two', 'A One']);
+  });
+
+  it('sorts by department name, not by department id', () => {
+    database.db.insert(departments).values({ name: 'Accounts' }).run();
+    add({ firstName: 'In', lastName: 'Engineering', departmentId: 1 });
+    add({ firstName: 'In', lastName: 'Accounts', departmentId: 2 });
+
+    expect(names(list({ sortBy: 'department' }))).toEqual(['In Accounts', 'In Engineering']);
+  });
+
+  it('sorts by level rank, not by level code or id', () => {
+    database.db.insert(levels).values({ code: 'Z0', label: 'Intern', rank: 0 }).run();
+    add({ firstName: 'At', lastName: 'L1', levelId: 1 });
+    add({ firstName: 'At', lastName: 'L3', levelId: 3 });
+    add({ firstName: 'At', lastName: 'Z0', levelId: 4 });
+
+    expect(names(list({ sortBy: 'level', sortOrder: 'desc' }))).toEqual([
+      'At L3',
+      'At L1',
+      'At Z0',
+    ]);
+  });
+
+  it('sorts by country name, not by country code', () => {
+    database.db.insert(countries).values({ code: 'ES', name: 'Spain', currencyCode: 'EUR' }).run();
+    add({ firstName: 'In', lastName: 'Spain', countryCode: 'ES' });
+    add({ firstName: 'In', lastName: 'India', countryCode: 'IN' });
+    add({ firstName: 'In', lastName: 'Germany', countryCode: 'DE' });
+
+    expect(names(list({ sortBy: 'country' }))).toEqual(['In Germany', 'In India', 'In Spain']);
+  });
+
+  it('keeps ties in the same id order whichever direction is sorted', () => {
+    const first = add({ firstName: 'Same', lastName: 'Name', jobTitle: 'Analyst' });
+    const second = add({ firstName: 'Same', lastName: 'Name', jobTitle: 'Analyst' });
+
+    for (const sortOrder of ['asc', 'desc'] as const) {
+      const ids = list({ sortBy: 'jobTitle', sortOrder }).items.map((e) => e.id);
+      expect(ids).toEqual([first, second]);
+    }
   });
 });
 

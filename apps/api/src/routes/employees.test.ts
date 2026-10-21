@@ -94,6 +94,23 @@ describe('GET /api/employees', () => {
     }
   });
 
+  it('accepts every sort key', async () => {
+    const t = await setup();
+
+    for (const sortBy of [
+      'name',
+      'jobTitle',
+      'department',
+      'level',
+      'country',
+      'hireDate',
+      'salary',
+    ]) {
+      expect((await get(t, `/api/employees?sortBy=${sortBy}`)).statusCode, sortBy).toBe(200);
+    }
+    expect((await get(t, '/api/employees?sortBy=bogus')).statusCode).toBe(400);
+  });
+
   it('requires a session', async () => {
     const t = await setup();
 

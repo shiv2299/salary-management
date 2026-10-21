@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import {
+  countries,
   departments,
   employees,
   levels,
@@ -82,7 +83,7 @@ export interface EmployeeListFilter {
 }
 
 export interface EmployeeListPage {
-  sortBy: 'name' | 'salary' | 'hireDate';
+  sortBy: 'name' | 'jobTitle' | 'department' | 'level' | 'country' | 'hireDate' | 'salary';
   sortOrder: 'asc' | 'desc';
   limit: number;
   offset: number;
@@ -116,6 +117,11 @@ function listWhere(filter: EmployeeListFilter): SQL | undefined {
   return and(...conditions);
 }
 
+/** Rows that tie on the chosen key fall back to name, then id, whichever way the key runs. */
+function withNameTieBreak(primary: SQL): SQL[] {
+  return [primary, asc(employees.lastName), asc(employees.firstName), asc(employees.id)];
+}
+
 function listOrderBy({ sortBy, sortOrder }: EmployeeListPage): SQL[] {
   const direction = sortOrder === 'asc' ? asc : desc;
   // The trailing id keeps pages stable when the sort values tie.
@@ -126,6 +132,14 @@ function listOrderBy({ sortBy, sortOrder }: EmployeeListPage): SQL[] {
       return [direction(employees.hireDate), asc(employees.id)];
     case 'name':
       return [direction(employees.lastName), direction(employees.firstName), asc(employees.id)];
+    case 'jobTitle':
+      return withNameTieBreak(direction(employees.jobTitle));
+    case 'department':
+      return withNameTieBreak(direction(departments.name));
+    case 'level':
+      return withNameTieBreak(direction(levels.rank));
+    case 'country':
+      return withNameTieBreak(direction(countries.name));
   }
 }
 
@@ -138,7 +152,8 @@ function selectEmployeeRows(db: DbHandle) {
     })
     .from(employees)
     .innerJoin(departments, eq(departments.id, employees.departmentId))
-    .innerJoin(levels, eq(levels.id, employees.levelId));
+    .innerJoin(levels, eq(levels.id, employees.levelId))
+    .innerJoin(countries, eq(countries.code, employees.countryCode));
 }
 
 function toListRow(row: {

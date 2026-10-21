@@ -69,6 +69,7 @@ export const employees = sqliteTable(
     index('employees_department_idx').on(t.departmentId),
     index('employees_level_idx').on(t.levelId),
     index('employees_name_idx').on(t.lastName, t.firstName),
+    index('employees_status_job_title_idx').on(t.status, t.jobTitle),
   ],
 );
 

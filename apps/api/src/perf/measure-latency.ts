@@ -2,14 +2,24 @@ import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import { createDatabase } from '../db/client';
 
-// Measures list and facet latency in-process against an already seeded database, so network and
-// the Next.js rewrite are excluded. See docs/performance.md for the method and the figures.
+// Measures list, facet, insight, peer-context and salary-preview latency in-process against an
+// already seeded database, so network and the Next.js rewrite are excluded. See
+// docs/performance.md for the method and the figures.
 const WARM_UP = 5;
 const TIMED = 40;
 // Used only when JWT_SECRET is unset; the app never listens, so the value does not matter.
 const LOCAL_JWT_SECRET = 'local-latency-measurement-secret-32+';
 
-const CASES = [
+interface Case {
+  method: 'GET' | 'POST';
+  url: string;
+  payload?: object;
+}
+
+// The first seeded employee, active at the reference date, for the per-employee endpoints.
+const EMPLOYEE_ID = 1;
+
+const GET_URLS = [
   '/api/employees',
   '/api/employees?sortBy=jobTitle&sortOrder=desc',
   '/api/employees?sortBy=department&sortOrder=desc',
@@ -19,6 +29,20 @@ const CASES = [
   '/api/employees?country=IN&country=DE&level=3&level=4',
   '/api/employees/facets',
   '/api/employees/facets?search=ann&country=IN',
+  '/api/insights/distribution?groupBy=country',
+  '/api/insights/outliers',
+  '/api/insights/payroll?groupBy=department',
+  '/api/insights/recent-changes?years=5',
+  `/api/employees/${EMPLOYEE_ID}/peer-context`,
+];
+
+const CASES: Case[] = [
+  ...GET_URLS.map((url): Case => ({ method: 'GET', url })),
+  {
+    method: 'POST',
+    url: `/api/employees/${EMPLOYEE_ID}/salary-changes/preview`,
+    payload: { reason: 'raise', percentageBp: 500 },
+  },
 ];
 
 /** Nearest-rank percentile of an ascending list. */
@@ -52,18 +76,23 @@ try {
 
   console.log('| Case | p50 ms | p95 ms |');
   console.log('|---|---|---|');
-  for (const url of CASES) {
+  for (const { method, url, payload } of CASES) {
     const durations: number[] = [];
     for (let i = 0; i < WARM_UP + TIMED; i++) {
       const started = performance.now();
-      const response = await app.inject({ method: 'GET', url, headers: { cookie } });
+      const response = await app.inject({
+        method,
+        url,
+        headers: { cookie },
+        ...(payload ? { payload } : {}),
+      });
       const elapsed = performance.now() - started;
       if (response.statusCode !== 200) throw new Error(`${url} answered ${response.statusCode}`);
       if (i >= WARM_UP) durations.push(elapsed);
     }
     durations.sort((a, b) => a - b);
     console.log(
-      `| \`${url}\` | ${percentile(durations, 50).toFixed(1)} | ${percentile(durations, 95).toFixed(1)} |`,
+      `| \`${method} ${url}\` | ${percentile(durations, 50).toFixed(1)} | ${percentile(durations, 95).toFixed(1)} |`,
     );
   }
 } finally {

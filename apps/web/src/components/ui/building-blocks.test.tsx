@@ -65,6 +65,22 @@ describe('building blocks', () => {
     expect(screen.getByRole('group', { name: 'Country' })).toBeDefined();
   });
 
+  it('uses primary text for the count on a ticked row and secondary text on an unticked one', () => {
+    render(
+      <CheckboxGroup
+        legend="Country"
+        selected={['IN']}
+        onChange={vi.fn()}
+        options={[
+          { value: 'IN', label: 'India', count: 120 },
+          { value: 'DE', label: 'Germany', count: 80 },
+        ]}
+      />,
+    );
+    expect(screen.getByText('120').className).toContain('text-text-primary');
+    expect(screen.getByText('80').className).toContain('text-text-secondary');
+  });
+
   it('groups the thousands in a count', () => {
     render(
       <CheckboxGroup

@@ -53,7 +53,13 @@ export function CheckboxGroup<T extends string | number>({
                 {option.label}
               </span>
               {hasCount ? (
-                <span id={countId} className="text-xs tabular-nums text-text-secondary">
+                <span
+                  id={countId}
+                  className={cn(
+                    'text-xs tabular-nums',
+                    checked ? 'text-text-primary' : 'text-text-secondary',
+                  )}
+                >
                   {option.count?.toLocaleString('en-US')}
                 </span>
               ) : null}

@@ -2,7 +2,7 @@ import { buildApp } from '../app';
 import { loadConfig } from '../config';
 import { createDatabase } from '../db/client';
 
-// Measures list, facet, insight, peer-context and salary-preview latency in-process against an
+// Measures list, facet, insight, employee detail, peer-context and salary-preview latency in-process against an
 // already seeded database, so network and the Next.js rewrite are excluded. See
 // docs/performance.md for the method and the figures.
 const WARM_UP = 5;
@@ -33,6 +33,7 @@ const GET_URLS = [
   '/api/insights/outliers',
   '/api/insights/payroll?groupBy=department',
   '/api/insights/recent-changes?years=5',
+  `/api/employees/${EMPLOYEE_ID}`,
   `/api/employees/${EMPLOYEE_ID}/peer-context`,
 ];
 

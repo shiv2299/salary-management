@@ -91,6 +91,19 @@ export function toInputAmount(amountMinor: number, currencyCode: string): string
   return toDecimalString(amountMinor, minorExponent(currencyCode));
 }
 
+/**
+ * An amount for an editable input: grouped, always the currency's minor digits, with "," grouping
+ * and "." decimal (en-IN grouping for INR) so parseMajorToMinor reads it back.
+ */
+export function formatInputAmount(amountMinor: number, currencyCode: string): string {
+  const exponent = minorExponent(currencyCode);
+  return new Intl.NumberFormat(currencyCode === 'INR' ? 'en-IN' : 'en-US', {
+    style: 'decimal',
+    minimumFractionDigits: exponent,
+    maximumFractionDigits: exponent,
+  }).format(toDecimalString(amountMinor, exponent) as unknown as number);
+}
+
 /** Short axis label such as "$120K". The input is minor units; the point is moved, not divided. */
 export function formatMoneyCompact(amountMinor: number, currencyCode: string): string {
   const exponent = minorExponent(currencyCode);

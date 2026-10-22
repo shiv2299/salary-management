@@ -1,4 +1,4 @@
-import type { BulkConfirmBody, BulkPreviewItem } from '@acme/shared';
+import type { BulkConfirmBody, BulkOverride, BulkPreviewItem } from '@acme/shared';
 import { parseMajorToMinor } from '@/lib/money';
 
 /** Hand-typed override text keyed by employee id. Absent means "use the proposed amount". */
@@ -88,4 +88,59 @@ export function keepUnaffectedOverrides(
     }
   }
   return kept;
+}
+
+export type ReviewView = 'all' | 'overridden' | 'outside';
+
+/** The valid edits that differ from the proposed amount, ordered by employee id, for the summary. */
+export function overridesForSummary(
+  items: BulkPreviewItem[],
+  overrides: Overrides,
+): BulkOverride[] {
+  const edits: BulkOverride[] = [];
+  for (const item of items) {
+    const resolved = resolveNewAmount(item, overrides[item.employeeId]);
+    if (resolved.overridden && resolved.valid) {
+      edits.push({ employeeId: item.employeeId, newAmountMinor: resolved.amountMinor });
+    }
+  }
+  return edits.sort((a, b) => a.employeeId - b.employeeId);
+}
+
+/** Edits that are not a valid raise; they block the confirm. */
+export function countInvalid(items: BulkPreviewItem[], overrides: Overrides): number {
+  return items.filter((item) => !resolveNewAmount(item, overrides[item.employeeId]).valid).length;
+}
+
+/** Edited rows (invalid edits included) and people whose pay is outside their peer range. */
+export function reviewCounts(
+  items: BulkPreviewItem[],
+  overrides: Overrides,
+): { overridden: number; outside: number } {
+  let overridden = 0;
+  let outside = 0;
+  for (const item of items) {
+    if (resolveNewAmount(item, overrides[item.employeeId]).overridden) overridden += 1;
+    if (item.outsidePeerRange !== null) outside += 1;
+  }
+  return { overridden, outside };
+}
+
+/** The rows to show: those matching a name search and the chosen view. */
+export function reviewRows(
+  items: BulkPreviewItem[],
+  overrides: Overrides,
+  options: { search: string; view: ReviewView },
+): BulkPreviewItem[] {
+  const needle = options.search.trim().toLowerCase();
+  return items.filter((item) => {
+    if (needle && !`${item.firstName} ${item.lastName}`.toLowerCase().includes(needle)) {
+      return false;
+    }
+    if (options.view === 'overridden') {
+      return resolveNewAmount(item, overrides[item.employeeId]).overridden;
+    }
+    if (options.view === 'outside') return item.outsidePeerRange !== null;
+    return true;
+  });
 }

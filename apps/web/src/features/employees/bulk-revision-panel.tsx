@@ -23,7 +23,7 @@ import {
   resolveNewAmount,
   summarize,
   type Overrides,
-} from './bulk-state';
+} from '../bulk-revision/bulk-state';
 import { PAGE_SIZE } from './list-filters';
 
 export type BulkTarget =

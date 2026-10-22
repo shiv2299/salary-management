@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatChangeBp,
+  formatInputAmount,
   formatMoney,
   formatPercentageBp,
   formatSignedMoney,
@@ -81,5 +82,15 @@ describe('signed changes', () => {
     expect(formatSignedMoney(50_000_000, 'INR')).toBe('+₹5,00,000.00');
     expect(formatSignedMoney(-100_000, 'USD')).toBe('-$1,000.00');
     expect(formatSignedMoney(0, 'INR')).toBe('₹0.00');
+  });
+});
+
+describe('formatInputAmount', () => {
+  it('formats an amount for an input with digit grouping that it can read back', () => {
+    expect(formatInputAmount(198_218_262, 'USD')).toBe('1,982,182.62');
+    expect(formatInputAmount(198_218_262, 'INR')).toBe('19,82,182.62');
+    expect(formatInputAmount(198_218_262, 'EUR')).toBe('1,982,182.62');
+    expect(formatInputAmount(5, 'USD')).toBe('0.05');
+    expect(parseMajorToMinor('19,82,182.62', 'INR')).toBe(198_218_262);
   });
 });

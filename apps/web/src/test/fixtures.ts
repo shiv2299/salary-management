@@ -1,5 +1,6 @@
 import type {
   BulkPreviewItem,
+  BulkSummary,
   EmployeeDetail,
   EmployeeFacets,
   EmployeeListItem,
@@ -22,6 +23,22 @@ export function bulkPreviewItem(overrides: Partial<BulkPreviewItem> = {}): BulkP
     proposedAmountBaseMinor: 10_700_000,
     changeBp: 700,
     outsidePeerRange: null,
+    ...overrides,
+  };
+}
+
+export function bulkSummary(overrides: Partial<BulkSummary> = {}): BulkSummary {
+  return {
+    headcount: 2,
+    byDepartment: [{ departmentName: 'Engineering', headcount: 2 }],
+    revision: {
+      percentageBp: 700,
+      overriddenCount: 0,
+      addedByCurrency: [{ currencyCode: 'USD', addedMinor: 1_400_000 }],
+      addedBaseMinor: 1_400_000,
+      typical: { currencyCode: 'USD', beforeMinor: 10_000_000, afterMinor: 10_700_000 },
+      overrideChangeBp: [],
+    },
     ...overrides,
   };
 }

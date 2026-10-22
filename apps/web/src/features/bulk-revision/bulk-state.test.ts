@@ -3,8 +3,12 @@ import { bulkPreviewItem } from '@/test/fixtures';
 import { describe, expect, it } from 'vitest';
 import {
   buildConfirmBody,
+  countInvalid,
   keepUnaffectedOverrides,
+  overridesForSummary,
   resolveNewAmount,
+  reviewCounts,
+  reviewRows,
   summarize,
 } from './bulk-state';
 
@@ -115,5 +119,49 @@ describe('keepUnaffectedOverrides', () => {
     expect(keepUnaffectedOverrides(before, after, { 1: '11000', 2: '12000', 3: '13000' })).toEqual({
       1: '11000',
     });
+  });
+});
+
+describe('review state over the loaded preview', () => {
+  const items = [
+    bulkPreviewItem(),
+    bulkPreviewItem({ employeeId: 2, firstName: 'Ravi', lastName: 'Menon' }),
+    bulkPreviewItem({
+      employeeId: 3,
+      firstName: 'Mia',
+      lastName: 'Lopez',
+      outsidePeerRange: 'below',
+    }),
+  ];
+
+  it('sends only valid edits that differ from the proposed amount, ordered by employee', () => {
+    expect(
+      overridesForSummary(items, { 3: '120000', 1: '107,000.00', 2: 'abc', 9: '200000' }),
+    ).toEqual([{ employeeId: 3, newAmountMinor: 12_000_000 }]);
+  });
+
+  it('counts edits that are not a valid raise', () => {
+    expect(countInvalid(items, { 1: 'abc', 2: '90000' })).toBe(2);
+  });
+
+  it('counts edited rows, invalid ones included, and people outside their peer range', () => {
+    expect(reviewCounts(items, { 1: 'abc', 2: '120000' })).toEqual({ overridden: 2, outside: 1 });
+  });
+
+  it('finds people by any part of their name, ignoring case', () => {
+    expect(
+      reviewRows(items, {}, { search: 'menON', view: 'all' }).map((i) => i.employeeId),
+    ).toEqual([2]);
+  });
+
+  it('shows only the edited rows or only the people outside their peer range', () => {
+    expect(
+      reviewRows(items, { 2: '120000' }, { search: '', view: 'overridden' }).map(
+        (i) => i.employeeId,
+      ),
+    ).toEqual([2]);
+    expect(reviewRows(items, {}, { search: '', view: 'outside' }).map((i) => i.employeeId)).toEqual(
+      [3],
+    );
   });
 });

@@ -50,6 +50,7 @@ export {
   type RecentChangesResponse,
 } from './insights';
 export {
+  MAX_BULK_AMOUNT_MINOR,
   bulkConfirmBodySchema,
   bulkConfirmResponseSchema,
   bulkOverrideSchema,

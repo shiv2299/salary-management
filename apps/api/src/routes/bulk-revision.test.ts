@@ -1,3 +1,4 @@
+import { MAX_BULK_AMOUNT_MINOR } from '@acme/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createEmployees } from '../services/employees';
 import { FIXED_NOW } from '../test/test-db';
@@ -155,6 +156,33 @@ describe('POST /api/employees/bulk-salary-changes/summary', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('rejects an edit above the largest bulk amount with 400, not a server error', async () => {
+    const t = await setup();
+
+    const response = await post(t, url, {
+      filter: {},
+      percentageBp: 500,
+      overrides: [
+        { employeeId: 1, newAmountMinor: 5_000_000_000_000_000 },
+        { employeeId: 2, newAmountMinor: 5_000_000_000_000_000 },
+      ],
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('accepts an edit at the largest bulk amount', async () => {
+    const t = await setup();
+
+    const response = await post(t, url, {
+      filter: {},
+      percentageBp: 500,
+      overrides: [{ employeeId: 1, newAmountMinor: MAX_BULK_AMOUNT_MINOR }],
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it('requires a session', async () => {
     const t = await setup();
 
@@ -205,6 +233,24 @@ describe('POST /api/employees/bulk-salary-changes', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ error: { code: 'STALE_BULK_REVISION' } });
+  });
+
+  it('rejects a new amount above the largest bulk amount with 400', async () => {
+    const t = await setup();
+
+    const response = await post(
+      t,
+      '/api/employees/bulk-salary-changes',
+      confirm([
+        {
+          employeeId: 1,
+          expectedCurrentAmountMinor: 10_000_000,
+          newAmountMinor: MAX_BULK_AMOUNT_MINOR + 1,
+        },
+      ]),
+    );
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('rejects an empty item list with 400', async () => {

@@ -1,8 +1,17 @@
 import { z } from 'zod';
 import { isoDateSchema } from './employees';
 
+/**
+ * The largest new amount a bulk revision accepts, in minor units (900,000,000.00 in a two-decimal
+ * currency). 100,000 such amounts still sum within `Number.MAX_SAFE_INTEGER`, so the totals stay
+ * exact integers.
+ */
+export const MAX_BULK_AMOUNT_MINOR = 90_000_000_000;
+
 /** 1 to 10,000 basis points: a 0.01% to 100% increase. Decreases go through a correction. */
 const percentageBpSchema = z.number().int().min(1).max(10_000);
+
+const bulkNewAmountSchema = z.number().int().positive().max(MAX_BULK_AMOUNT_MINOR);
 
 const bulkFilterSchema = z
   .object({
@@ -49,7 +58,7 @@ export const bulkPreviewResponseSchema = z.object({
 export const bulkOverrideSchema = z
   .object({
     employeeId: z.number().int().positive(),
-    newAmountMinor: z.number().int().positive(),
+    newAmountMinor: bulkNewAmountSchema,
   })
   .strict();
 
@@ -110,7 +119,7 @@ export const bulkConfirmBodySchema = z
           .object({
             employeeId: z.number().int().positive(),
             expectedCurrentAmountMinor: z.number().int().positive(),
-            newAmountMinor: z.number().int().positive(),
+            newAmountMinor: bulkNewAmountSchema,
           })
           .strict(),
       )

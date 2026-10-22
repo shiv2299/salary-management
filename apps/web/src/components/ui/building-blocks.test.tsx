@@ -6,6 +6,7 @@ import { Chip } from './chip';
 import { CountryFlag } from './country-flag';
 import { LevelBadge } from './level-badge';
 import { StatTile } from './stat-tile';
+import { StepIndicator } from './step-indicator';
 
 describe('building blocks', () => {
   it('makes initials from the first and last words of a name', () => {
@@ -158,5 +159,19 @@ describe('building blocks', () => {
   it('shows a level as a badge', () => {
     render(<LevelBadge code="L3" />);
     expect(screen.getByText('L3')).toBeDefined();
+  });
+
+  it('marks the current step and the finished ones', () => {
+    render(
+      <StepIndicator steps={['Choose people', 'Set increase & review', 'Confirm']} current={1} />,
+    );
+    const [first, second, third] = within(
+      screen.getByRole('list', { name: 'Progress' }),
+    ).getAllByRole('listitem');
+    expect(second?.getAttribute('aria-current')).toBe('step');
+    expect(first?.textContent).toBe('Choose people (done)');
+    expect(first?.getAttribute('aria-current')).toBeNull();
+    expect(third?.getAttribute('aria-current')).toBeNull();
+    expect(third?.textContent).not.toContain('(done)');
   });
 });

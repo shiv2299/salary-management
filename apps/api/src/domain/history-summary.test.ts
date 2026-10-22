@@ -77,6 +77,24 @@ describe('summariseHistory', () => {
     });
   });
 
+  it('starts from the corrected pay when the hire pay was corrected on the hire day', () => {
+    const corrected = [
+      usd(1, '2020-01-01', 10_000_000, 'hire'),
+      usd(2, '2020-01-01', 10_500_000, 'correction'),
+      usd(3, '2022-01-01', 11_025_000, 'raise'),
+    ];
+    expect(summariseHistory(corrected, rates, '2026-10-22')).toMatchObject({
+      hireAmountMinor: 10_500_000,
+      sinceHireBp: 500,
+      biggestJump: { historyId: 3, changeBp: 500 },
+    });
+    expect(summariseHistory(corrected.slice(0, 2), rates, '2026-10-22')).toMatchObject({
+      hireAmountMinor: 10_500_000,
+      sinceHireBp: null,
+      biggestJump: null,
+    });
+  });
+
   it('has no growth figures for an employee with only the hire row', () => {
     expect(
       summariseHistory([usd(1, '2026-10-15', 9_000_000, 'hire')], rates, '2026-10-22'),

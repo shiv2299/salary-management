@@ -15,7 +15,7 @@ export interface HistorySummaryFigures<R extends string = string> {
   /** The rows' currency, or USD when they span more than one. */
   currencyCode: string;
   convertedToUsd: boolean;
-  /** First row (by date, then id), in `currencyCode`. */
+  /** The pay in force on the first day, in `currencyCode`. */
   hireAmountMinor: number;
   /** Current row, in `currencyCode`. */
   currentAmountMinor: number;
@@ -60,10 +60,15 @@ export function summariseHistory<R extends string>(
     convertedToUsd
       ? convert(row.amountMinor, row.currencyCode, BASE_CURRENCY, rates)
       : row.amountMinor;
-  const hireAmountMinor = inFigures(first);
+  // Rows dated on the first day are the starting pay: a correction made that day replaces the hire
+  // amount instead of counting as a change.
+  const start = selectCurrentRow(
+    ordered.filter((row) => row.effectiveDate === first.effectiveDate),
+  );
+  const hireAmountMinor = inFigures(start);
   const currentAmountMinor = inFigures(current);
 
-  const hasChanges = ordered.length >= 2;
+  const hasChanges = ordered.some((row) => row.effectiveDate > first.effectiveDate);
   const sinceHireBp = hasChanges
     ? percentChangeBpOrNull(hireAmountMinor, currentAmountMinor)
     : null;
@@ -81,6 +86,7 @@ export function summariseHistory<R extends string>(
   for (const row of ordered) {
     const changeBp = changes.get(row.id) ?? null;
     if (
+      row.effectiveDate > first.effectiveDate &&
       changeBp !== null &&
       changeBp > 0 &&
       (biggestJump === null || changeBp > biggestJump.changeBp)

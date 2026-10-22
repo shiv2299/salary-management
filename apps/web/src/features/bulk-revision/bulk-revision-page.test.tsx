@@ -415,6 +415,10 @@ describe('BulkRevisionPage review', () => {
       await screen.findByText('No active employees in this selection.', {}, WAIT),
     ).toBeDefined();
     expect(screen.queryByRole('group', { name: 'Added to annual payroll' })).toBeNull();
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 0 changes →' })
+        .disabled,
+    ).toBe(true);
   });
 
   it('offers a retry when the preview fails', async () => {

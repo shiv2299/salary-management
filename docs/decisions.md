@@ -311,17 +311,49 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Verified**: the image was built and run with a volume. Login via `/api/auth/login` worked, data survived a container restart, and the restart did not re-seed (`seeded: false`, `hrUser: exists`). The container exits non-zero without `JWT_SECRET`.
 
-## Frontend: bulk-revision total shown per currency, batch rows not expandable
+## Frontend: batch rows not expandable, list state in the URL, native selects
 
 **Chosen**:
-- The bulk preview summary reads "N employees · M overridden · total increase X", where X is the sum of increases within each currency (for example "$12,000.00 + ₹4,50,000.00"), not one USD figure.
+- The bulk revision total is no longer the browser's per-currency sum: see "Bulk revision figures: a server summary that follows the edits".
 - A bulk revision in the recent-changes list is one row (headcount, percentage, note) that does not expand to list its employees.
 - Detail links carry the list's own query string (`/employees/123?status=all`), and the list reads its filters, sort and page from the URL query only.
 - Form pickers and the rows-per-page choice are native `<select>` elements, not a custom listbox. List filters are checkbox groups instead (see "Employee filters: a left panel of checkbox groups, not an inline dropdown row").
 
-**Why**: the preview response carries local amounts only, and the browser never converts currencies, so a single USD total would need either browser FX arithmetic or a new endpoint. Summing integers within one currency is exact and needs neither. The API has no endpoint that lists a batch's members, so the expandable row in `docs/design.md` §5 has nothing to show beyond what the row already says. The intercepted drawer route changes the URL to `/employees/123`, and the list underneath keeps rendering, so without the carried query it would reset its filters while the drawer is open. Native selects are reliable on touch screens and for keyboards, which matters for the 44px mobile targets.
+**Why**: the API has no endpoint that lists a batch's members, so the expandable row in `docs/design.md` §5 has nothing to show beyond what the row already says. The intercepted drawer route changes the URL to `/employees/123`, and the list underneath keeps rendering, so without the carried query it would reset its filters while the drawer is open. Native selects are reliable on touch screens and for keyboards, which matters for the 44px mobile targets.
 
-**Revisit if**: HR wants a single USD figure (add USD amounts to the preview response) or a drill-down into a batch (add a batch-members endpoint).
+**Revisit if**: HR wants a drill-down into a batch (add a batch-members endpoint).
+
+## Bulk revision: its own screen at `/employees/revisions/new`, the selection in the query string
+
+**Alternatives considered**: the panel that replaced the list; `/employees/bulk-revision` (the drawer's intercepting route rewrites every one-segment `/employees/<x>` soft navigation into the drawer); carrying the selection in `sessionStorage` or in memory (lost in a new tab, missing when storage is blocked, and gone after a refresh in memory).
+
+**Chosen**: the screen lives at `/employees/revisions/new`, and its query string is the list's own query plus `select=all` or `ids=3,12`. At most 1,000 people can be picked by hand (about 6 KB of URL); beyond that the selection bar asks for "select all matching". No percentage is pre-chosen, and changing it keeps hand edits, because an edit is an amount the HR Manager typed, not a percentage.
+
+**Why**: refresh, back and a copied link reproduce the screen, and "Back to employees" rebuilds the list exactly. A `select=all` filter is evaluated when the screen loads; the confirm still sends the explicit reviewed list (see "Bulk revision: confirm an explicit, checked list, not a filter").
+
+## Bulk revision figures: a server summary that follows the edits
+
+**Alternatives considered**: the browser's per-currency sums only (the earlier rule); converting each row to USD and adding them (rounds once per person); the average instead of the median.
+
+**Chosen**: `POST /api/employees/bulk-salary-changes/summary`, re-posted 400 ms after the last edit. Added payroll is the exact integer sum of new minus current per currency; the USD total converts each currency's sum once (half away from zero) and adds them. Typical pay is the median before and after: in the local currency when everyone selected is paid in one currency, otherwise in USD (before from the cached USD amount, after from each new amount converted once).
+
+**Why**: the browser never converts or applies a percentage, so every figure that does comes from `domain/`. One rounding per currency keeps the USD total consistent with the per-currency figures shown beside it. The median is the "typical" the rest of the app uses, and one outlier cannot move it.
+
+## Bulk review: search and quick filters run over the loaded preview
+
+The preview is already the full selection held in the browser (see "Bulk revision: confirm an explicit, checked list, not a filter"), so name search and the Overridden / Outside peer range filters need no request. The review table is plain table markup rather than TanStack Table: it has no sorting, column choice or row selection, which are what TanStack brings.
+
+## Bulk revision: "outside peer range" is the FR-8 rule on current pay
+
+The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay before the revision, so it matches the drawer and the outliers list; groups under 10 are not evaluated. It is a heads-up, not a block.
+
+## Last bulk revision: the batch with the latest effective date
+
+**Alternative considered**: the first batch entry of recent changes, which is windowed to 3 or 5 years and paginated, so an older revision would be missed.
+
+**Chosen**: `GET /api/employees/bulk-salary-changes/latest`, taking the latest `effective_date` and the highest id on a tie. The batch table is small, so there is no index.
+
+**Why**: it answers "when did we last do this" directly and regardless of the recent-changes window.
 
 ## Employee filters: a left panel of checkbox groups, not an inline dropdown row
 

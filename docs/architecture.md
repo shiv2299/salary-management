@@ -140,7 +140,9 @@ Peer grouping for outliers is country + level, not + department: at 10,000 emplo
 | `POST /api/employees` | Create employee + initial (hire) salary row, via `createEmployees` (§6) |
 | `PATCH /api/employees/:id` | Edit name, email, department, job title. Requests that change `country_code`, `level_id`, or salary fields are rejected with a 400 — those change only through `salary-changes` |
 | `POST /api/employees/:id/salary-changes` | One effective-dated change: `{ reason, effectiveDate, amountMinor, newLevelId?, newCountryCode? }`. See the validation rules below |
-| `POST /api/employees/bulk-salary-changes/preview` | `{ filter \| employeeIds, percentageBp }` (`filter` takes arrays for `country`, `department`, `level`) → every matching **active** employee with `currentAmountMinor`, currency, and `proposedAmountMinor`. Read-only. Returns the full set (not paginated) so the UI can page through it and hold overrides locally; at 10,000 rows that is roughly 2 MB |
+| `POST /api/employees/bulk-salary-changes/preview` | `{ filter \| employeeIds, percentageBp }` (`filter` takes arrays for `country`, `department`, `level`) → every matching **active** employee with `currentAmountMinor`, currency, and `proposedAmountMinor`; each item also carries `currentAmountBaseMinor` (the cached USD amount), `proposedAmountBaseMinor` (converted once in `domain/`), `changeBp` (`percentChangeBp(current, proposed)`) and `outsidePeerRange` (`'above' | 'below' | null`, the FR-8 rule from `getPeerGroups` on current pay). Read-only. Returns the full set (not paginated) so the UI can page through it and hold overrides locally; at 10,000 rows that is roughly 2 MB |
+| `POST /api/employees/bulk-salary-changes/summary` | `{ filter \| employeeIds, percentageBp?, overrides?: [{ employeeId, newAmountMinor }] }` → `headcount`, `byDepartment`, and with a percentage `revision`: `addedByCurrency`, `addedBaseMinor`, `typical { currencyCode, beforeMinor, afterMinor }`, `overriddenCount`, `overrideChangeBp`. Read-only; overrides for people outside the selection are ignored |
+| `GET /api/employees/bulk-salary-changes/latest` | `{ latest: { batchId, effectiveDate, percentageBp, employeeCount, note } \| null }`: the batch with the latest effective date (highest id on a tie) |
 | `POST /api/employees/bulk-salary-changes` | Confirm: `{ percentageBp, effectiveDate, note, items: [{ employeeId, expectedCurrentAmountMinor, newAmountMinor }] }`. Always an explicit list from the preview, never a filter, so the committed set is exactly the set the HR Manager reviewed. If any employee's current amount no longer matches `expectedCurrentAmountMinor`, or any employee is now inactive, the whole request fails with `409` and nothing is written. Otherwise it creates one `salary_revision_batches` row and calls the single writer once with every item, in one transaction |
 | `DELETE /api/employees/:id` | Soft delete (`status: inactive`); never a hard delete, to preserve salary history |
 | `POST /api/employees/:id/reactivate` | Sets `status: active` |
@@ -173,18 +175,21 @@ src/app/
   login/page.tsx                          # public
   (app)/layout.tsx                        # auth guard (GET /api/auth/me) + top bar; renders {children} and {drawer}
   (app)/insights/page.tsx                 # default landing page post-login: distribution charts, payroll summary, outliers, recent changes
-  (app)/employees/page.tsx                # list: left filter panel + TanStack Table, toolbar, pagination, export, bulk-revision action bar
+  (app)/employees/page.tsx                # list: left filter panel + TanStack Table, toolbar, pagination, export, bulk selection bar
+  (app)/employees/revisions/new/page.tsx  # bulk revision screen; selection carried in the query string
   (app)/employees/[id]/page.tsx           # full-page detail (direct navigation / refresh)
   (app)/@drawer/default.tsx               # renders nothing when no drawer is open
   (app)/@drawer/(.)employees/[id]/page.tsx  # intercepted route: same detail rendered in a slide-over drawer over the list
 src/features/
   auth/       # login form, useSession hook (wraps /api/auth/me), route guard
-  employees/  # query hooks, table columns, filter panel, drawer tabs, forms, bulk-revision preview state (pagination + overrides)
+  employees/  # query hooks, table columns, filter panel, drawer tabs, forms
+  bulk-revision/  # selection ⇄ URL, preview/summary hooks, setup and review columns, confirm dialog
   insights/   # query hooks, chart components
 src/components/ui/  # shared building blocks named in docs/design.md §5: card, stat tile, segmented control, chip, checkbox group, tabs, avatar, country flag, level badge, menus
 src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), throws a typed error on non-2xx; on 401 redirects to /login
 ```
 
+- The bulk revision screen reads its selection from its own query string, loads the preview and a debounced summary through TanStack Query, and never computes a money figure; the preview stays the full set held in the browser, which pages, searches and filters it locally.
 - Route guard: the `(app)` layout calls `GET /api/auth/me`; a 401 redirects to `/login`. Sufficient for a single-user, non-SEO internal tool.
 - Insights is the default route after login (§5): it's the surface used weekly, versus the employee list and salary changes which are used far less often.
 - Employee detail uses a Next.js parallel route slot (`@drawer`) plus an intercepting route, so it opens as a slide-over drawer while keeping the list's scroll position and filters. On direct navigation or refresh, the same URL renders the full page instead. Both render the same detail component from `features/employees`.

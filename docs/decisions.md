@@ -154,7 +154,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: a filter evaluated twice can return a different set of employees the second time, and the overrides are keyed by employee. Committing exactly what was reviewed is the only way the preview means anything. Decreases are rare, individual events and go through `correction`.
 
-**Trade-off**: the preview returns the full matching set (~2 MB at 10,000 rows) so the UI can page through it and hold overrides locally. That's fine at this scale, and selecting tens of thousands of people in one revision isn't a realistic workflow.
+**Trade-off**: the preview returns the full matching set (about 3.0 MB for the 9,577 active employees of the seeded 10,000) so the UI can page through it and hold overrides locally. That's fine at this scale, and selecting tens of thousands of people in one revision isn't a realistic workflow.
 
 ## Search: substring match, unindexed
 

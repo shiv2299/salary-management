@@ -7,6 +7,7 @@ import {
   promotionLabel,
   rangeStartDate,
   timeSinceText,
+  yearTicks,
 } from './history-chart';
 
 describe('history chart helpers', () => {
@@ -106,5 +107,17 @@ describe('history chart helpers', () => {
       headline: 'Hired at ₹45,00,000.00 on 12 Apr 2021. No changes since.',
       counts: null,
     });
+  });
+
+  it('puts a tick on each January 1st inside a multi-year range', () => {
+    expect(yearTicks('2021-04-12', '2024-10-19')).toEqual([
+      Date.parse('2022-01-01T00:00:00Z'),
+      Date.parse('2023-01-01T00:00:00Z'),
+      Date.parse('2024-01-01T00:00:00Z'),
+    ]);
+  });
+
+  it('leaves the ticks to the chart when the range lies within one calendar year', () => {
+    expect(yearTicks('2026-02-03', '2026-10-19')).toBeUndefined();
   });
 });

@@ -39,8 +39,28 @@ export interface HistoryChart {
 
 const RANGE_YEARS: Record<Exclude<HistoryRange, 'all'>, number> = { '3y': 3, '5y': 5, '10y': 10 };
 
-function toTime(date: string): number {
+export function toTime(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
+}
+
+/**
+ * January 1st of each year inside the range, thinned to at most about six labels. Undefined when the
+ * range lies within one calendar year, so the chart picks its own ticks.
+ */
+export function yearTicks(startDate: string, endDate: string): number[] | undefined {
+  const years: number[] = [];
+  for (
+    let year = Number(startDate.slice(0, 4)) + 1;
+    year <= Number(endDate.slice(0, 4));
+    year += 1
+  ) {
+    years.push(year);
+  }
+  if (years.length === 0) return undefined;
+  const step = Math.max(1, Math.ceil(years.length / 6));
+  return years
+    .filter((_, index) => index % step === 0)
+    .map((year) => toTime(`${String(year).padStart(4, '0')}-01-01`));
 }
 
 /** N calendar years before the end date (29 Feb becomes 28 Feb), never before the hire date. */

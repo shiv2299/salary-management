@@ -8,6 +8,8 @@ import { formatDate } from '@/features/reference/use-reference';
 import {
   promotionLabel,
   REASON_COLORS,
+  toTime,
+  yearTicks,
   type HistoryChart,
   type HistoryChartPoint,
 } from './history-chart';
@@ -20,20 +22,14 @@ const REASON_ORDER: SalaryHistoryEntry['reason'][] = [
   'correction',
 ];
 
-/** January 1st of each year inside the range, thinned to at most about six labels. */
-function yearTicks(startDate: string, endDate: string): number[] {
-  const years: number[] = [];
-  for (
-    let year = Number(startDate.slice(0, 4)) + 1;
-    year <= Number(endDate.slice(0, 4));
-    year += 1
-  ) {
-    years.push(year);
-  }
-  const step = Math.max(1, Math.ceil(years.length / 6));
-  return years
-    .filter((_, index) => index % step === 0)
-    .map((year) => Date.parse(`${String(year).padStart(4, '0')}-01-01T00:00:00Z`));
+function tickLabel(time: number, byYear: boolean): string {
+  return byYear
+    ? String(new Date(time).getUTCFullYear())
+    : new Date(time).toLocaleDateString('en-GB', {
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+      });
 }
 
 function HistoryDot(props: { cx?: number; cy?: number; payload?: HistoryChartPoint }) {
@@ -74,8 +70,9 @@ function HistoryTooltip({
 }
 
 export function SalaryHistoryChart({ chart, label }: { chart: HistoryChart; label: string }) {
-  const start = Date.parse(`${chart.startDate}T00:00:00Z`);
-  const end = Date.parse(`${chart.endDate}T00:00:00Z`);
+  const start = toTime(chart.startDate);
+  const end = toTime(chart.endDate);
+  const ticks = yearTicks(chart.startDate, chart.endDate);
   const reasons = REASON_ORDER.filter((reason) =>
     chart.points.some((point) => point.entry?.reason === reason),
   );
@@ -89,8 +86,8 @@ export function SalaryHistoryChart({ chart, label }: { chart: HistoryChart; labe
               type="number"
               dataKey="time"
               domain={[start, end]}
-              ticks={yearTicks(chart.startDate, chart.endDate)}
-              tickFormatter={(time: number) => String(new Date(time).getUTCFullYear())}
+              ticks={ticks}
+              tickFormatter={(time: number) => tickLabel(time, ticks !== undefined)}
               tick={{ fontSize: 11 }}
               stroke="var(--border)"
             />

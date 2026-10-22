@@ -33,7 +33,7 @@
 |---|---|---|---|
 | 1 | Style foundation, login and Employees list + drawer (spec §4, §5, §6 except the history chart, §9, §11, §12) | `2026-10-21-redesign-phase-1-style-and-employees.md` | — |
 | 2 | Bulk revision screen (spec §7) | `2026-10-21-redesign-phase-2-bulk-revision.md` | 1 |
-| 3 | Seed data and data model, then the drawer history chart (spec §10, §6 History tab) | `2026-10-21-redesign-phase-3-seed-and-history.md` | 1 |
+| 3 | Seed data and data model, then the drawer history chart (spec §10, §6 History tab) | `2026-10-22-redesign-phase-3-seed-and-history.md` | 1 |
 | 4 | Insights rebuild and attention filters (spec §8) | `2026-10-21-redesign-phase-4-insights.md` | 1, 3 |
 
 ### Phase 1 — Style and Employees

@@ -43,6 +43,16 @@ const CASES: Case[] = [
     url: `/api/employees/${EMPLOYEE_ID}/salary-changes/preview`,
     payload: { reason: 'raise', percentageBp: 500 },
   },
+  {
+    method: 'POST',
+    url: '/api/employees/bulk-salary-changes/preview',
+    payload: { filter: {}, percentageBp: 700 },
+  },
+  {
+    method: 'POST',
+    url: '/api/employees/bulk-salary-changes/summary',
+    payload: { filter: {}, percentageBp: 700 },
+  },
 ];
 
 /** Nearest-rank percentile of an ascending list. */

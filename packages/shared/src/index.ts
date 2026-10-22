@@ -52,14 +52,20 @@ export {
 export {
   bulkConfirmBodySchema,
   bulkConfirmResponseSchema,
+  bulkOverrideSchema,
   bulkPreviewBodySchema,
   bulkPreviewItemSchema,
   bulkPreviewResponseSchema,
+  bulkSummaryBodySchema,
+  bulkSummaryResponseSchema,
   type BulkConfirmBody,
   type BulkConfirmResponse,
   type BulkPreviewBody,
   type BulkPreviewItem,
+  type BulkOverride,
   type BulkPreviewResponse,
+  type BulkSummary,
+  type BulkSummaryBody,
 } from './bulk-revision';
 export {
   countrySchema,

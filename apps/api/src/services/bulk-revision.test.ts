@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { employees, salaryHistory, salaryRevisionBatches } from '../db/schema';
+import { departments, employees, salaryHistory, salaryRevisionBatches } from '../db/schema';
 import { FIXED_NOW, createTestDb } from '../test/test-db';
-import { confirmBulkRevision, previewBulkRevision } from './bulk-revision';
+import { confirmBulkRevision, previewBulkRevision, summariseBulkRevision } from './bulk-revision';
 import { createEmployee, deactivateEmployee } from './employees';
 
 // FIXED_NOW is 2026-01-15, so that is "today" for every rule below.
@@ -15,7 +15,14 @@ beforeEach(() => {
 });
 
 let sequence = 0;
-function add(overrides: { countryCode?: string; levelId?: number; amountMinor?: number } = {}) {
+function add(
+  overrides: {
+    countryCode?: string;
+    levelId?: number;
+    amountMinor?: number;
+    departmentId?: number;
+  } = {},
+) {
   const countryCode = overrides.countryCode ?? 'US';
   return createEmployee(
     database.db,
@@ -24,7 +31,7 @@ function add(overrides: { countryCode?: string; levelId?: number; amountMinor?: 
       lastName: 'Rao',
       email: `emp${sequence}@acme.test`,
       countryCode,
-      departmentId: 1,
+      departmentId: overrides.departmentId ?? 1,
       levelId: overrides.levelId ?? 1,
       jobTitle: 'Engineer',
       hireDate: '2020-01-01',
@@ -148,6 +155,87 @@ describe('previewBulkRevision', () => {
 
     expect(historyOf(id)).toHaveLength(1);
     expect(batches()).toHaveLength(0);
+  });
+});
+
+describe('summariseBulkRevision', () => {
+  it('totals the selection with its hand edits per currency and in USD', () => {
+    const a = add({ amountMinor: 10_000_000 });
+    const b = add({ amountMinor: 20_000_000 });
+    const c = add({ countryCode: 'IN', amountMinor: 500_000_000 });
+    expect(
+      summariseBulkRevision(database.db, {
+        employeeIds: [a, b, c],
+        percentageBp: 700,
+        overrides: [{ employeeId: b, newAmountMinor: 21_000_000 }],
+      }),
+    ).toEqual({
+      headcount: 3,
+      byDepartment: [{ departmentName: 'Engineering', headcount: 3 }],
+      revision: {
+        percentageBp: 700,
+        overriddenCount: 1,
+        addedByCurrency: [
+          { currencyCode: 'INR', addedMinor: 35_000_000 },
+          { currencyCode: 'USD', addedMinor: 1_700_000 },
+        ],
+        addedBaseMinor: 2_119_300,
+        typical: { currencyCode: 'USD', beforeMinor: 10_000_000, afterMinor: 10_700_000 },
+        overrideChangeBp: [{ employeeId: b, changeBp: 500 }],
+      },
+    });
+  });
+
+  it('gives only the headcount and departments when no percentage is chosen', () => {
+    const a = add();
+    const b = add();
+    expect(summariseBulkRevision(database.db, { employeeIds: [a, b] })).toEqual({
+      headcount: 2,
+      byDepartment: [{ departmentName: 'Engineering', headcount: 2 }],
+      revision: null,
+    });
+  });
+
+  it('orders the department breakdown by headcount, then by name', () => {
+    database.db.insert(departments).values({ name: 'Sales' }).run();
+    const ids = [add({ departmentId: 1 }), add({ departmentId: 2 }), add({ departmentId: 2 })];
+    expect(summariseBulkRevision(database.db, { employeeIds: ids }).byDepartment).toEqual([
+      { departmentName: 'Sales', headcount: 2 },
+      { departmentName: 'Engineering', headcount: 1 },
+    ]);
+  });
+
+  it('ignores edits for people outside the selection and edits equal to the proposed amount', () => {
+    const a = add({ amountMinor: 10_000_000 });
+    const outside = add({ amountMinor: 10_000_000 });
+    const summary = summariseBulkRevision(database.db, {
+      employeeIds: [a],
+      percentageBp: 700,
+      overrides: [
+        { employeeId: a, newAmountMinor: 10_700_000 },
+        { employeeId: outside, newAmountMinor: 12_000_000 },
+      ],
+    });
+    expect(summary.revision?.overriddenCount).toBe(0);
+    expect(summary.revision?.overrideChangeBp).toEqual([]);
+    expect(summary.revision?.addedByCurrency).toEqual([
+      { currencyCode: 'USD', addedMinor: 700_000 },
+    ]);
+  });
+
+  it('counts only active people', () => {
+    const a = add();
+    const gone = add();
+    deactivateEmployee(database.db, gone, deps);
+    expect(summariseBulkRevision(database.db, { employeeIds: [a, gone] }).headcount).toBe(1);
+  });
+
+  it('does not write anything', () => {
+    const a = add();
+    const before = database.db.select().from(salaryHistory).all().length;
+    summariseBulkRevision(database.db, { employeeIds: [a], percentageBp: 500 });
+    expect(database.db.select().from(salaryHistory).all().length).toBe(before);
+    expect(employee(a).currentAmountMinor).toBe(10_000_000);
   });
 });
 

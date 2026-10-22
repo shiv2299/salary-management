@@ -1,4 +1,6 @@
+import type { BulkOverride, BulkSummary } from '@acme/shared';
 import type { DbHandle } from '../db/client';
+import { bulkRevisionFigures } from '../domain/bulk-summary';
 import { BASE_CURRENCY, convert } from '../domain/fx';
 import { peerGroupKey, peerPosition } from '../domain/peer-groups';
 import { percentChangeBp, proposedAmount } from '../domain/revision';
@@ -21,6 +23,11 @@ export type BulkSelectionInput =
   | { employeeIds: number[] };
 
 export type BulkPreviewInput = BulkSelectionInput & { percentageBp: number };
+
+export type BulkSummaryInput = BulkSelectionInput & {
+  percentageBp?: number;
+  overrides?: BulkOverride[];
+};
 
 export interface BulkConfirmInput {
   percentageBp: number;
@@ -85,6 +92,58 @@ export function previewBulkRevision(db: DbHandle, input: BulkPreviewInput) {
       };
     }),
     total: rows.length,
+  };
+}
+
+/**
+ * The headline figures for a selection: its headcount and department mix, and, once a percentage
+ * is chosen, the pay it would add (per currency and in USD), the typical pay before and after, and
+ * the change each hand edit amounts to. An edit counts only for a selected person and only when it
+ * differs from the amount the percentage gives. Read-only.
+ */
+export function summariseBulkRevision(db: DbHandle, input: BulkSummaryInput): BulkSummary {
+  const rows = selectedRows(db, input);
+
+  const perDepartment = new Map<string, number>();
+  for (const row of rows) {
+    perDepartment.set(row.departmentName, (perDepartment.get(row.departmentName) ?? 0) + 1);
+  }
+  const byDepartment = [...perDepartment]
+    .map(([departmentName, headcount]) => ({ departmentName, headcount }))
+    .sort((a, b) => b.headcount - a.headcount || a.departmentName.localeCompare(b.departmentName));
+
+  const { percentageBp } = input;
+  if (percentageBp === undefined) return { headcount: rows.length, byDepartment, revision: null };
+
+  const overrides = new Map((input.overrides ?? []).map((o) => [o.employeeId, o.newAmountMinor]));
+  const overrideChangeBp: { employeeId: number; changeBp: number }[] = [];
+  const figureRows = rows.map((row) => {
+    const proposed = proposedAmount(row.currentAmountMinor, percentageBp);
+    const edited = overrides.get(row.id);
+    if (edited !== undefined && edited !== proposed) {
+      overrideChangeBp.push({
+        employeeId: row.id,
+        changeBp: percentChangeBp(row.currentAmountMinor, edited),
+      });
+    }
+    return {
+      currencyCode: row.currentCurrencyCode,
+      currentAmountMinor: row.currentAmountMinor,
+      currentAmountBaseMinor: row.currentAmountBaseMinor,
+      newAmountMinor: edited ?? proposed,
+    };
+  });
+  overrideChangeBp.sort((a, b) => a.employeeId - b.employeeId);
+
+  return {
+    headcount: rows.length,
+    byDepartment,
+    revision: {
+      percentageBp,
+      overriddenCount: overrideChangeBp.length,
+      ...bulkRevisionFigures(figureRows, loadLatestFxRates(db)),
+      overrideChangeBp,
+    },
   };
 }
 

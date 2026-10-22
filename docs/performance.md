@@ -14,9 +14,9 @@ Target: list and insights endpoints respond in under 300 ms (p95) on the full 10
 
 ## Endpoint latency (p50 / p95)
 
-Measured in-process with Fastify `app.inject` (so network and the Next.js rewrite are excluded), 40 requests each, file-backed SQLite seeded with RNG seed 42. The list rows were measured on 2026-10-19: `country=IN&level=3` for the filtered salary sort, `search=ann` (425 matches) for search. The insights, export and bulk-preview rows were measured on 2026-10-19 with the same method (reference date 2026-10-19; the export and preview include the response body, collected in memory by `app.inject`). Distribution by department or level and payroll by country are within 1 ms of the rows shown, since every insight reads the same active-employee set. `recent-changes?years=3` takes 14.0 ms at p50, and the deepest 5-year page (`limit=200&offset=2000`) 21.8 ms. A search that matches nothing takes 7.5 ms and the deepest page (`offset=9000`, `status=all`, hire-date sort) 12.0 ms at p50.
+Measured in-process with Fastify `app.inject` (so network and the Next.js rewrite are excluded), 40 requests each, file-backed SQLite seeded with RNG seed 42. The list rows were measured on 2026-10-19: `country=IN&level=3` for the filtered salary sort, `search=ann` (425 matches) for search. The insights and export rows were measured on 2026-10-19 with the same method (reference date 2026-10-19; the export includes the response body, collected in memory by `app.inject`). Distribution by department or level and payroll by country are within 1 ms of the rows shown, since every insight reads the same active-employee set. `recent-changes?years=3` takes 14.0 ms at p50, and the deepest 5-year page (`limit=200&offset=2000`) 21.8 ms. A search that matches nothing takes 7.5 ms and the deepest page (`offset=9000`, `status=all`, hire-date sort) 12.0 ms at p50.
 
-The list sorts, multi-value filters, facet counts, the insight reads (outliers, distribution, payroll, recent changes), peer context and the salary-change preview were re-measured on 2026-10-21 with `npm run perf:latency` (the same in-process `app.inject` method, 5 warm-up and 40 timed requests per case, nearest-rank percentiles, RNG seed 42, reference date 2026-10-21). The database file was `apps/api/data/perf.db` (git-ignored), seeded fresh for the run. The insight rows replace the 2026-10-19 figures above; the outlier read is slower than it was because its implementation changed. `peer-context` and the preview use employee 1. The `department` rows use the default status; the last sort row is the deepest page (`status=all`, `offset=9000`).
+The list sorts, multi-value filters, facet counts, the insight reads (outliers, distribution, payroll, recent changes), peer context, the salary-change preview and the bulk revision preview and summary were re-measured on 2026-10-21 with `npm run perf:latency` (the same in-process `app.inject` method, 5 warm-up and 40 timed requests per case, nearest-rank percentiles, RNG seed 42, reference date 2026-10-21). The database file was `apps/api/data/perf.db` (git-ignored), seeded fresh for the run. The insight rows replace the 2026-10-19 figures above; the outlier read is slower than it was because its implementation changed. `peer-context` and the salary-change preview use employee 1; the bulk preview and summary take every active employee at 7%, the preview now also reading peer groups and converting to USD. The `department` rows use the default status; the last sort row is the deepest page (`status=all`, `offset=9000`).
 
 | Endpoint | p50 | p95 |
 |---|---|---|
@@ -39,7 +39,8 @@ The list sorts, multi-value filters, facet counts, the insight reads (outliers, 
 | `POST /api/employees/1/salary-changes/preview` | 1.5 ms | 1.6 ms |
 | `GET /api/employees/export?scope=all` (full stream, 1.4 MB) | 34.1 ms | 49.3 ms |
 | `GET /api/employees/export?scope=filtered&country=IN&level=3` | 4.1 ms | 4.9 ms |
-| `POST /api/employees/bulk-salary-changes/preview` (all active employees, 2.0 MB) | 40.1 ms | 51.0 ms |
+| `POST /api/employees/bulk-salary-changes/preview` (all active employees at 7%, with peer ranges and USD amounts) | 59.9 ms | 74.3 ms |
+| `POST /api/employees/bulk-salary-changes/summary` (all active employees at 7%) | 39.4 ms | 40.8 ms |
 
 ## Build effort
 

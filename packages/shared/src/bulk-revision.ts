@@ -46,6 +46,59 @@ export const bulkPreviewResponseSchema = z.object({
   total: z.number().int(),
 });
 
+export const bulkOverrideSchema = z
+  .object({
+    employeeId: z.number().int().positive(),
+    newAmountMinor: z.number().int().positive(),
+  })
+  .strict();
+
+/** A selection, an optional percentage and the hand-edited amounts, for the headline figures. */
+export const bulkSummaryBodySchema = z
+  .object({
+    filter: bulkFilterSchema.optional(),
+    employeeIds: z.array(z.number().int().positive()).max(100_000).optional(),
+    percentageBp: percentageBpSchema.optional(),
+    overrides: z.array(bulkOverrideSchema).max(100_000).optional(),
+  })
+  .strict()
+  .refine((body) => (body.filter === undefined) !== (body.employeeIds === undefined), {
+    message: 'provide exactly one of filter or employeeIds',
+  })
+  .refine((body) => body.overrides === undefined || body.percentageBp !== undefined, {
+    message: 'overrides need a percentageBp',
+  })
+  .refine(
+    (body) =>
+      new Set(body.overrides?.map((o) => o.employeeId)).size === (body.overrides?.length ?? 0),
+    { message: 'an employee appears more than once' },
+  );
+
+export const bulkSummaryResponseSchema = z.object({
+  headcount: z.number().int(),
+  byDepartment: z.array(z.object({ departmentName: z.string(), headcount: z.number().int() })),
+  revision: z
+    .object({
+      percentageBp: z.number().int(),
+      overriddenCount: z.number().int(),
+      addedByCurrency: z.array(
+        z.object({ currencyCode: z.string(), addedMinor: z.number().int() }),
+      ),
+      addedBaseMinor: z.number().int(),
+      typical: z
+        .object({
+          currencyCode: z.string(),
+          beforeMinor: z.number().int(),
+          afterMinor: z.number().int(),
+        })
+        .nullable(),
+      overrideChangeBp: z.array(
+        z.object({ employeeId: z.number().int(), changeBp: z.number().int() }),
+      ),
+    })
+    .nullable(),
+});
+
 export const bulkConfirmBodySchema = z
   .object({
     percentageBp: percentageBpSchema,
@@ -77,3 +130,6 @@ export type BulkPreviewItem = z.infer<typeof bulkPreviewItemSchema>;
 export type BulkPreviewResponse = z.infer<typeof bulkPreviewResponseSchema>;
 export type BulkConfirmBody = z.infer<typeof bulkConfirmBodySchema>;
 export type BulkConfirmResponse = z.infer<typeof bulkConfirmResponseSchema>;
+export type BulkOverride = z.infer<typeof bulkOverrideSchema>;
+export type BulkSummaryBody = z.infer<typeof bulkSummaryBodySchema>;
+export type BulkSummary = z.infer<typeof bulkSummaryResponseSchema>;

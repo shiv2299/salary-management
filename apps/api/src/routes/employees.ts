@@ -3,6 +3,8 @@ import {
   bulkConfirmResponseSchema,
   bulkPreviewBodySchema,
   bulkPreviewResponseSchema,
+  bulkSummaryBodySchema,
+  bulkSummaryResponseSchema,
   employeeDetailSchema,
   employeeExportQuerySchema,
   employeeFacetsQuerySchema,
@@ -26,7 +28,11 @@ import {
   reactivateEmployee,
   updateEmployee,
 } from '../services/employees';
-import { confirmBulkRevision, previewBulkRevision } from '../services/bulk-revision';
+import {
+  confirmBulkRevision,
+  previewBulkRevision,
+  summariseBulkRevision,
+} from '../services/bulk-revision';
 import { previewSalaryChange } from '../services/salary-change-preview';
 import { recordSalaryChange } from '../services/salary-changes';
 import { exportEmployeesCsv } from '../services/employee-export';
@@ -72,6 +78,29 @@ export const employeeRoutes =
           employeeIds !== undefined
             ? { employeeIds, percentageBp }
             : { filter: filter ?? {}, percentageBp },
+        );
+      },
+    );
+
+    app.post(
+      '/api/employees/bulk-salary-changes/summary',
+      {
+        schema: {
+          body: bulkSummaryBodySchema,
+          response: { 200: bulkSummaryResponseSchema },
+        },
+      },
+      (request) => {
+        const { filter, employeeIds, percentageBp, overrides } = request.body;
+        const figures = {
+          ...(percentageBp !== undefined ? { percentageBp } : {}),
+          ...(overrides !== undefined ? { overrides } : {}),
+        };
+        return summariseBulkRevision(
+          database.db,
+          employeeIds !== undefined
+            ? { employeeIds, ...figures }
+            : { filter: filter ?? {}, ...figures },
         );
       },
     );

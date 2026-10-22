@@ -112,6 +112,58 @@ describe('POST /api/employees/bulk-salary-changes/preview', () => {
   });
 });
 
+describe('POST /api/employees/bulk-salary-changes/summary', () => {
+  const url = '/api/employees/bulk-salary-changes/summary';
+
+  it('returns the figures for the selection, percentage and edits', async () => {
+    const t = await setup();
+
+    const response = await post(t, url, { filter: { country: ['US'] }, percentageBp: 500 });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{
+      headcount: number;
+      revision: { addedByCurrency: { currencyCode: string; addedMinor: number }[] };
+    }>();
+    expect(body.headcount).toBe(2);
+    expect(body.revision.addedByCurrency).toEqual([{ currencyCode: 'USD', addedMinor: 1_500_000 }]);
+  });
+
+  it('rejects edits without a percentage with 400', async () => {
+    const t = await setup();
+
+    const response = await post(t, url, {
+      filter: {},
+      overrides: [{ employeeId: 1, newAmountMinor: 11_000_000 }],
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('rejects the same employee edited twice with 400', async () => {
+    const t = await setup();
+
+    const response = await post(t, url, {
+      filter: {},
+      percentageBp: 500,
+      overrides: [
+        { employeeId: 1, newAmountMinor: 11_000_000 },
+        { employeeId: 1, newAmountMinor: 12_000_000 },
+      ],
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('requires a session', async () => {
+    const t = await setup();
+
+    const response = await t.app.inject({ method: 'POST', url, payload: { filter: {} } });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
 describe('POST /api/employees/bulk-salary-changes', () => {
   const confirm = (items: object[], extra: object = {}) => ({
     percentageBp: 1000,

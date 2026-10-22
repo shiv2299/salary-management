@@ -8,8 +8,10 @@ import { formatDate } from '@/features/reference/use-reference';
 import {
   promotionLabel,
   REASON_COLORS,
+  amountTicks,
+  isShortRange,
+  timeTicks,
   toTime,
-  yearTicks,
   type HistoryChart,
   type HistoryChartPoint,
 } from './history-chart';
@@ -22,7 +24,10 @@ const REASON_ORDER: SalaryHistoryEntry['reason'][] = [
   'correction',
 ];
 
-function tickLabel(time: number, byYear: boolean): string {
+function tickLabel(time: number, chart: HistoryChart, byYear: boolean): string {
+  if (isShortRange(chart.startDate, chart.endDate)) {
+    return formatDate(new Date(time).toISOString().slice(0, 10));
+  }
   return byYear
     ? String(new Date(time).getUTCFullYear())
     : new Date(time).toLocaleDateString('en-GB', {
@@ -31,6 +36,9 @@ function tickLabel(time: number, byYear: boolean): string {
         timeZone: 'UTC',
       });
 }
+
+const AXIS_LINE = { stroke: 'var(--border)' };
+const AXIS_TICK = { fontSize: 11, fill: 'var(--text-secondary)' };
 
 function HistoryDot(props: { cx?: number; cy?: number; payload?: HistoryChartPoint }) {
   const { cx, cy, payload } = props;
@@ -72,7 +80,8 @@ function HistoryTooltip({
 export function SalaryHistoryChart({ chart, label }: { chart: HistoryChart; label: string }) {
   const start = toTime(chart.startDate);
   const end = toTime(chart.endDate);
-  const ticks = yearTicks(chart.startDate, chart.endDate);
+  const ticks = timeTicks(chart);
+  const yTicks = amountTicks(chart);
   const reasons = REASON_ORDER.filter((reason) =>
     chart.points.some((point) => point.entry?.reason === reason),
   );
@@ -87,16 +96,19 @@ export function SalaryHistoryChart({ chart, label }: { chart: HistoryChart; labe
               dataKey="time"
               domain={[start, end]}
               ticks={ticks}
-              tickFormatter={(time: number) => tickLabel(time, ticks !== undefined)}
-              tick={{ fontSize: 11 }}
-              stroke="var(--border)"
+              tickFormatter={(time: number) => tickLabel(time, chart, ticks !== undefined)}
+              tick={AXIS_TICK}
+              axisLine={AXIS_LINE}
+              tickLine={AXIS_LINE}
             />
             <YAxis
               width={64}
               domain={['auto', 'auto']}
               tickFormatter={(value: number) => formatMoneyCompact(value, chart.currencyCode)}
-              tick={{ fontSize: 11 }}
-              stroke="var(--border)"
+              ticks={yTicks}
+              tick={AXIS_TICK}
+              axisLine={AXIS_LINE}
+              tickLine={AXIS_LINE}
             />
             <Tooltip content={<HistoryTooltip currencyCode={chart.currencyCode} />} />
             <Line

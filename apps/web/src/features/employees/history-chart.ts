@@ -43,9 +43,16 @@ export function toTime(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
 }
 
+/** Ranges shorter than this show just their two end dates on the time axis. */
+const SHORT_RANGE_DAYS = 62;
+
+export function isShortRange(startDate: string, endDate: string): boolean {
+  return (toTime(endDate) - toTime(startDate)) / 86_400_000 < SHORT_RANGE_DAYS;
+}
+
 /**
- * January 1st of each year inside the range, thinned to at most about six labels. Undefined when the
- * range lies within one calendar year, so the chart picks its own ticks.
+ * January 1st of each year inside the range, thinned to at most about six labels. Undefined when
+ * fewer than two fall inside it, so the chart picks month ticks instead of a lone year label.
  */
 export function yearTicks(startDate: string, endDate: string): number[] | undefined {
   const years: number[] = [];
@@ -56,11 +63,33 @@ export function yearTicks(startDate: string, endDate: string): number[] | undefi
   ) {
     years.push(year);
   }
-  if (years.length === 0) return undefined;
+  if (years.length < 2) return undefined;
   const step = Math.max(1, Math.ceil(years.length / 6));
   return years
     .filter((_, index) => index % step === 0)
     .map((year) => toTime(`${String(year).padStart(4, '0')}-01-01`));
+}
+
+/**
+ * Where the time axis is labelled: both end dates for a range of under about two months (just one
+ * when they coincide), the years for a longer range, or undefined to let the chart choose.
+ */
+export function timeTicks(chart: HistoryChart): number[] | undefined {
+  if (isShortRange(chart.startDate, chart.endDate)) {
+    const start = toTime(chart.startDate);
+    const end = toTime(chart.endDate);
+    return start === end ? [start] : [start, end];
+  }
+  return yearTicks(chart.startDate, chart.endDate);
+}
+
+/** One label at the pay when it never changes in the range, otherwise undefined for the chart's own. */
+export function amountTicks(chart: HistoryChart): number[] | undefined {
+  const first = chart.points[0];
+  if (!first || chart.points.some((point) => point.amountMinor !== first.amountMinor)) {
+    return undefined;
+  }
+  return [first.amountMinor];
 }
 
 /** N calendar years before the end date (29 Feb becomes 28 Feb), never before the hire date. */
@@ -102,7 +131,18 @@ export function historyChart(
   if (opening && !inRange.some((row) => row.effectiveDate === startDate)) {
     points.push(point(startDate, amountOf(opening), null));
   }
-  for (const row of inRange) points.push(point(row.effectiveDate, amountOf(row), row));
+  const hireDay = rows[0]?.effectiveDate;
+  const hireDayRows = inRange.filter((row) => row.effectiveDate === hireDay);
+  for (const row of inRange) {
+    if (row.effectiveDate === hireDay && hireDayRows.length > 1) {
+      // A correction made on the hire day is the starting pay: one point, with no step.
+      if (row === hireDayRows[0]) {
+        points.push(point(row.effectiveDate, amountOf(hireDayRows.at(-1)!), row));
+      }
+      continue;
+    }
+    points.push(point(row.effectiveDate, amountOf(row), row));
+  }
   const closing = inForceAt(endDate);
   if (closing && closing.effectiveDate !== endDate) {
     points.push(point(endDate, amountOf(closing), null));

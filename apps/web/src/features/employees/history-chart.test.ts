@@ -1,13 +1,17 @@
+import type { SalaryHistoryEntry } from '@acme/shared';
 import { describe, expect, it } from 'vitest';
 import { employeeDetail, newHireDetail, relocatedDetail } from '@/test/fixtures';
 import {
+  amountTicks,
   chartLabel,
   historyChart,
   historySummaryText,
   promotionLabel,
   rangeStartDate,
   timeSinceText,
+  timeTicks,
   yearTicks,
+  type HistoryChart,
 } from './history-chart';
 
 describe('history chart helpers', () => {
@@ -119,5 +123,72 @@ describe('history chart helpers', () => {
 
   it('leaves the ticks to the chart when the range lies within one calendar year', () => {
     expect(yearTicks('2026-02-03', '2026-10-19')).toBeUndefined();
+  });
+
+  it('leaves the ticks to the chart when a range under two years holds a single New Year', () => {
+    expect(yearTicks('2025-05-01', '2026-10-19')).toBeUndefined();
+  });
+
+  describe('axis ticks', () => {
+    const chartOf = (startDate: string, endDate: string, amounts: number[]): HistoryChart => ({
+      startDate,
+      endDate,
+      currencyCode: 'INR',
+      changeCount: 0,
+      points: amounts.map((amountMinor, index) => ({
+        time: Date.parse(`${index === 0 ? startDate : endDate}T00:00:00Z`),
+        date: index === 0 ? startDate : endDate,
+        amountMinor,
+        entry: null,
+      })),
+    });
+    const t = (date: string) => Date.parse(`${date}T00:00:00Z`);
+
+    it('labels a flat series once, at its amount', () => {
+      expect(amountTicks(chartOf('2021-04-12', '2026-10-19', [5_000, 5_000]))).toEqual([5_000]);
+    });
+
+    it('leaves the amount ticks to the chart when the pay changes', () => {
+      expect(amountTicks(chartOf('2021-04-12', '2026-10-19', [5_000, 6_000]))).toBeUndefined();
+    });
+
+    it('labels a range of under two months with its two end dates', () => {
+      expect(timeTicks(chartOf('2026-10-01', '2026-10-19', [1, 1]))).toEqual([
+        t('2026-10-01'),
+        t('2026-10-19'),
+      ]);
+    });
+
+    it('labels a single date when the range starts and ends on the same day', () => {
+      expect(timeTicks(chartOf('2026-10-19', '2026-10-19', [1]))).toEqual([t('2026-10-19')]);
+    });
+
+    it('labels a multi-year range by year as before', () => {
+      expect(timeTicks(chartOf('2021-04-12', '2024-10-19', [1, 2]))).toEqual([
+        t('2022-01-01'),
+        t('2023-01-01'),
+        t('2024-01-01'),
+      ]);
+    });
+  });
+
+  it('plots a hire pay corrected on the hire day as one starting point, without a step', () => {
+    const [raise, hire] = employeeDetail().history as [SalaryHistoryEntry, SalaryHistoryEntry];
+    const correction = {
+      ...hire,
+      id: 90,
+      reason: 'correction' as const,
+      amountMinor: 460_000_000,
+      amountBaseMinor: 460_000_000,
+    };
+    const detail = employeeDetail({ history: [hire, correction, raise] });
+    expect(
+      historyChart(detail, 'all', '2026-10-19').points.map((p) => [p.date, p.amountMinor]),
+    ).toEqual([
+      ['2021-04-12', 460_000_000],
+      ['2025-04-01', 500_000_000],
+      ['2026-10-19', 500_000_000],
+    ]);
+    expect(historyChart(detail, 'all', '2026-10-19').changeCount).toBe(2);
   });
 });

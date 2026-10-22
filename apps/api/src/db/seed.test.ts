@@ -66,6 +66,10 @@ function promotionUplifts(db: ReturnType<typeof freshDb>): number[] {
   });
 }
 
+function addDays(date: string, days: number): string {
+  return new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 function daysBetween(from: string, to: string): number {
   return (Date.parse(to) - Date.parse(from)) / 86_400_000;
 }
@@ -400,5 +404,62 @@ describe('seed', () => {
       5,
     );
     expect(inactive.some((e) => daysBetween(e.deactivatedOn!, REFERENCE_DATE) <= 365)).toBe(true);
+  });
+
+  it('leaves 3% to 5% of active employees without a raise or promotion for over two years', () => {
+    const twoYearsAgo = addDays(REFERENCE_DATE, -730);
+    const active = large.db
+      .select()
+      .from(employees)
+      .all()
+      .filter((e) => e.status === 'active');
+    const increased = new Set(
+      large.db
+        .select()
+        .from(salaryHistory)
+        .all()
+        .filter(
+          (r) =>
+            (r.reason === 'raise' || r.reason === 'promotion') && r.effectiveDate > twoYearsAgo,
+        )
+        .map((r) => r.employeeId),
+    );
+    const stalled = active.filter((e) => e.hireDate <= twoYearsAgo && !increased.has(e.id));
+    expect(stalled.length / active.length).toBeGreaterThanOrEqual(0.03);
+    expect(stalled.length / active.length).toBeLessThanOrEqual(0.05);
+  });
+
+  it('pays recent hires above long-tenured staff in each planted group and in at most five groups in all', () => {
+    const levelCode = new Map(
+      large.db
+        .select()
+        .from(levels)
+        .all()
+        .map((l) => [l.id, l.code]),
+    );
+    const recentFrom = addDays(REFERENCE_DATE, -365);
+    const tenuredTo = addDays(REFERENCE_DATE, -1095);
+    const groups = new Map<string, { recent: number[]; tenured: number[] }>();
+    for (const e of large.db
+      .select()
+      .from(employees)
+      .all()
+      .filter((x) => x.status === 'active')) {
+      const key = `${e.countryCode} ${levelCode.get(e.levelId)}`;
+      const group = groups.get(key) ?? { recent: [], tenured: [] };
+      if (e.hireDate > recentFrom) group.recent.push(e.currentAmountMinor);
+      if (e.hireDate <= tenuredTo) group.tenured.push(e.currentAmountMinor);
+      groups.set(key, group);
+    }
+    const compressed = [...groups]
+      .filter(
+        ([, g]) =>
+          g.recent.length >= 5 &&
+          g.tenured.length >= 5 &&
+          computeDistribution(g.recent).median > computeDistribution(g.tenured).median,
+      )
+      .map(([key]) => key);
+    expect(compressed).toEqual(expect.arrayContaining(['IN L2', 'IN L3', 'US L2']));
+    expect(compressed.length).toBeLessThanOrEqual(5);
   });
 });

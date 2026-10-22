@@ -94,6 +94,19 @@ export const MEAN_CYCLE_BP = 450;
 export const MARKET_GROWTH_BP = 300;
 /** A promotion raises pay by a draw from this range, in basis points. */
 export const PROMOTION_UPLIFT_BP = { min: 1000, max: 2000 } as const;
+/** Share of active employees (3+ years' tenure) who get no change from 2-3 years before the reference date. */
+export const SKIPPED_RAISE_SHARE = 0.04;
+export const SKIP_MIN_TENURE_DAYS = 1100;
+export const SKIP_START_DAYS = { min: 760, max: 1095 } as const;
+/** Hires this recent in these country + level-rank groups come in above long-tenured staff. */
+export const COMPRESSION_GROUPS = [
+  { countryCode: 'IN', rank: 2 },
+  { countryCode: 'IN', rank: 3 },
+  { countryCode: 'US', rank: 2 },
+] as const;
+export const RECENT_HIRE_DAYS = 365;
+/** A recent hire in a compression group is paid this multiple of the market rate (tunable 1.15-1.3). */
+export const COMPRESSION_PREMIUM = 1.2;
 export const HIRE_BATCH_SIZE = 1000;
 export const WRITE_BATCH_SIZE = 1000;
 

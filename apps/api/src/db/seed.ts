@@ -12,6 +12,8 @@ import { createEmployees, type NewEmployeeInput } from '../services/employees';
 import { applySalaryChanges, type SalaryChange } from '../services/salary-writer';
 import type { DbHandle } from './client';
 import {
+  COMPRESSION_GROUPS,
+  COMPRESSION_PREMIUM,
   COUNTRIES,
   DEPARTMENTS,
   ENTRY_PAY_MAJOR,
@@ -35,6 +37,10 @@ import {
   OUTLIER_SHARE,
   PAY_SIGMA,
   PROMOTION_UPLIFT_BP,
+  RECENT_HIRE_DAYS,
+  SKIP_MIN_TENURE_DAYS,
+  SKIP_START_DAYS,
+  SKIPPED_RAISE_SHARE,
   WRITE_BATCH_SIZE,
 } from './seed-config';
 
@@ -81,6 +87,8 @@ function createRng(rngSeed: number) {
   return {
     float,
     int,
+    sample: <T>(items: readonly T[], count: number): T[] =>
+      faker.helpers.arrayElements(items, count),
     pick: <T>(items: readonly T[]): T => faker.helpers.arrayElement(items),
     weighted<T>(items: readonly T[], weights: readonly number[]): T {
       let remaining = float() * weights.reduce((a, b) => a + b, 0);
@@ -137,6 +145,8 @@ interface Worker {
   leftOn: string | null;
   amountMinor: number;
   lastChangeDate: string;
+  /** From this day on the employee gets no change of any kind; null if never paused. */
+  pausedFrom: string | null;
 }
 
 interface PlannedEvent {
@@ -241,6 +251,12 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
           ) /
             10 ** currencyExponent(currencyCode)) *
           Math.exp(PAY_SIGMA * rng.truncatedNormal());
+        if (
+          daysBetween(hireDate, referenceDate) <= RECENT_HIRE_DAYS &&
+          COMPRESSION_GROUPS.some((g) => g.countryCode === countryCode && g.rank === rank)
+        ) {
+          major *= COMPRESSION_PREMIUM;
+        }
         if (rng.float() < OUTLIER_SHARE) {
           major *= rng.float() < 0.6 ? 1.9 + rng.float() * 0.7 : 0.4 + rng.float() * 0.15;
         }
@@ -274,12 +290,28 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
           leftOn,
           amountMinor,
           lastChangeDate: hireDate,
+          pausedFrom: null,
         });
       }
 
       const ids = createEmployees(tx, inputs, deps);
       historyRows += ids.length;
       ids.forEach((id, i) => workers.push({ id, ...pending[i]! }));
+    }
+
+    // ---- Skipped raises: a few long-tenured active employees stop getting any change.
+    const candidates = workers.filter(
+      (w) => w.leftOn === null && daysBetween(w.hireDate, referenceDate) >= SKIP_MIN_TENURE_DAYS,
+    );
+    const activeCount = workers.filter((w) => w.leftOn === null).length;
+    const paused = rng
+      .sample(
+        candidates,
+        Math.min(candidates.length, Math.round(SKIPPED_RAISE_SHARE * activeCount)),
+      )
+      .sort((a, b) => a.id - b.id);
+    for (const w of paused) {
+      w.pausedFrom = addDays(referenceDate, -rng.int(SKIP_START_DAYS.min, SKIP_START_DAYS.max));
     }
 
     // ---- Individual changes, planned up front and applied in date order among the cycles.
@@ -316,6 +348,7 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
         (w) =>
           daysBetween(w.hireDate, cycleDate) >= MIN_TENURE_FOR_CYCLE_DAYS &&
           (w.leftOn === null || w.leftOn > cycleDate) &&
+          (w.pausedFrom === null || cycleDate < w.pausedFrom) &&
           daysBetween(w.lastChangeDate, cycleDate) >= MIN_QUIET_DAYS_BEFORE_CYCLE,
       );
 
@@ -410,6 +443,7 @@ function buildIndividualChange(
   const { currencyOf, levelIdByRank, payFactorByDepartmentId, referenceDate } = context;
   const { worker, date } = event;
   const currencyCode = currencyOf.get(worker.countryCode)!;
+  if (worker.pausedFrom !== null && date >= worker.pausedFrom) return null;
   const base = { employeeId: worker.id, effectiveDate: date };
   worker.lastChangeDate = date;
 

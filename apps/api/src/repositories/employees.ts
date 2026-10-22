@@ -64,13 +64,21 @@ export function countEmployees(db: DbHandle): number {
   return db.select({ value: count() }).from(employees).get()?.value ?? 0;
 }
 
-/** Status is not a salary column, so it has its own writer; it never touches `current_*`. */
-export function markEmployeesInactive(db: DbHandle, ids: number[], updatedAt: string): void {
-  if (ids.length === 0) return;
-  db.update(employees)
-    .set({ status: 'inactive', updatedAt })
-    .where(inArray(employees.id, ids))
-    .run();
+/**
+ * Status and the deactivation date are not salary columns, so they have their own writer; it
+ * never touches `current_*`. One update per leaver, each with its own date.
+ */
+export function markEmployeesInactive(
+  db: DbHandle,
+  leavers: { id: number; deactivatedOn: string }[],
+  updatedAt: string,
+): void {
+  for (const { id, deactivatedOn } of leavers) {
+    db.update(employees)
+      .set({ status: 'inactive', deactivatedOn, updatedAt })
+      .where(eq(employees.id, id))
+      .run();
+  }
 }
 
 export interface EmployeeListFilter {

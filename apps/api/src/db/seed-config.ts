@@ -96,7 +96,6 @@ export const MARKET_GROWTH_BP = 300;
 export const PROMOTION_UPLIFT_BP = { min: 1000, max: 2000 } as const;
 export const HIRE_BATCH_SIZE = 1000;
 export const WRITE_BATCH_SIZE = 1000;
-export const INACTIVE_UPDATE_CHUNK = 500;
 
 export const INDIVIDUAL_EVENT_COUNT_WEIGHTS = [55, 30, 12, 3];
 export const INDIVIDUAL_EVENT_KINDS = ['raise', 'promotion', 'relocation'] as const;

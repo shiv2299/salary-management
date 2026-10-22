@@ -371,4 +371,34 @@ describe('seed', () => {
     expect(promoted.size / 2000).toBeGreaterThanOrEqual(0.05);
     expect(promoted.size / 2000).toBeLessThanOrEqual(0.25);
   });
+
+  it("dates every deactivation after the employee's last salary change and before the reference date", () => {
+    const lastChange = new Map<number, string>();
+    for (const row of small.db.select().from(salaryHistory).all()) {
+      if (row.effectiveDate > (lastChange.get(row.employeeId) ?? ''))
+        lastChange.set(row.employeeId, row.effectiveDate);
+    }
+    for (const e of small.db.select().from(employees).all()) {
+      if (e.status === 'active') {
+        expect(e.deactivatedOn).toBeNull();
+      } else {
+        expect(e.deactivatedOn! > lastChange.get(e.id)!).toBe(true);
+        expect(e.deactivatedOn! < REFERENCE_DATE).toBe(true);
+      }
+    }
+  });
+
+  it('marks between 3% and 5% of employees inactive, spread over the years and including the last twelve months', () => {
+    const inactive = large.db
+      .select()
+      .from(employees)
+      .all()
+      .filter((e) => e.status === 'inactive');
+    expect(inactive.length / 2000).toBeGreaterThanOrEqual(0.03);
+    expect(inactive.length / 2000).toBeLessThanOrEqual(0.05);
+    expect(new Set(inactive.map((e) => e.deactivatedOn!.slice(0, 4))).size).toBeGreaterThanOrEqual(
+      5,
+    );
+    expect(inactive.some((e) => daysBetween(e.deactivatedOn!, REFERENCE_DATE) <= 365)).toBe(true);
+  });
 });

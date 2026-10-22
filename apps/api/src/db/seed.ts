@@ -23,7 +23,6 @@ import {
   HIRE_BATCH_SIZE,
   HIRE_SPAN_DAYS,
   INACTIVE_SHARE,
-  INACTIVE_UPDATE_CHUNK,
   INDIVIDUAL_EVENT_COUNT_WEIGHTS,
   INDIVIDUAL_EVENT_KIND_WEIGHTS,
   INDIVIDUAL_EVENT_KINDS,
@@ -134,8 +133,8 @@ interface Worker {
   departmentId: number;
   rank: number;
   hireDate: string;
-  /** Last day the employee can receive a change: the reference date, or the exit date. */
-  endDate: string;
+  /** The day the employee became inactive; null for someone still employed. */
+  leftOn: string | null;
   amountMinor: number;
   lastChangeDate: string;
 }
@@ -251,11 +250,10 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
         const handle = `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z.]/g, '');
         const role = rng.pick(rolesByDepartmentId.get(departmentId)!);
 
+        // A leaver stays at least 90 days and leaves before the reference date.
         const inactive = rng.float() < INACTIVE_SHARE;
         const span = daysBetween(hireDate, referenceDate);
-        const endDate = inactive
-          ? addDays(hireDate, rng.int(Math.min(90, span), span))
-          : referenceDate;
+        const leftOn = inactive && span > 91 ? addDays(hireDate, rng.int(90, span - 1)) : null;
 
         inputs.push({
           firstName,
@@ -273,7 +271,7 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
           departmentId,
           rank,
           hireDate,
-          endDate,
+          leftOn,
           amountMinor,
           lastChangeDate: hireDate,
         });
@@ -285,7 +283,7 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
     }
 
     // ---- Individual changes, planned up front and applied in date order among the cycles.
-    const events = planIndividualEvents(rng, workers);
+    const events = planIndividualEvents(rng, workers, referenceDate);
 
     let buffer: SalaryChange[] = [];
     const flush = () => {
@@ -317,7 +315,7 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
       const eligible = workers.filter(
         (w) =>
           daysBetween(w.hireDate, cycleDate) >= MIN_TENURE_FOR_CYCLE_DAYS &&
-          w.endDate > cycleDate &&
+          (w.leftOn === null || w.leftOn > cycleDate) &&
           daysBetween(w.lastChangeDate, cycleDate) >= MIN_QUIET_DAYS_BEFORE_CYCLE,
       );
 
@@ -357,11 +355,11 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
     }
     applyEventsBefore(null);
 
-    // ---- A few leavers. Their history already stops at their exit date.
-    const leavers = workers.filter((w) => w.endDate !== referenceDate).map((w) => w.id);
-    for (let i = 0; i < leavers.length; i += INACTIVE_UPDATE_CHUNK) {
-      markEmployeesInactive(tx, leavers.slice(i, i + INACTIVE_UPDATE_CHUNK), now());
-    }
+    // ---- A few leavers. Their history already stops the day before they left.
+    const leavers = workers.flatMap((w) =>
+      w.leftOn === null ? [] : [{ id: w.id, deactivatedOn: w.leftOn }],
+    );
+    markEmployeesInactive(tx, leavers, now());
 
     return {
       skipped: false,
@@ -374,11 +372,11 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
 }
 
 /** Plans each employee's individual changes, sorted by date. */
-function planIndividualEvents(rng: Rng, people: Worker[]): PlannedEvent[] {
+function planIndividualEvents(rng: Rng, people: Worker[], referenceDate: string): PlannedEvent[] {
   const planned: PlannedEvent[] = [];
   for (const worker of people) {
     const windowStart = addDays(worker.hireDate, MIN_TENURE_FOR_CHANGE_DAYS);
-    const windowEnd = worker.endDate;
+    const windowEnd = worker.leftOn === null ? referenceDate : addDays(worker.leftOn, -1);
     if (windowStart > windowEnd) continue;
 
     const blocks = Math.max(1, Math.round(daysBetween(windowStart, windowEnd) / EVENT_BLOCK_DAYS));

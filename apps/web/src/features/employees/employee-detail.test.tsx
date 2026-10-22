@@ -1,6 +1,13 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { employeeDetail, peerContext, REFERENCE_ROUTES, salaryPreview } from '@/test/fixtures';
+import {
+  employeeDetail,
+  newHireDetail,
+  peerContext,
+  REFERENCE_ROUTES,
+  relocatedDetail,
+  salaryPreview,
+} from '@/test/fixtures';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
 import { EmployeeDetailView } from './employee-detail';
 
@@ -126,7 +133,85 @@ describe('EmployeeDetailView', () => {
     expect(entries[0]?.textContent).toContain('₹50,00,000.00');
     expect(entries[0]?.textContent).toContain('+11.11%');
     expect(entries[1]?.textContent).toContain('Hire');
-    expect(screen.getAllByText(/%/)).toHaveLength(1);
+    expect(within(history).getAllByText(/%/)).toHaveLength(1);
+  });
+
+  it('sums up the whole history above the chart and gives its figures below', async () => {
+    renderDetail();
+    await screen.findByRole('heading', { name: 'Asha Rao' });
+    showTab('History (2)');
+    expect(screen.getByText('₹45,00,000.00 → ₹50,00,000.00 since hire (+11.11%)')).toBeDefined();
+    expect(screen.getByText('0 promotions · 1 raise')).toBeDefined();
+    const figures = screen.getByLabelText('History figures');
+    expect(within(figures).getByText('+1.93%')).toBeDefined();
+    expect(within(figures).getByText('+11.11% · Raise, 1 Apr 2025')).toBeDefined();
+    expect(within(figures).getByText('1 year, 6 months ago')).toBeDefined();
+    expect(
+      within(screen.getByRole('list', { name: 'Chart key' })).getByText('Raise'),
+    ).toBeDefined();
+  });
+
+  it('offers 3Y, 5Y, 10Y and All, starting on All', async () => {
+    renderDetail();
+    await screen.findByRole('heading', { name: 'Asha Rao' });
+    showTab('History (2)');
+    const range = screen.getByRole('radiogroup', { name: 'Range' });
+    expect(
+      within(range)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['3Y', '5Y', '10Y', 'All']);
+    expect(within(range).getByRole('radio', { name: 'All' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    expect(screen.getByRole('img', { name: 'Salary over time since hire' })).toBeDefined();
+    fireEvent.click(within(range).getByRole('radio', { name: '3Y' }));
+    expect(screen.getByRole('img', { name: 'Salary over time, last 3 years' })).toBeDefined();
+  });
+
+  it('shows a relocated employee in USD and says why', async () => {
+    renderDetail({ 'GET /api/employees/1': () => Response.json(relocatedDetail()) });
+    await screen.findByRole('heading', { name: 'Asha Rao' });
+    showTab('History (2)');
+    expect(screen.getByText('$11,980.00 → $60,000.00 since hire (+400.83%)')).toBeDefined();
+    expect(
+      await screen.findByText(
+        'Shown in USD because this salary moved between currencies. FX rates as of 15 Jan 2026.',
+      ),
+    ).toBeDefined();
+    expect(
+      within(screen.getByRole('list', { name: 'Salary history' })).getByText('₹10,00,000.00'),
+    ).toBeDefined();
+  });
+
+  it('describes a new hire with no changes yet', async () => {
+    renderDetail({ 'GET /api/employees/1': () => Response.json(newHireDetail()) });
+    await screen.findByRole('heading', { name: 'Asha Rao' });
+    showTab('History (1)');
+    expect(
+      screen.getByText('Hired at ₹45,00,000.00 on 12 Apr 2021. No changes since.'),
+    ).toBeDefined();
+    expect(within(screen.getByLabelText('History figures')).getAllByText('—')).toHaveLength(2);
+    expect(screen.getByText('No salary changes in this period.')).toBeDefined();
+  });
+
+  it('says when the chosen range has no salary change', async () => {
+    renderDetail({
+      'GET /api/employees/1': () => {
+        const detail = employeeDetail();
+        return Response.json({
+          ...detail,
+          history: detail.history.map((h) =>
+            h.id === 2 ? { ...h, effectiveDate: '2022-01-01' } : h,
+          ),
+        });
+      },
+    });
+    await screen.findByRole('heading', { name: 'Asha Rao' });
+    showTab('History (2)');
+    expect(screen.queryByText('No salary changes in this period.')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: '3Y' }));
+    expect(screen.getByText('No salary changes in this period.')).toBeDefined();
   });
 
   it('marks a change that came from a bulk revision', async () => {

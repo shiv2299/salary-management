@@ -10,7 +10,7 @@ import { formatDate, useCountries, useDepartments } from '@/features/reference/u
 import { EmployeeHeader } from './employee-header';
 import { InlineField } from './inline-field';
 import { SalaryChangeForm } from './salary-change-form';
-import { SalaryHistoryList } from './salary-history-list';
+import { SalaryHistoryTab } from './salary-history-tab';
 import { SalarySummary } from './salary-summary';
 import { useEmployee, useUpdateEmployee } from './use-employee';
 
@@ -142,7 +142,7 @@ export function EmployeeDetailView({ id, today }: { id: number; today?: string }
           <Details employee={employee} />
         </TabsContent>
         <TabsContent value="history">
-          <SalaryHistoryList employee={employee} />
+          <SalaryHistoryTab employee={employee} today={today ?? todayUtc()} />
         </TabsContent>
       </Tabs>
     </div>

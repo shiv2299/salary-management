@@ -116,6 +116,77 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
   };
 }
 
+/** Hired in India, relocated to the US: the pay moved between currencies, so the summary is in USD. */
+export function relocatedDetail(): EmployeeDetail {
+  const base = employeeDetail();
+  const [, hire] = base.history;
+  return {
+    ...base,
+    countryCode: 'US',
+    hireDate: '2020-01-01',
+    history: [
+      {
+        ...base.history[0]!,
+        id: 2,
+        amountMinor: 6_000_000,
+        currencyCode: 'USD',
+        amountBaseMinor: 6_000_000,
+        effectiveDate: '2023-01-01',
+        reason: 'relocation',
+        countryCode: 'US',
+        changeBp: 40083,
+      },
+      {
+        ...hire!,
+        id: 1,
+        amountMinor: 100_000_000,
+        currencyCode: 'INR',
+        amountBaseMinor: 1_198_000,
+        effectiveDate: '2020-01-01',
+        reason: 'hire',
+        countryCode: 'IN',
+        changeBp: null,
+      },
+    ],
+    historySummary: {
+      currencyCode: 'USD',
+      convertedToUsd: true,
+      hireAmountMinor: 1_198_000,
+      currentAmountMinor: 6_000_000,
+      sinceHireBp: 40083,
+      averageYearlyGrowthBp: 2671,
+      biggestJump: {
+        historyId: 2,
+        changeBp: 40083,
+        effectiveDate: '2023-01-01',
+        reason: 'relocation',
+      },
+      promotionCount: 0,
+      raiseCount: 0,
+    },
+  };
+}
+
+/** Only the hire row so far. */
+export function newHireDetail(): EmployeeDetail {
+  const base = employeeDetail();
+  return {
+    ...base,
+    salary: { ...base.salary, amountMinor: 450_000_000, effectiveDate: '2021-04-12' },
+    history: [base.history[1]!],
+    historySummary: {
+      ...base.historySummary,
+      hireAmountMinor: 450_000_000,
+      currentAmountMinor: 450_000_000,
+      sinceHireBp: null,
+      averageYearlyGrowthBp: null,
+      biggestJump: null,
+      promotionCount: 0,
+      raiseCount: 0,
+    },
+  };
+}
+
 export function peerContext(overrides: Partial<PeerContext> = {}): PeerContext {
   return {
     countryCode: 'IN',

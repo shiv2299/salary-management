@@ -1,22 +1,26 @@
 import type { DbHandle } from '../db/client';
-import { proposedAmount } from '../domain/revision';
+import { BASE_CURRENCY, convert } from '../domain/fx';
+import { peerGroupKey, peerPosition } from '../domain/peer-groups';
+import { percentChangeBp, proposedAmount } from '../domain/revision';
 import { validateSalaryChange } from '../domain/salary-change-rules';
 import { conflict, notFound, unprocessable } from '../errors';
 import {
   findEmployeesByIds,
+  type EmployeeListRow,
   listActiveEmployeeRowsByIds,
   listActiveEmployeeRowsMatching,
 } from '../repositories/employees';
+import { loadLatestFxRates } from '../repositories/fx-rates';
 import { insertSalaryRevisionBatch } from '../repositories/salary-revision-batches';
+import { getPeerGroups, type PeerGroup } from './peer-groups';
 import { currencyInForce } from './salary-changes';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
 
-export type BulkPreviewInput = {
-  percentageBp: number;
-} & (
+export type BulkSelectionInput =
   | { filter: { country?: string[]; department?: number[]; level?: number[]; search?: string } }
-  | { employeeIds: number[] }
-);
+  | { employeeIds: number[] };
+
+export type BulkPreviewInput = BulkSelectionInput & { percentageBp: number };
 
 export interface BulkConfirmInput {
   percentageBp: number;
@@ -25,28 +29,61 @@ export interface BulkConfirmInput {
   items: { employeeId: number; expectedCurrentAmountMinor: number; newAmountMinor: number }[];
 }
 
+/** The active employees a selection names: explicit ids, or everyone matching the filter. */
+function selectedRows(db: DbHandle, selection: BulkSelectionInput): EmployeeListRow[] {
+  return 'employeeIds' in selection
+    ? listActiveEmployeeRowsByIds(db, selection.employeeIds)
+    : listActiveEmployeeRowsMatching(db, definedOnly(selection.filter));
+}
+
 /**
- * Every active employee the selection matches, with the amount the percentage would give them.
- * Read-only and not paginated: the UI pages through it and holds overrides locally.
+ * Every active employee the selection matches, with the amount the percentage would give them,
+ * both in USD, the resulting change and whether their current pay is already outside their
+ * country and level peer range (the outliers rule). Read-only and not paginated: the UI pages
+ * through it and holds overrides locally.
  */
 export function previewBulkRevision(db: DbHandle, input: BulkPreviewInput) {
-  const rows =
-    'employeeIds' in input
-      ? listActiveEmployeeRowsByIds(db, input.employeeIds)
-      : listActiveEmployeeRowsMatching(db, definedOnly(input.filter));
+  const rows = selectedRows(db, input);
+  const rates = loadLatestFxRates(db);
+  const distinctPairs = new Map(
+    rows.map((row) => [
+      peerGroupKey(row.countryCode, row.levelId),
+      { countryCode: row.countryCode, levelId: row.levelId },
+    ]),
+  );
+  const groups =
+    distinctPairs.size > 0
+      ? getPeerGroups(db, [...distinctPairs.values()])
+      : new Map<string, PeerGroup>();
 
   return {
-    items: rows.map((row) => ({
-      employeeId: row.id,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      countryCode: row.countryCode,
-      departmentName: row.departmentName,
-      levelCode: row.levelCode,
-      currencyCode: row.currentCurrencyCode,
-      currentAmountMinor: row.currentAmountMinor,
-      proposedAmountMinor: proposedAmount(row.currentAmountMinor, input.percentageBp),
-    })),
+    items: rows.map((row) => {
+      const proposed = proposedAmount(row.currentAmountMinor, input.percentageBp);
+      const summary = groups.get(peerGroupKey(row.countryCode, row.levelId))?.summary ?? null;
+      return {
+        employeeId: row.id,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        countryCode: row.countryCode,
+        departmentName: row.departmentName,
+        levelCode: row.levelCode,
+        currencyCode: row.currentCurrencyCode,
+        currentAmountMinor: row.currentAmountMinor,
+        proposedAmountMinor: proposed,
+        currentAmountBaseMinor: row.currentAmountBaseMinor,
+        proposedAmountBaseMinor: convert(proposed, row.currentCurrencyCode, BASE_CURRENCY, rates),
+        changeBp: percentChangeBp(row.currentAmountMinor, proposed),
+        outsidePeerRange: summary
+          ? peerPosition(
+              {
+                amountMinor: row.currentAmountMinor,
+                amountBaseMinor: row.currentAmountBaseMinor,
+              },
+              summary,
+            ).outlier
+          : null,
+      };
+    }),
     total: rows.length,
   };
 }

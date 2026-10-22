@@ -41,6 +41,51 @@ const historyOf = (id: number) =>
 const batches = () => database.db.select().from(salaryRevisionBatches).all();
 
 describe('previewBulkRevision', () => {
+  it('gives each row its current and proposed pay in USD and the change in basis points', () => {
+    const india = add({ countryCode: 'IN', amountMinor: 500_000_000 });
+    const odd = add({ amountMinor: 333 });
+    const items = previewBulkRevision(database.db, {
+      employeeIds: [india, odd],
+      percentageBp: 700,
+    }).items;
+    expect(items.find((i) => i.employeeId === india)).toMatchObject({
+      currencyCode: 'INR',
+      currentAmountMinor: 500_000_000,
+      proposedAmountMinor: 535_000_000,
+      currentAmountBaseMinor: 5_990_000,
+      proposedAmountBaseMinor: 6_409_300,
+      changeBp: 700,
+    });
+    // 333 becomes 356 after rounding, so the change is 6.91%, not the 7% asked for
+    expect(items.find((i) => i.employeeId === odd)).toMatchObject({
+      proposedAmountMinor: 356,
+      changeBp: 691,
+    });
+  });
+
+  it('flags people already outside their peer range by the same rule as the outliers list', () => {
+    const peers = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19].map((m) =>
+      add({ amountMinor: m * 1_000_000 }),
+    );
+    const high = add({ amountMinor: 100_000_000 }); // US/L1 fences are $50,000.00 to $250,000.00
+    const items = previewBulkRevision(database.db, {
+      filter: { level: [1] },
+      percentageBp: 100,
+    }).items;
+    expect(items.find((i) => i.employeeId === high)?.outsidePeerRange).toBe('above');
+    expect(
+      items.filter((i) => peers.includes(i.employeeId)).map((i) => i.outsidePeerRange),
+    ).toEqual(Array(10).fill(null));
+  });
+
+  it('does not flag anyone in a peer group smaller than the minimum size', () => {
+    add({ amountMinor: 10_000_000 });
+    add({ amountMinor: 11_000_000 });
+    add({ amountMinor: 100_000_000 });
+    const items = previewBulkRevision(database.db, { filter: {}, percentageBp: 100 }).items;
+    expect(items.map((i) => i.outsidePeerRange)).toEqual([null, null, null]);
+  });
+
   it('proposes the percentage increase for every active employee matching the filter', () => {
     const l1 = add({ levelId: 1, amountMinor: 10_000_000 });
     add({ levelId: 2 });

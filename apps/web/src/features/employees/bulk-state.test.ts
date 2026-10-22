@@ -1,4 +1,5 @@
 import type { BulkPreviewItem } from '@acme/shared';
+import { bulkPreviewItem } from '@/test/fixtures';
 import { describe, expect, it } from 'vitest';
 import {
   buildConfirmBody,
@@ -8,7 +9,7 @@ import {
 } from './bulk-state';
 
 function item(overrides: Partial<BulkPreviewItem> = {}): BulkPreviewItem {
-  return {
+  return bulkPreviewItem({
     employeeId: 1,
     firstName: 'Asha',
     lastName: 'Rao',
@@ -19,7 +20,7 @@ function item(overrides: Partial<BulkPreviewItem> = {}): BulkPreviewItem {
     currentAmountMinor: 10_000_00,
     proposedAmountMinor: 10_700_00,
     ...overrides,
-  };
+  });
 }
 
 describe('resolveNewAmount', () => {

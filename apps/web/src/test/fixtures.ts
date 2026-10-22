@@ -1,10 +1,30 @@
 import type {
+  BulkPreviewItem,
   EmployeeDetail,
   EmployeeFacets,
   EmployeeListItem,
   PeerContext,
   SalaryChangePreview,
 } from '@acme/shared';
+
+export function bulkPreviewItem(overrides: Partial<BulkPreviewItem> = {}): BulkPreviewItem {
+  return {
+    employeeId: 1,
+    firstName: 'Asha',
+    lastName: 'Rao',
+    countryCode: 'US',
+    departmentName: 'Engineering',
+    levelCode: 'L3',
+    currencyCode: 'USD',
+    currentAmountMinor: 10_000_000,
+    proposedAmountMinor: 10_700_000,
+    currentAmountBaseMinor: 10_000_000,
+    proposedAmountBaseMinor: 10_700_000,
+    changeBp: 700,
+    outsidePeerRange: null,
+    ...overrides,
+  };
+}
 
 export function employeeItem(overrides: Partial<EmployeeListItem> = {}): EmployeeListItem {
   return {

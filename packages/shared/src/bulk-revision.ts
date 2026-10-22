@@ -35,6 +35,10 @@ export const bulkPreviewItemSchema = z.object({
   currencyCode: z.string(),
   currentAmountMinor: z.number().int(),
   proposedAmountMinor: z.number().int(),
+  currentAmountBaseMinor: z.number().int(),
+  proposedAmountBaseMinor: z.number().int(),
+  changeBp: z.number().int(),
+  outsidePeerRange: z.enum(['above', 'below']).nullable(),
 });
 
 export const bulkPreviewResponseSchema = z.object({

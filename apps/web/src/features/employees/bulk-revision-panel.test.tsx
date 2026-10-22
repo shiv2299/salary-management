@@ -1,13 +1,14 @@
 import type { BulkPreviewItem } from '@acme/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { bulkPreviewItem } from '@/test/fixtures';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
 import { BulkRevisionPanel } from './bulk-revision-panel';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function previewItem(id: number, overrides: Partial<BulkPreviewItem> = {}): BulkPreviewItem {
-  return {
+  return bulkPreviewItem({
     employeeId: id,
     firstName: `First${id}`,
     lastName: `Last${id}`,
@@ -18,7 +19,7 @@ function previewItem(id: number, overrides: Partial<BulkPreviewItem> = {}): Bulk
     currentAmountMinor: 100_000_00,
     proposedAmountMinor: 107_000_00,
     ...overrides,
-  };
+  });
 }
 
 function previewResponse(items: BulkPreviewItem[]) {

@@ -52,9 +52,17 @@ describe('POST /api/employees/bulk-salary-changes/preview', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json<{ items: { proposedAmountMinor: number }[]; total: number }>();
+    const body = response.json<{
+      items: { proposedAmountMinor: number }[];
+      total: number;
+    }>();
     expect(body.total).toBe(2);
     expect(body.items.map((i) => i.proposedAmountMinor)).toEqual([11_000_000, 22_000_000]);
+    expect(body.items[0]).toMatchObject({
+      currentAmountBaseMinor: 10_000_000,
+      changeBp: 1000,
+      outsidePeerRange: null,
+    });
   });
 
   it('rejects a filter value that is not a list with 400', async () => {

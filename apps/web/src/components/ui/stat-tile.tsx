@@ -13,18 +13,20 @@ export function StatTile({
   value,
   hint,
   tone = 'neutral',
+  className,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   tone?: 'neutral' | 'positive' | 'negative' | 'warning';
+  className?: string;
 }) {
   const labelId = useId();
   return (
     <div
       role="group"
       aria-labelledby={labelId}
-      className="rounded-md border border-border bg-background p-4"
+      className={cn('rounded-md border border-border bg-background p-4', className)}
     >
       <div
         id={labelId}

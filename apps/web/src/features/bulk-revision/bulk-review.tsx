@@ -132,6 +132,8 @@ export function BulkReview({
   const typical = revision ? typicalPayText(revision) : null;
   const headcount = summary.data?.headcount ?? items.length;
   const anyForeign = items.some((item) => item.currencyCode !== 'USD');
+  // Dimmed, as the rows are, while the figures shown are an older answer.
+  const totalsClass = summary.isPlaceholderData ? 'opacity-60' : undefined;
 
   function changeText(item: BulkPreviewItem): ReactNode {
     const resolved = resolveNewAmount(item, overrides[item.employeeId]);
@@ -184,12 +186,19 @@ export function BulkReview({
               label="Added to annual payroll"
               value={added?.headline ?? '…'}
               hint={added?.detail}
+              className={totalsClass}
             />
-            <StatTile label="Typical pay" value={typical?.headline ?? '…'} hint={typical?.detail} />
+            <StatTile
+              label="Typical pay"
+              value={typical?.headline ?? '…'}
+              hint={typical?.detail}
+              className={totalsClass}
+            />
             <StatTile
               label="Rows overridden"
               value={revision ? revision.overriddenCount.toLocaleString('en-US') : '…'}
               hint={`of ${headcount.toLocaleString('en-US')}`}
+              className={totalsClass}
             />
           </>
         )}

@@ -320,6 +320,41 @@ describe('BulkRevisionPage review', () => {
     expect(await screen.findByText('+10%', {}, WAIT)).toBeDefined();
   });
 
+  it('dims the totals while they wait for an edit to be counted', async () => {
+    const edited = deferredResponse();
+    stubBulk({
+      [SUMMARY]: (_, init) => {
+        const body = JSON.parse(init.body as string) as { percentageBp?: number; overrides?: [] };
+        if (body.overrides) return edited.promise;
+        return Response.json(
+          body.percentageBp === undefined ? bulkSummary({ revision: null }) : bulkSummary(),
+        );
+      },
+    });
+    render();
+    choose('7');
+    const tile = await screen.findByRole('group', { name: 'Added to annual payroll' }, WAIT);
+    expect(await within(tile).findByText('+$14,000.00', {}, WAIT)).toBeDefined();
+    expect(tile.className).not.toContain('opacity-60');
+    fireEvent.change(screen.getByLabelText('New salary for Ravi Menon'), {
+      target: { value: '110000' },
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('group', { name: 'Added to annual payroll' }).className).toContain(
+        'opacity-60',
+      );
+    }, WAIT);
+    expect(screen.getByRole('group', { name: 'Outside peer range' }).className).not.toContain(
+      'opacity-60',
+    );
+    await edited.answer(bulkSummary());
+    await waitFor(() => {
+      expect(
+        screen.getByRole('group', { name: 'Added to annual payroll' }).className,
+      ).not.toContain('opacity-60');
+    }, WAIT);
+  });
+
   it('filters the rows by name and by the quick filters', async () => {
     stubBulk();
     render();

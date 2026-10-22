@@ -103,7 +103,8 @@ export function BulkReview({
   if (!percentageChosen) {
     return <p className="text-sm text-text-secondary">Choose an increase to see the review.</p>;
   }
-  if (!preview.data) {
+  // An error wins over rows kept from before, which may no longer match the server.
+  if (!preview.data || preview.isError) {
     return preview.isError ? (
       <RetryAlert
         message={preview.error.message}

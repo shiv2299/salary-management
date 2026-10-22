@@ -139,10 +139,18 @@ export function BulkRevisionPage({ today }: { today?: string }) {
       onError: (error) => {
         if (error instanceof ApiError && error.status === 409) {
           setDialogOpen(false);
-          toast.error('Salaries changed since the preview. The preview has been reloaded.');
           void preview.refetch().then((result) => {
-            const after = result.data?.items;
-            if (after) setOverrides(keepUnaffectedOverrides(before, after, overrides));
+            // Pay or headcount moved on the server, so the totals are asked again either way.
+            void queryClient.invalidateQueries({ queryKey: ['bulk-revision', 'summary'] });
+            if (!result.isSuccess) {
+              // The review shows the preview's error with a retry; the edits stay as typed.
+              toast.error(
+                'Salaries changed since the preview, and it could not be reloaded. Try again.',
+              );
+              return;
+            }
+            toast.error('Salaries changed since the preview. The preview has been reloaded.');
+            setOverrides(keepUnaffectedOverrides(before, result.data.items, overrides));
           });
           return;
         }

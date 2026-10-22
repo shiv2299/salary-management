@@ -704,7 +704,7 @@ describe('BulkRevisionPage confirmation', () => {
 
   it('reloads a stale preview, says so, and keeps edits for people whose pay did not change', async () => {
     let previews = 0;
-    stubBulk({
+    const { calls } = stubBulk({
       [PREVIEW]: () => {
         previews += 1;
         return Response.json({
@@ -724,6 +724,7 @@ describe('BulkRevisionPage confirmation', () => {
       },
       [CONFIRM]: apiError(409, 'CONFLICT', 'Salaries changed since the preview. Preview again.'),
     });
+    const summaries = () => calls.filter((c) => c.url.pathname.endsWith('/summary')).length;
     render();
     choose('7');
     fireEvent.change(await screen.findByLabelText('New salary for Asha Rao', {}, WAIT), {
@@ -743,6 +744,7 @@ describe('BulkRevisionPage confirmation', () => {
     await waitFor(() => {
       expect((apply as HTMLButtonElement).disabled).toBe(false);
     }, WAIT);
+    const summariesBefore = summaries();
     fireEvent.click(apply);
 
     await waitFor(() => {
@@ -758,6 +760,126 @@ describe('BulkRevisionPage confirmation', () => {
     expect(previews).toBe(2);
     expect(screen.getByLabelText<HTMLInputElement>('New salary for Asha Rao').value).toBe('120000');
     expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => {
+      expect(summaries()).toBeGreaterThan(summariesBefore);
+    }, WAIT);
+  });
+
+  it('asks for the totals again after a stale preview even when no edit changes', async () => {
+    let previews = 0;
+    let revisionSummaries = 0;
+    const { calls } = stubBulk({
+      [PREVIEW]: () => {
+        previews += 1;
+        return Response.json({
+          items: [
+            bulkPreviewItem(),
+            bulkPreviewItem({
+              employeeId: 2,
+              firstName: 'Ravi',
+              lastName: 'Menon',
+              ...(previews === 1
+                ? {}
+                : { currentAmountMinor: 10_500_000, proposedAmountMinor: 11_235_000 }),
+            }),
+          ],
+          total: 2,
+        });
+      },
+      [SUMMARY]: (_, init) => {
+        if (
+          (JSON.parse(init.body as string) as { percentageBp?: number }).percentageBp === undefined
+        ) {
+          return Response.json(bulkSummary({ revision: null }));
+        }
+        revisionSummaries += 1;
+        const added = revisionSummaries === 1 ? 1_400_000 : 1_435_000;
+        return Response.json(
+          bulkSummary({
+            revision: {
+              ...bulkSummary().revision!,
+              addedByCurrency: [{ currencyCode: 'USD', addedMinor: added }],
+              addedBaseMinor: added,
+            },
+          }),
+        );
+      },
+      [CONFIRM]: apiError(409, 'CONFLICT', 'Salaries changed since the preview. Preview again.'),
+    });
+    render();
+    choose('7');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Review & confirm 2 changes →' }, WAIT),
+    );
+    const apply = await screen.findByRole<HTMLButtonElement>('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect(apply.disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+
+    const tile = await screen.findByRole('group', { name: 'Added to annual payroll' });
+    expect(await within(tile).findByText('+$14,350.00', {}, WAIT)).toBeDefined();
+    expect(
+      calls.filter(
+        (c) =>
+          c.url.pathname.endsWith('/summary') &&
+          JSON.stringify(c.body) === JSON.stringify({ employeeIds: [1, 2], percentageBp: 700 }),
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('says the preview could not be reloaded after a conflict and keeps the edits', async () => {
+    let previews = 0;
+    stubBulk({
+      [PREVIEW]: () => {
+        previews += 1;
+        return previews === 2
+          ? apiError(500, 'INTERNAL', 'Server error')
+          : Response.json({
+              items: [
+                bulkPreviewItem(),
+                bulkPreviewItem({ employeeId: 2, firstName: 'Ravi', lastName: 'Menon' }),
+              ],
+              total: 2,
+            });
+      },
+      [CONFIRM]: apiError(409, 'CONFLICT', 'Salaries changed since the preview. Preview again.'),
+    });
+    render();
+    choose('7');
+    fireEvent.change(await screen.findByLabelText('New salary for Asha Rao', {}, WAIT), {
+      target: { value: '120000' },
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+          .disabled,
+      ).toBe(false);
+    }, WAIT);
+    openDialog();
+    const apply = await screen.findByRole<HTMLButtonElement>('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect(apply.disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Salaries changed since the preview, and it could not be reloaded. Try again.',
+      );
+    });
+    expect(toast.error).not.toHaveBeenCalledWith(
+      'Salaries changed since the preview. The preview has been reloaded.',
+    );
+    const review = screen.getByRole('region', { name: 'Review' });
+    expect(within(review).getByRole('alert')).toBeDefined();
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: /^Review & confirm/ }).disabled,
+    ).toBe(true);
+    fireEvent.click(within(review).getByRole('button', { name: 'Retry' }));
+    expect(
+      (await screen.findByLabelText<HTMLInputElement>('New salary for Asha Rao', {}, WAIT)).value,
+    ).toBe('120000');
   });
 
   it('shows the broken rule inside the dialog without reloading the preview', async () => {

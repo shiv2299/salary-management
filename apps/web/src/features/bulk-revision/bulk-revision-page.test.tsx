@@ -459,6 +459,25 @@ describe('BulkRevisionPage review', () => {
     expect(await screen.findByText('+$14,000.00')).toBeDefined();
   });
 
+  it('keeps the people counted when the totals later fail', async () => {
+    stubBulk({
+      [SUMMARY]: (_, init) =>
+        (JSON.parse(init.body as string) as { percentageBp?: number }).percentageBp === undefined
+          ? Response.json(bulkSummary({ revision: null }))
+          : apiError(500, 'INTERNAL', 'Server error'),
+    });
+    render();
+    expect(await screen.findByText('2 people, active only')).toBeDefined();
+    choose('7');
+    expect(await screen.findByText('Could not update the totals.', {}, WAIT)).toBeDefined();
+    expect(screen.getByText('2 people, active only')).toBeDefined();
+    expect(
+      within(screen.getByRole('list', { name: 'By department' })).getByText('Engineering'),
+    ).toBeDefined();
+    expect(screen.queryByText('Could not count the people selected.')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1);
+  });
+
   it('says the people could not be counted and offers a retry', async () => {
     let fail = true;
     stubBulk({

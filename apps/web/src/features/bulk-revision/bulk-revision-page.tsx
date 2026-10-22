@@ -77,7 +77,9 @@ export function BulkRevisionPage({ today }: { today?: string }) {
     [debouncedOverridesJson, percentageBp],
   );
   const summary = useBulkSummary(target, percentageBp, summaryOverrides);
-  const who = summary.data;
+  // Who asks without a percentage or edits (the same request as before a percentage is chosen), so
+  // a later totals failure leaves the count in place.
+  const who = useBulkSummary(target, null, []);
 
   const defaultNote =
     target && countries && departments && levels
@@ -224,10 +226,10 @@ export function BulkRevisionPage({ today }: { today?: string }) {
         <BulkSetup
           target={target}
           listParams={listParams}
-          who={who}
-          whoFailed={summary.isError && !summary.data}
+          who={who.data}
+          whoFailed={who.isError && !who.data}
           onRetryWho={() => {
-            void summary.refetch();
+            void who.refetch();
           }}
           percentageText={percentageText}
           percentageError={percentageError}

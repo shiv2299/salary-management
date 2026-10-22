@@ -467,7 +467,7 @@ The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay b
 
 **Chosen**: the `docs/architecture.md` §6 bullets, with these values: ten cycles, 180 days' tenure for a cycle, entry pay +3% a year (`MARKET_GROWTH_BP = 300`) against 4.5% increments, promotions of 10–20% only for someone at or above entry pay, India's entry pay by level ₹8.0L / 10.8L / 14.5L / 19.5L / 26L / 35L (steps of about 1.35×), 4% of active employees with no change for the last 2–3 years, compression in India L2, India L3 and US L2 with recent hires 20% above entry pay, and 4% leavers with `deactivated_on`.
 
-**Why**: every insight has real people behind it by design, and seed tests assert each proportion. Entry pay that trails increments is what makes tenure pay off, so compression appears only where it was planted. With India's steeper steps a 10–20% promotion left every promotee below the new level's fences and the outliers list filled with promotions.
+**Why**: every insight has real people behind it by design, and seed tests assert each proportion. Entry pay that trails increments is what makes tenure pay off, so the three planted groups show compression. On a small seed a few other groups can show a noise-level gap (5% or less); the full 10,000-employee seed shows only the planted three. With India's steeper steps a 10–20% promotion left every promotee below the new level's fences and the outliers list filled with promotions.
 
 ## Salary history chart: ranges zoom the chart, figures cover the whole history, USD after a currency change
 

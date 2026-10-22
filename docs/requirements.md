@@ -13,7 +13,7 @@ Replace ACME's Excel-based salary management for 10,000 employees across multipl
 ### Employee records
 
 - **FR-1**: Maintain a searchable, filterable, sortable, paginated list of employees (server-side). Search matches the term anywhere in an employee's full name, email, or job title (substring, case-insensitive), not just at the start. Sorting by salary compares amounts in the base currency, so employees paid in different currencies sort correctly against each other. The country, department, and level filters each accept several values (OR within a filter, AND across filters), and each option shows how many employees match it under the search and the other groups' selections. The list sorts by name, job title, department, level (by rank), country, hire date, or salary. The list shows active employees by default; the status filter can switch to inactive or all.
-- **FR-2**: Create, edit, deactivate (soft delete), and reactivate employee records. Deactivation preserves salary history; employees are never hard-deleted. Country and level are not edited directly — they change only through a relocation or promotion (FR-3), because both affect pay.
+- **FR-2**: Create, edit, deactivate (soft delete), and reactivate employee records. Deactivation preserves salary history; employees are never hard-deleted. Country and level are not edited directly — they change only through a relocation or promotion (FR-3), because both affect pay. Deactivating records the date it happened; reactivating clears it.
 
 ### Compensation
 
@@ -27,6 +27,7 @@ Replace ACME's Excel-based salary management for 10,000 employees across multipl
   Effective dates cannot be in the future. Changes cannot be recorded for an inactive employee.
 - **FR-4**: Apply a salary revision to a group of employees at once (a filtered selection, e.g. "all L3 Engineers in India") as a single percentage increase, with the option to hand-override the computed amount for any individual employee before confirming. This reflects how revisions actually happen (a few times a year, across many people at once), not one employee at a time. Only active employees are included; each resulting change has reason **raise**. Before confirming, the HR Manager sees what the revision adds to annual payroll (per currency and in USD), the typical pay before and after, and who is already outside their peer range.
 - **FR-5**: Export employee and salary data as CSV, with two options: **export current result** (exactly the rows matching the list's current search and filters) or **export all** (every employee, active and inactive, with a status column).
+- **FR-13**: Show each employee's pay over time since hire as a step chart, with a 3, 5 or 10-year or all-time range, the change since hire, the counts of promotions and raises, average yearly growth, the biggest increase and the time since the last change. An employee whose pay moved between currencies is shown in USD at the static FX rates.
 
 ### Insights (the HR Manager's core compensation questions)
 
@@ -44,7 +45,7 @@ All insights cover **active employees only** — deactivated employees are no lo
 
 ### Data
 
-- **FR-12**: Seed the system with a 10,000-employee dataset spanning 3 countries, 7 departments, and 6 levels, for development, testing, and demo purposes. Given the same RNG seed and the same reference date, the seed produces identical data; salary-change dates are generated relative to the reference date (today when the app seeds itself, a fixed date in tests), so the salary-changes view always has realistic data spread across the full 5-year window, including a yearly company-wide increment cycle recorded as bulk revisions.
+- **FR-12**: Seed the system with a 10,000-employee dataset spanning 3 countries, 7 departments, and 6 levels, for development, testing, and demo purposes. Given the same RNG seed and the same reference date, the seed produces identical data; salary-change dates are generated relative to the reference date (today when the app seeds itself, a fixed date in tests), so every view has realistic data across the full 10-year span: a yearly company-wide increment cycle recorded as bulk revisions from the earliest hire onward, individual raises, promotions of 10–20% and relocations, a few people whose raises stopped more than two years ago, a few country + level groups where recent hires are paid more than long-tenured staff, and leavers deactivated on dates spread over the years.
 
 ## 4. Deliberately Left Out
 
@@ -87,7 +88,7 @@ Each FR is done when the behavior below is covered by tests at the layer named i
 | FR | Accepted when |
 |---|---|
 | FR-1 | Searching "ann" matches "Joanne", "ann@acme.test", and "Channel Manager"; salary sort places a $90,000 employee above a ₹50,00,000 one (≈ $60,000); inactive employees are hidden unless the status filter includes them. Filtering by India and Germany at L3 returns exactly the L3 employees of both countries; sorting by level orders by rank; each filter option's count equals the rows that option alone matches under the search and the other groups' selections. |
-| FR-2 | A deactivated employee keeps their full salary history, disappears from the default list and from insights, and can be reactivated. Editing country or level directly is rejected. |
+| FR-2 | A deactivated employee keeps their full salary history, disappears from the default list and from insights, and can be reactivated. Editing country or level directly is rejected. Deactivating on 1 Feb 2026 records that date, deactivating again while inactive keeps it, and reactivating clears it. |
 | FR-3 | A promotion that doesn't raise the level is rejected; a relocation stores the new salary in the new country's currency and updates the employee's country in the same transaction; a future effective date is rejected; a correction dated the same day as the row it fixes becomes the current salary. |
 | FR-4 | Confirming a 7% revision for N previewed employees writes exactly N rows sharing one batch, applies overrides exactly as entered, and is rejected entirely (no rows written) if any employee's salary changed after the preview. The added payroll shown before confirming equals, per currency, the sum of new minus current amounts including hand edits, and its USD total equals each currency's sum converted once at the documented rate. |
 | FR-5 | "Export current result" returns exactly the rows the list currently matches (all pages); "export all" includes inactive employees with a status column. |
@@ -97,4 +98,5 @@ Each FR is done when the behavior below is covered by tests at the layer named i
 | FR-9 | Payroll totals per group equal the sum of the group's current USD salaries. |
 | FR-10 | A bulk revision appears as one entry with headcount and percentage; a change dated 4 years ago appears with the 5-year window but not the 3-year one. |
 | FR-11 | Every data endpoint returns 401 without a valid session; a page refresh keeps the user logged in. |
-| FR-12 | Two seed runs with the same RNG seed and reference date produce byte-identical data; ~1–2% of employees fall outside their peer-group fences. |
+| FR-12 | Two seed runs with the same RNG seed and reference date produce byte-identical data; ~1–2% of employees fall outside their peer-group fences; 3–5% of active employees have had no raise or promotion for over two years; every promotion raises pay by 10–20%; recent hires out-earn long-tenured peers in each planted country + level group and in at most five groups in all; every inactive employee has a deactivation date after their last salary change. |
+| FR-13 | For an employee hired at $100,000.00 on 22 Oct 2016 and paid $148,024.43 on 22 Oct 2026, the change since hire is +48.02% and average yearly growth +4%; a relocated employee's summary and chart are in USD; an employee with only the hire row has no growth figures. |

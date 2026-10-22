@@ -444,3 +444,35 @@ The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay b
 **Chosen**: the login screen has a solid `brand-panel` navy panel carrying only the app mark and name and a faint bar-chart pattern. It is the app's only dark surface, and an exception to the no-dark-mode rule in `docs/design.md`.
 
 **Why**: the panel gives the first screen some identity without a second theme to maintain. It carries no pitch or feature list because the only user is already an employee who knows what the tool is for.
+
+## Deactivation date: one nullable `deactivated_on`, cleared on reactivation, no backfill
+
+**Alternatives considered**: reading it from `updated_at` (it changes on every edit); a status-history table (keeps every leave and return, which no question needs); backfilling existing inactive rows from `updated_at`.
+
+**Chosen**: deactivating sets `deactivated_on` to today from the injected clock; deactivating someone already inactive keeps it; reactivating clears it. Existing databases are reset with `npm run db:reset -w @acme/api` rather than backfilled, since every database is demo data.
+
+**Why**: a payroll at a past date needs to know who had left by then, and one date per person answers that. Someone who left, came back and left again keeps only the last date, so a past payroll counts them during the gap, which is acceptable for a rare event. A backfill from `updated_at` would write wrong dates into history.
+
+## Database reset: an explicit command that keeps the login, never automatic
+
+**Alternatives considered**: wiping and re-seeding on boot when the schema or seed changes (silently destroys data); deleting the file (fails while the API holds it open and loses the HR login); upgrading demo data in place (a data migration per seed change).
+
+**Chosen**: `npm run db:reset -w @acme/api` drops every table, migrates, restores the `users` rows with their ids and password hashes, then seeds. Stop the API first. The boot-time seed still does nothing once employees exist.
+
+**Why**: nothing is lost by surprise, and because a session carries the user id, keeping the users means the HR login and any open session keep working after a reset.
+
+## Seed realism: ten years of history, entry pay that trails increments, 10–20% promotions, skipped raises, compression groups, dated leavers
+
+**Alternatives considered**: the earlier seed (increments only in the last five years, so someone hired ten years ago showed flat pay for five; promotions priced at the full gap between level medians, about 50% in India); hand-written fixtures for each pattern.
+
+**Chosen**: the `docs/architecture.md` §6 bullets, with these values: ten cycles, 180 days' tenure for a cycle, entry pay +3% a year (`MARKET_GROWTH_BP = 300`) against 4.5% increments, promotions of 10–20% only for someone at or above entry pay, India's entry pay by level ₹8.0L / 10.8L / 14.5L / 19.5L / 26L / 35L (steps of about 1.35×), 4% of active employees with no change for the last 2–3 years, compression in India L2, India L3 and US L2 with recent hires 20% above entry pay, and 4% leavers with `deactivated_on`.
+
+**Why**: every insight has real people behind it by design, and seed tests assert each proportion. Entry pay that trails increments is what makes tenure pay off, so compression appears only where it was planted. With India's steeper steps a 10–20% promotion left every promotee below the new level's fences and the outliers list filled with promotions.
+
+## Salary history chart: ranges zoom the chart, figures cover the whole history, USD after a currency change
+
+**Alternatives considered**: figures per range (four server summaries, or division in the browser); a 3Y default like recent changes; one line per currency.
+
+**Chosen**: 3Y / 5Y / 10Y / All, default All, change only the chart's window, which ends today (or on the deactivation date) and never starts before the hire date. The summary line and figures cover the whole history and come from `domain/`. Average yearly growth is compound (`(current ÷ hire)^(365.25 ÷ days) − 1`, rounded half away from zero to a basis point, null under 365 days). The biggest jump is the largest increase, earliest on a tie. After a relocation the summary and chart are in USD at the current static rates, as the per-row % already is (see "History % change").
+
+**Why**: one person's history is a couple of dozen rows, so the whole story is the useful default and a range is just a closer look. Compound growth is the figure that reads as "a year" across uneven gaps. Plotting two currencies on one axis would show the exchange rate, not the pay.

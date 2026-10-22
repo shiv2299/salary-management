@@ -210,7 +210,7 @@ No `manager_id` / reporting hierarchy on `employees`. None of the five HR questi
 | Domain | money rounding, FX conversion, bulk-revision amount, `computeDistribution` (incl. interpolation), IQR outlier check, current-row selection rule, seed distribution math | Vitest | Pure functions, no I/O; written first |
 | Repository/service | employee CRUD, single salary writer (backdated, same-day correction, promotion, relocation), bulk revision incl. 409 on stale preview, insights queries, auth (hash/verify/issue token) | Vitest + in-memory SQLite, small fixed fixture | Injected clock and RNG for determinism |
 | API | route validation, pagination params, auth 401/200 and deny-by-default, error shape, CSV export scopes and headers | Vitest + Fastify `app.inject()` | A handful per route |
-| Frontend | employee table rendering, form validation, relocation pre-fill, bulk preview overrides, insights chart data mapping, auth redirect | Vitest + React Testing Library + jsdom, stubbed `fetch` | Component tests live next to the component |
+| Frontend | employee table rendering, form validation, relocation pre-fill, bulk revision overrides, insights chart data mapping, auth redirect | Vitest + React Testing Library + jsdom, stubbed `fetch` | Component tests live next to the component |
 | E2E | — | Not in this build | Matches `AGENTS.md` |
 
 Test names are plain sentences. Coverage is reported honestly; no arbitrary percentage target is chased.

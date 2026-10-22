@@ -63,7 +63,7 @@ Insights sits on `canvas`, with white cards on top of it. Employees and the deta
 ## 4. Navigation and page structure
 
 - **`/insights`** is the default route after login (it's the weekly-use surface).
-- **`/employees`** is the list: a left filter panel and a main column (title row, toolbar, table, pagination), plus the bulk-revision action bar (appears only when rows are selected). Shows active employees by default; inactive rows, when the status filter includes them, use the `inactive` text color plus an "Inactive" badge.
+- **`/employees`** is the list: a left filter panel and a main column (title row, toolbar, table, pagination), plus the bulk selection bar (appears only when rows are selected; its "Apply % increase" opens the bulk revision screen, below, and is disabled with "Pick up to 1,000 people, or select all matching." when more than 1,000 are picked by hand). Shows active employees by default; inactive rows, when the status filter includes them, use the `inactive` text color plus an "Inactive" badge.
 - **`/employees/revisions/new`** is the bulk revision screen, reached from the list's selection bar. Its query string carries the list's own query plus the selection (`select=all` or `ids=…`), so refresh, back and a copied link show the same screen.
 - **Employee detail** opens as a slide-over drawer from the right, over the list — not a full page navigation. Closing it returns to the list exactly as it was (scroll position, filters, pagination page all preserved). Direct navigation or refresh at the detail URL still renders a full page as a fallback.
 
@@ -116,7 +116,7 @@ This is one implementation, not a separate mobile build. Breakpoint: `md` (768px
 - Color is never the only signal (e.g. outlier flags pair the warning color with a label/icon, not color alone).
 - Flags and avatars are decorative: the person's name and the country name are always written beside them.
 - A chip's remove button is named for what it removes ("Remove filter India"). Each option count in the filter panel is attached to its checkbox with `aria-describedby`.
-- All interactive elements are keyboard-reachable: table sort headers, filter controls, drawer close, bulk-action bar.
+- All interactive elements are keyboard-reachable: table sort headers, filter controls, drawer close, bulk selection bar.
 - Text and background combinations meet WCAG AA contrast (all palette tokens are verified in §2; `text-secondary`/`inactive` on `surface` is the tightest pair at 4.5:1, so don't put them on anything darker).
 - Focus states are visible (a 2px outline in `accent`), never suppressed.
 

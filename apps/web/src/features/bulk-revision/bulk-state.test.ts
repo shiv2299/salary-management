@@ -9,7 +9,6 @@ import {
   resolveNewAmount,
   reviewCounts,
   reviewRows,
-  summarize,
 } from './bulk-state';
 
 function item(overrides: Partial<BulkPreviewItem> = {}): BulkPreviewItem {
@@ -52,35 +51,6 @@ describe('resolveNewAmount', () => {
     expect(resolveNewAmount(item(), 'abc').valid).toBe(false);
     expect(resolveNewAmount(item(), '10000').valid).toBe(false);
     expect(resolveNewAmount(item(), '9000').valid).toBe(false);
-  });
-});
-
-describe('summarize', () => {
-  const items = [
-    item({ employeeId: 1 }),
-    item({
-      employeeId: 2,
-      currencyCode: 'INR',
-      currentAmountMinor: 100_00,
-      proposedAmountMinor: 107_00,
-    }),
-    item({ employeeId: 3, currentAmountMinor: 20_000_00, proposedAmountMinor: 21_400_00 }),
-  ];
-
-  it('counts people and overrides and totals the increase per currency', () => {
-    const summary = summarize(items, { 3: '22000' });
-
-    expect(summary.count).toBe(3);
-    expect(summary.overriddenCount).toBe(1);
-    expect(summary.invalidCount).toBe(0);
-    expect(summary.increaseByCurrency).toEqual([
-      { currencyCode: 'USD', increaseMinor: 700_00n + 2_000_00n },
-      { currencyCode: 'INR', increaseMinor: 7_00n },
-    ]);
-  });
-
-  it('counts invalid cells so the confirm button can stay disabled', () => {
-    expect(summarize(items, { 1: 'oops' }).invalidCount).toBe(1);
   });
 });
 

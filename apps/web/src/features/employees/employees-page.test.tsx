@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { employeeFacets, employeeItem, REFERENCE_ROUTES } from '@/test/fixtures';
 import { renderWithQuery, stubApi } from '@/test/render';
@@ -230,26 +230,51 @@ describe('EmployeesPage', () => {
     ).toBeDefined();
   });
 
-  it('previews a bulk revision for the selected employee ids', async () => {
-    const { calls } = stubApi({
-      ...REFERENCE_ROUTES,
-      'GET /api/employees': () => Response.json(listResponse()),
-      'POST /api/employees/bulk-salary-changes/preview': { items: [], total: 0 },
-    });
+  it('opens the bulk revision screen for the picked employees', async () => {
+    search = 'country=US&sortBy=salary';
+    stubList();
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    await screen.findByRole('link', { name: 'Asha Rao' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Ravi Menon' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Asha Rao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply % increase' }));
+    expect(push).toHaveBeenCalledWith('/employees/revisions/new?country=US&sortBy=salary&ids=1,2');
+  });
+
+  it('opens the bulk revision screen for everyone matching the list', async () => {
+    search = 'country=US';
+    stubList(120);
     renderWithQuery(<EmployeesPage today="2026-10-19" />);
     await screen.findByRole('link', { name: 'Asha Rao' });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Asha Rao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select all 120 matching this filter' }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply % increase' }));
+    expect(push).toHaveBeenCalledWith('/employees/revisions/new?country=US&select=all');
+  });
 
-    fireEvent.change(screen.getByLabelText('Percentage increase'), { target: { value: '5' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+  it('disables the bulk revision when more than 1,000 people are picked by hand', async () => {
+    stubApi({
+      ...REFERENCE_ROUTES,
+      'GET /api/employees/facets': employeeFacets(),
+      'GET /api/employees': () =>
+        Response.json({
+          items: Array.from({ length: 1001 }, (_, index) =>
+            employeeItem({ id: index + 1, firstName: `Person${index + 1}`, lastName: 'Test' }),
+          ),
+          total: 1001,
+          limit: 50,
+          offset: 0,
+        }),
+    });
+    renderWithQuery(<EmployeesPage today="2026-10-19" />);
+    await screen.findByRole('link', { name: 'Person1 Test' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
 
-    await waitFor(() => {
-      expect(calls.some((call) => call.url.pathname.endsWith('/preview'))).toBe(true);
-    });
-    expect(calls.find((call) => call.url.pathname.endsWith('/preview'))?.body).toEqual({
-      employeeIds: [1],
-      percentageBp: 500,
-    });
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    expect(within(bar).getByText('Pick up to 1,000 people, or select all matching.')).toBeDefined();
+    expect(within(bar).getByRole('button', { name: 'Apply % increase' })).toHaveProperty(
+      'disabled',
+      true,
+    );
   });
 });

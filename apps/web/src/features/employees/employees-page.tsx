@@ -1,6 +1,5 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -10,9 +9,8 @@ import { Chip } from '@/components/ui/chip';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsDesktop } from '@/hooks/use-is-desktop';
-import { todayUtc } from '@/lib/clock';
+import { bulkRevisionHref, MAX_PICKED_IDS } from '@/features/bulk-revision/selection';
 import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
-import { BulkRevisionPanel, type BulkTarget } from './bulk-revision-panel';
 import { ColumnsMenu } from './columns-menu';
 import { EmployeeFilterPanel } from './employee-filter-panel';
 import {
@@ -26,7 +24,6 @@ import { NewEmployeeSheet } from './new-employee-sheet';
 import {
   DEFAULT_FILTERS,
   PAGE_SIZES,
-  bulkFilterFrom,
   filterChips,
   filtersFromParams,
   hasActiveFilters,
@@ -111,7 +108,6 @@ function TableSkeleton() {
 export function EmployeesPage({ today }: { today?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const isDesktop = useIsDesktop();
   const countries = useCountries().data;
   const departments = useDepartments().data;
@@ -125,7 +121,6 @@ export function EmployeesPage({ today }: { today?: string }) {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
-  const [bulkOpen, setBulkOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(ALL_COLUMNS_VISIBLE);
 
   const clearSelection = useCallback(() => {
@@ -181,42 +176,11 @@ export function EmployeesPage({ today }: { today?: string }) {
     setSelectedIds(next);
   }
 
-  const bulkTarget: BulkTarget = allMatching
-    ? { filter: bulkFilterFrom(filters) }
-    : { employeeIds: [...selectedIds] };
+  const tooManyPicked = !allMatching && selectedIds.size > MAX_PICKED_IDS;
 
-  const defaultNote = allMatching
-    ? [
-        ...filters.department.map(
-          (id) => departments?.find((department) => department.id === id)?.name,
-        ),
-        ...filters.level.map((id) => levels?.find((level) => level.id === id)?.code),
-        ...filters.country.map((code) => countries?.find((country) => country.code === code)?.name),
-      ]
-        .filter(Boolean)
-        .join(', ') || 'All matching employees'
-    : 'Selected employees';
-
-  if (bulkOpen) {
-    return (
-      <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-semibold text-text-primary">Employees</h1>
-        <BulkRevisionPanel
-          target={bulkTarget}
-          defaultNote={defaultNote}
-          today={today ?? todayUtc()}
-          onClose={() => {
-            setBulkOpen(false);
-          }}
-          onDone={() => {
-            setBulkOpen(false);
-            clearSelection();
-            setSelectMode(false);
-            void queryClient.invalidateQueries({ queryKey: ['employees'] });
-            void queryClient.invalidateQueries({ queryKey: ['insights'] });
-          }}
-        />
-      </div>
+  function openBulkRevision() {
+    router.push(
+      bulkRevisionHref(paramsText, allMatching ? { all: true } : { ids: [...selectedIds] }),
     );
   }
 
@@ -300,12 +264,16 @@ export function EmployeesPage({ today }: { today?: string }) {
               <Button variant="ghost" size="sm" onClick={clearSelection}>
                 Clear
               </Button>
+              {tooManyPicked && (
+                <span className="ml-auto text-text-secondary">
+                  Pick up to 1,000 people, or select all matching.
+                </span>
+              )}
               <Button
                 size="sm"
-                className="ml-auto"
-                onClick={() => {
-                  setBulkOpen(true);
-                }}
+                className={tooManyPicked ? undefined : 'ml-auto'}
+                disabled={tooManyPicked}
+                onClick={openBulkRevision}
               >
                 Apply % increase
               </Button>

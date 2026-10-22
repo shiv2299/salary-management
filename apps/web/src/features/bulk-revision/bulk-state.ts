@@ -25,39 +25,6 @@ export function resolveNewAmount(
   return { amountMinor: typed, overridden: true, valid: typed > item.currentAmountMinor };
 }
 
-export interface BulkSummary {
-  count: number;
-  overriddenCount: number;
-  invalidCount: number;
-  /** Exact sums of new minus current within each currency; the browser never converts. */
-  increaseByCurrency: { currencyCode: string; increaseMinor: bigint }[];
-}
-
-export function summarize(items: BulkPreviewItem[], overrides: Overrides): BulkSummary {
-  let overriddenCount = 0;
-  let invalidCount = 0;
-  const totals = new Map<string, bigint>();
-  for (const item of items) {
-    const resolved = resolveNewAmount(item, overrides[item.employeeId]);
-    if (resolved.overridden) overriddenCount += 1;
-    if (!resolved.valid) {
-      invalidCount += 1;
-      continue;
-    }
-    const increase = BigInt(resolved.amountMinor) - BigInt(item.currentAmountMinor);
-    totals.set(item.currencyCode, (totals.get(item.currencyCode) ?? 0n) + increase);
-  }
-  return {
-    count: items.length,
-    overriddenCount,
-    invalidCount,
-    increaseByCurrency: [...totals].map(([currencyCode, increaseMinor]) => ({
-      currencyCode,
-      increaseMinor,
-    })),
-  };
-}
-
 export function buildConfirmBody(
   items: BulkPreviewItem[],
   overrides: Overrides,

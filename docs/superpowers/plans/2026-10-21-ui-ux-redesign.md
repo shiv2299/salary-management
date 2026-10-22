@@ -22,6 +22,7 @@
   - injected clock and RNG in tests.
 - The browser never converts currencies and never applies a percentage to money. Integer subtraction or summing within one currency is allowed.
 - Docs first: a task that changes behaviour covered by `docs/design.md`, `docs/requirements.md`, `docs/architecture.md` or `docs/decisions.md` updates that doc in the same task. Decision entries use the existing "Alternatives considered / Chosen / Why" form.
+- Repository text (docs, comments, commit messages) reads as a real product's own documentation: it describes the product and its decisions, never the circumstances of its development.
 - Conventional Commits, small commits. Each commit message ends with the trailer line `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push, force-push or rewrite history.
 - Add a dependency only with a stated reason in the commit message.
 - The visual language is "Refined classic" (spec §4). Reuse shared building blocks rather than restyling per screen.

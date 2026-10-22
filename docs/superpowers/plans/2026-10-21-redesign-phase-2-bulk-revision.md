@@ -26,6 +26,7 @@ Copied verbatim from the overview plan (apply to every task):
   - injected clock and RNG in tests.
 - The browser never converts currencies and never applies a percentage to money. Integer subtraction or summing within one currency is allowed.
 - Docs first: a task that changes behaviour covered by `docs/design.md`, `docs/requirements.md`, `docs/architecture.md` or `docs/decisions.md` updates that doc in the same task. Decision entries use the existing "Alternatives considered / Chosen / Why" form.
+- Repository text (docs, comments, commit messages) reads as a real product's own documentation: it describes the product and its decisions, never the circumstances of its development.
 - Conventional Commits, small commits. Each commit message ends with the trailer line `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push, force-push or rewrite history.
 - Add a dependency only with a stated reason in the commit message.
 - The visual language is "Refined classic" (spec §4). Reuse shared building blocks rather than restyling per screen.
@@ -134,8 +135,8 @@ FR-4: append "Before confirming, the HR Manager sees what the revision adds to a
 
 - [ ] **Step 5: Check wording and formatting**
 
-Run: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH" && grep -niE "hiring|assess|client|brief|reviewer|clarif|exercise" docs/design.md docs/decisions.md docs/requirements.md docs/architecture.md; npm run format:check`
-Expected: grep prints nothing; Prettier reports all files formatted.
+Run: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH" && npm run format:check`, and reread the added lines against the wording rule in the Global Constraints.
+Expected: Prettier reports all files formatted; no added line breaks the wording rule.
 
 - [ ] **Step 6: Commit**
 

@@ -4,7 +4,7 @@ import type { EmployeeDetail } from '@acme/shared';
 import { useState } from 'react';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { formatChangeBp } from '@/lib/money';
-import { REASON_LABELS } from '@/features/insights/recent-changes-panel';
+import { REASON_LABELS } from './reason-labels';
 import { formatDate, useFxAsOfLabel } from '@/features/reference/use-reference';
 import {
   chartLabel,

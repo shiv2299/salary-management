@@ -9,18 +9,11 @@ import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { formatPercentageBp, formatMoney } from '@/lib/money';
 import { formatDate } from '@/features/reference/use-reference';
+import { REASON_LABELS } from '@/features/employees/reason-labels';
 import { Panel, PanelError, RowsSkeleton } from './panel';
 import { useRecentChanges } from './use-insights';
 
 const PAGE_SIZE = 10;
-
-export const REASON_LABELS = {
-  hire: 'Hire',
-  raise: 'Raise',
-  promotion: 'Promotion',
-  relocation: 'Relocation',
-  correction: 'Correction',
-} as const;
 
 function ChangeEntry({ entry }: { entry: RecentChangeEntry }) {
   if (entry.kind === 'batch') {

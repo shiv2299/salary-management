@@ -4,7 +4,7 @@ import type { EmployeeDetail } from '@acme/shared';
 import { Badge } from '@/components/ui/badge';
 import { cn } from 'cn';
 import { formatChangeBp, formatMoney } from '@/lib/money';
-import { REASON_LABELS } from '@/features/insights/recent-changes-panel';
+import { REASON_LABELS } from './reason-labels';
 import { formatDate, useCountries } from '@/features/reference/use-reference';
 
 function changeTone(bp: number): string {

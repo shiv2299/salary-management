@@ -3,7 +3,7 @@
 import type { SalaryHistoryEntry } from '@acme/shared';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatMoney, formatMoneyCompact } from '@/lib/money';
-import { REASON_LABELS } from '@/features/insights/recent-changes-panel';
+import { REASON_LABELS } from './reason-labels';
 import { formatDate } from '@/features/reference/use-reference';
 import {
   promotionLabel,

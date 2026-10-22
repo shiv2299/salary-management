@@ -1,11 +1,13 @@
-import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import { getUser, login, verifySessionToken } from '../services/auth';
 import { createEmployees, deactivateEmployee } from '../services/employees';
 import { bootstrapDatabase } from './bootstrap';
 import { createDatabase, type Db } from './client';
 import { resetDatabase } from './reset';
-import { employees, salaryHistory, salaryRevisionBatches } from './schema';
+import { employees, salaryHistory, salaryRevisionBatches, users } from './schema';
 
 const options = {
   migrationsFolder: resolve(import.meta.dirname, '../../drizzle'),
@@ -85,5 +87,50 @@ describe('resetDatabase', () => {
     const result = await resetDatabase(db, { ...options, hrUser });
 
     expect(result).toMatchObject({ seed: { skipped: false, employees: 50 }, hrUser: 'created' });
+  });
+
+  describe('when a migration fails', () => {
+    let scratch: string | undefined;
+    afterEach(() => {
+      if (scratch) rmSync(scratch, { recursive: true, force: true });
+      scratch = undefined;
+    });
+
+    it('leaves the original employees and users untouched and rejects', async () => {
+      scratch = mkdtempSync(join(tmpdir(), 'reset-test-'));
+      cpSync(options.migrationsFolder, scratch, { recursive: true });
+      writeFileSync(join(scratch, '9999_broken.sql'), 'create table broken (;');
+      const journalPath = join(scratch, 'meta', '_journal.json');
+      const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+        entries: {
+          idx: number;
+          version: string;
+          when: number;
+          tag: string;
+          breakpoints: boolean;
+        }[];
+      };
+      const last = journal.entries[journal.entries.length - 1]!;
+      journal.entries.push({
+        idx: last.idx + 1,
+        version: last.version,
+        when: last.when + 1000,
+        tag: '9999_broken',
+        breakpoints: true,
+      });
+      writeFileSync(journalPath, JSON.stringify(journal));
+
+      const { db } = createDatabase(':memory:');
+      await bootstrapDatabase(db, { ...options, hrUser });
+      const before = dump(db);
+      const usersBefore = db.select().from(users).all();
+
+      await expect(
+        resetDatabase(db, { ...options, migrationsFolder: scratch, hrUser }),
+      ).rejects.toThrow();
+
+      expect(dump(db)).toBe(before);
+      expect(db.select().from(users).all()).toEqual(usersBefore);
+    });
   });
 });

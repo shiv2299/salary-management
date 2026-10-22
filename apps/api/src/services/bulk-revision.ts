@@ -1,4 +1,4 @@
-import type { BulkOverride, BulkSummary } from '@acme/shared';
+import type { BulkOverride, BulkSummary, LatestBulkRevision } from '@acme/shared';
 import type { DbHandle } from '../db/client';
 import { bulkRevisionFigures } from '../domain/bulk-summary';
 import { BASE_CURRENCY, convert } from '../domain/fx';
@@ -13,7 +13,10 @@ import {
   listActiveEmployeeRowsMatching,
 } from '../repositories/employees';
 import { loadLatestFxRates } from '../repositories/fx-rates';
-import { insertSalaryRevisionBatch } from '../repositories/salary-revision-batches';
+import {
+  findLatestSalaryRevisionBatch,
+  insertSalaryRevisionBatch,
+} from '../repositories/salary-revision-batches';
 import { getPeerGroups, type PeerGroup } from './peer-groups';
 import { currencyInForce } from './salary-changes';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
@@ -143,6 +146,21 @@ export function summariseBulkRevision(db: DbHandle, input: BulkSummaryInput): Bu
       overriddenCount: overrideChangeBp.length,
       ...bulkRevisionFigures(figureRows, loadLatestFxRates(db)),
       overrideChangeBp,
+    },
+  };
+}
+
+/** The bulk revision with the latest effective date, shown beside the setup of the next one. */
+export function getLatestBulkRevision(db: DbHandle): LatestBulkRevision {
+  const batch = findLatestSalaryRevisionBatch(db);
+  if (!batch) return { latest: null };
+  return {
+    latest: {
+      batchId: batch.id,
+      effectiveDate: batch.effectiveDate,
+      percentageBp: batch.percentageBp,
+      employeeCount: batch.employeeCount,
+      note: batch.note,
     },
   };
 }

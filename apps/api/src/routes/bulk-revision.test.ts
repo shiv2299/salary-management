@@ -228,3 +228,29 @@ describe('POST /api/employees/bulk-salary-changes', () => {
     expect(response.statusCode).toBe(415);
   });
 });
+
+describe('GET /api/employees/bulk-salary-changes/latest', () => {
+  it('answers with no revision on a fresh database', async () => {
+    const t = await setup();
+
+    const response = await t.app.inject({
+      method: 'GET',
+      url: '/api/employees/bulk-salary-changes/latest',
+      headers: { cookie: await t.loginCookie() },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ latest: null });
+  });
+
+  it('requires a session', async () => {
+    const t = await setup();
+
+    const response = await t.app.inject({
+      method: 'GET',
+      url: '/api/employees/bulk-salary-changes/latest',
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+});

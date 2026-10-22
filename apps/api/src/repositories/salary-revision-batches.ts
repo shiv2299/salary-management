@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { desc, inArray } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import {
   salaryRevisionBatches,
@@ -21,4 +21,14 @@ export function findBatchesByIds(db: DbHandle, ids: number[]): SalaryRevisionBat
     .from(salaryRevisionBatches)
     .where(inArray(salaryRevisionBatches.id, ids))
     .all();
+}
+
+/** The batch with the latest effective date; the most recently created one on a tie. */
+export function findLatestSalaryRevisionBatch(db: DbHandle): SalaryRevisionBatch | undefined {
+  return db
+    .select()
+    .from(salaryRevisionBatches)
+    .orderBy(desc(salaryRevisionBatches.effectiveDate), desc(salaryRevisionBatches.id))
+    .limit(1)
+    .get();
 }

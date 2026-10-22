@@ -58,6 +58,7 @@ export {
   bulkPreviewResponseSchema,
   bulkSummaryBodySchema,
   bulkSummaryResponseSchema,
+  latestBulkRevisionSchema,
   type BulkConfirmBody,
   type BulkConfirmResponse,
   type BulkPreviewBody,
@@ -66,6 +67,7 @@ export {
   type BulkPreviewResponse,
   type BulkSummary,
   type BulkSummaryBody,
+  type LatestBulkRevision,
 } from './bulk-revision';
 export {
   countrySchema,

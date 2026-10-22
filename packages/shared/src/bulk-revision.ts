@@ -125,6 +125,19 @@ export const bulkConfirmResponseSchema = z.object({
   effectiveDate: z.string(),
 });
 
+/** The bulk revision with the latest effective date, or none before the first one. */
+export const latestBulkRevisionSchema = z.object({
+  latest: z
+    .object({
+      batchId: z.number().int(),
+      effectiveDate: z.string(),
+      percentageBp: z.number().int(),
+      employeeCount: z.number().int(),
+      note: z.string().nullable(),
+    })
+    .nullable(),
+});
+
 export type BulkPreviewBody = z.infer<typeof bulkPreviewBodySchema>;
 export type BulkPreviewItem = z.infer<typeof bulkPreviewItemSchema>;
 export type BulkPreviewResponse = z.infer<typeof bulkPreviewResponseSchema>;
@@ -133,3 +146,4 @@ export type BulkConfirmResponse = z.infer<typeof bulkConfirmResponseSchema>;
 export type BulkOverride = z.infer<typeof bulkOverrideSchema>;
 export type BulkSummaryBody = z.infer<typeof bulkSummaryBodySchema>;
 export type BulkSummary = z.infer<typeof bulkSummaryResponseSchema>;
+export type LatestBulkRevision = z.infer<typeof latestBulkRevisionSchema>;

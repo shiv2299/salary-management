@@ -5,6 +5,7 @@ import {
   bulkPreviewResponseSchema,
   bulkSummaryBodySchema,
   bulkSummaryResponseSchema,
+  latestBulkRevisionSchema,
   employeeDetailSchema,
   employeeExportQuerySchema,
   employeeFacetsQuerySchema,
@@ -30,6 +31,7 @@ import {
 } from '../services/employees';
 import {
   confirmBulkRevision,
+  getLatestBulkRevision,
   previewBulkRevision,
   summariseBulkRevision,
 } from '../services/bulk-revision';
@@ -103,6 +105,12 @@ export const employeeRoutes =
             : { filter: filter ?? {}, ...figures },
         );
       },
+    );
+
+    app.get(
+      '/api/employees/bulk-salary-changes/latest',
+      { schema: { response: { 200: latestBulkRevisionSchema } } },
+      () => getLatestBulkRevision(database.db),
     );
 
     app.post(

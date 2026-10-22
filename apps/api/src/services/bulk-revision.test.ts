@@ -2,7 +2,13 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { departments, employees, salaryHistory, salaryRevisionBatches } from '../db/schema';
 import { FIXED_NOW, createTestDb } from '../test/test-db';
-import { confirmBulkRevision, previewBulkRevision, summariseBulkRevision } from './bulk-revision';
+import {
+  confirmBulkRevision,
+  getLatestBulkRevision,
+  previewBulkRevision,
+  summariseBulkRevision,
+} from './bulk-revision';
+import { insertSalaryRevisionBatch } from '../repositories/salary-revision-batches';
 import { createEmployee, deactivateEmployee } from './employees';
 
 // FIXED_NOW is 2026-01-15, so that is "today" for every rule below.
@@ -404,5 +410,37 @@ describe('confirmBulkRevision', () => {
         deps,
       ),
     ).toThrowError(expect.objectContaining({ statusCode: 422 }));
+  });
+});
+
+describe('getLatestBulkRevision', () => {
+  const batch = (effectiveDate: string, note: string | null) =>
+    insertSalaryRevisionBatch(database.db, {
+      createdAt: FIXED_NOW,
+      effectiveDate,
+      percentageBp: 400,
+      employeeCount: 12,
+      note,
+    });
+
+  it('gives the bulk revision with the latest effective date, the newest on a tie', () => {
+    batch('2025-04-01', 'Annual increment 2025');
+    batch('2024-04-01', 'Annual increment 2024');
+
+    expect(getLatestBulkRevision(database.db).latest).toEqual({
+      batchId: 1,
+      effectiveDate: '2025-04-01',
+      percentageBp: 400,
+      employeeCount: 12,
+      note: 'Annual increment 2025',
+    });
+
+    batch('2025-04-01', null);
+
+    expect(getLatestBulkRevision(database.db).latest).toMatchObject({ batchId: 3, note: null });
+  });
+
+  it('gives none before any bulk revision', () => {
+    expect(getLatestBulkRevision(database.db)).toEqual({ latest: null });
   });
 });

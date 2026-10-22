@@ -222,7 +222,7 @@ export function BulkRevisionPage({ today }: { today?: string }) {
         <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>
         <StepIndicator steps={STEPS} current={dialogOpen ? 2 : 1} />
       </header>
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:items-start">
+      <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <BulkSetup
           target={target}
           listParams={listParams}

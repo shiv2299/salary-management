@@ -249,51 +249,55 @@ export function BulkReview({
       ) : (
         <div className={preview.isPlaceholderData ? 'opacity-60' : undefined}>
           {isDesktop ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead numeric>Current</TableHead>
-                  <TableHead numeric>New salary</TableHead>
-                  <TableHead numeric>Change</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageRows.map((item) => {
-                  const edited = resolveNewAmount(item, overrides[item.employeeId]).overridden;
-                  return (
-                    <TableRow key={item.employeeId}>
-                      <TableCell className="h-auto">
-                        <span className="flex items-center gap-2">
-                          <Avatar name={fullName(item)} />
-                          <span className="flex flex-col">
-                            <span className="font-medium text-text-primary">{fullName(item)}</span>
-                            <PeerTag item={item} />
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead numeric>Current</TableHead>
+                    <TableHead numeric>New salary</TableHead>
+                    <TableHead numeric>Change</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pageRows.map((item) => {
+                    const edited = resolveNewAmount(item, overrides[item.employeeId]).overridden;
+                    return (
+                      <TableRow key={item.employeeId}>
+                        <TableCell className="h-auto">
+                          <span className="flex items-center gap-2">
+                            <Avatar name={fullName(item)} />
+                            <span className="flex flex-col">
+                              <span className="font-medium text-text-primary">
+                                {fullName(item)}
+                              </span>
+                              <PeerTag item={item} />
+                            </span>
                           </span>
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-text-primary">{item.departmentName}</TableCell>
-                      <TableCell numeric className="text-text-primary">
-                        <span className="flex flex-col items-end">
-                          {formatMoney(item.currentAmountMinor, item.currencyCode)}
-                          {usdOf(item.currentAmountBaseMinor, item)}
-                        </span>
-                      </TableCell>
-                      <TableCell numeric className="h-auto">
-                        <span className="flex items-start justify-end gap-2">
-                          {!edited ? usdOf(item.proposedAmountBaseMinor, item) : null}
-                          {cell(item)}
-                        </span>
-                      </TableCell>
-                      <TableCell numeric className="text-positive">
-                        {changeText(item)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                        <TableCell className="text-text-primary">{item.departmentName}</TableCell>
+                        <TableCell numeric className="text-text-primary">
+                          <span className="flex flex-col items-end">
+                            {formatMoney(item.currentAmountMinor, item.currencyCode)}
+                            {usdOf(item.currentAmountBaseMinor, item)}
+                          </span>
+                        </TableCell>
+                        <TableCell numeric className="h-auto">
+                          <span className="flex items-start justify-end gap-2">
+                            {!edited ? usdOf(item.proposedAmountBaseMinor, item) : null}
+                            {cell(item)}
+                          </span>
+                        </TableCell>
+                        <TableCell numeric className="text-positive">
+                          {changeText(item)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <ul className="flex flex-col">
               {pageRows.map((item) => (

@@ -59,7 +59,7 @@ function PeerTag({ item }: { item: BulkPreviewItem }) {
   );
 }
 
-function RetryAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function RetryAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div role="alert" className="flex items-center gap-3 text-sm text-negative">
       <span>{message}</span>

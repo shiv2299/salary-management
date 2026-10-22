@@ -901,6 +901,35 @@ describe('BulkRevisionPage confirmation', () => {
     ).toBe('120000');
   });
 
+  it('says in the dialog why Apply is disabled when the totals fail, and retries them', async () => {
+    let fail = true;
+    stubBulk({
+      [SUMMARY]: (_, init) => {
+        if (
+          (JSON.parse(init.body as string) as { percentageBp?: number }).percentageBp === undefined
+        ) {
+          return Response.json(bulkSummary({ revision: null }));
+        }
+        return fail ? apiError(500, 'INTERNAL', 'Server error') : Response.json(bulkSummary());
+      },
+    });
+    render();
+    choose('7');
+    expect(await screen.findByText('Could not update the totals.', {}, WAIT)).toBeDefined();
+    openDialog();
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm salary revision' });
+    const apply = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Apply 2 raises' });
+    expect(apply.disabled).toBe(true);
+    expect(within(dialog).getByRole('alert').textContent).toContain('Could not update the totals.');
+    fail = false;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    expect(await within(dialog).findByText('+$14,000.00', {}, WAIT)).toBeDefined();
+    await waitFor(() => {
+      expect(apply.disabled).toBe(false);
+    }, WAIT);
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+  });
+
   it('shows the broken rule inside the dialog without reloading the preview', async () => {
     let previews = 0;
     stubBulk({

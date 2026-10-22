@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { formatPercentageBp } from '@/lib/money';
 import { formatDate } from '@/features/reference/use-reference';
+import { RetryAlert } from './bulk-review';
 import { addedPayrollText } from './figures-text';
 
 export interface ConfirmDialogProps {
@@ -17,6 +18,9 @@ export interface ConfirmDialogProps {
   revision: NonNullable<BulkSummary['revision']> | undefined;
   /** The preview and the summary both answer the current inputs, so what is shown is what applies. */
   figuresCurrent: boolean;
+  /** The totals failed; says why Apply is disabled and offers a retry. */
+  summaryFailed: boolean;
+  onRetrySummary: () => void;
   pending: boolean;
   error: string | null;
   onApply: () => void;
@@ -62,6 +66,9 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
           </Row>
           {props.note.trim() !== '' ? <Row label="Note">{props.note}</Row> : null}
         </dl>
+        {props.summaryFailed ? (
+          <RetryAlert message="Could not update the totals." onRetry={props.onRetrySummary} />
+        ) : null}
         {props.error ? (
           <p role="alert" className="text-sm text-negative">
             {props.error}

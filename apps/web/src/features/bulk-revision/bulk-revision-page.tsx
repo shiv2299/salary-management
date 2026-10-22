@@ -283,6 +283,10 @@ export function BulkRevisionPage({ today }: { today?: string }) {
           note={note}
           revision={summary.data?.revision ?? undefined}
           figuresCurrent={previewCurrent && summaryCurrent}
+          summaryFailed={summary.isError}
+          onRetrySummary={() => {
+            void summary.refetch();
+          }}
           pending={confirm.isPending}
           error={confirmError}
           onApply={apply}

@@ -1,18 +1,23 @@
 import { MIGRATIONS_FOLDER, loadConfig } from '../config';
 import { bootstrapDatabase } from './bootstrap';
 import { createDatabase } from './client';
+import { resetDatabase } from './reset';
 
 // The CLI reads the clock for the reference date, which defaults to today.
 // SEED_REFERENCE_DATE / SEED_RNG_SEED pin both inputs for a reproducible dataset.
 const rngSeed = Number(process.env.SEED_RNG_SEED ?? 42);
 const referenceDate = process.env.SEED_REFERENCE_DATE ?? new Date().toISOString().slice(0, 10);
 
+const reset = process.argv.includes('--reset');
+
 const config = loadConfig();
 const database = createDatabase(config.DATABASE_PATH);
 
 try {
+  if (reset) console.log(`Resetting the database at ${config.DATABASE_PATH}.`);
   const started = performance.now();
-  const result = await bootstrapDatabase(database.db, {
+  const run = reset ? resetDatabase : bootstrapDatabase;
+  const result = await run(database.db, {
     migrationsFolder: MIGRATIONS_FOLDER,
     referenceDate,
     rngSeed,

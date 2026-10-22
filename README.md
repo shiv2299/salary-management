@@ -17,6 +17,8 @@ npm run dev
 
 The first start migrates the database and seeds 10,000 demo employees, which takes about 15 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
 
+**Starting over.** `npm run db:reset -w @acme/api` drops every table, applies the migrations and seeds a fresh dataset, keeping the HR login (its email, password and any open session). Stop the API first. Run it after pulling a change to the schema or the seed: nothing wipes the database automatically, and the start-up seed does nothing once employees exist. With Docker, remove the volume instead (`docker volume rm salary-data`) and start the container again.
+
 - Web: http://localhost:3000 (proxies `/api/*` to the API)
 - API: http://localhost:3001, health at `/api/health`
 
@@ -24,16 +26,18 @@ The first start migrates the database and seeds 10,000 demo employees, which tak
 
 Run from the repo root.
 
-| Command                            | Purpose                     |
-| ---------------------------------- | --------------------------- |
-| `npm run dev`                      | API and web together        |
-| `npm run build`                    | Build every workspace       |
-| `npm run lint`                     | ESLint (type-aware)         |
-| `npm run typecheck`                | TypeScript, all workspaces  |
-| `npm test`                         | Vitest, all workspaces      |
-| `npm run format` / `format:check`  | Prettier                    |
-| `npm run db:generate -w @acme/api` | Generate Drizzle migrations |
-| `npm run db:migrate -w @acme/api`  | Apply Drizzle migrations    |
+| Command                            | Purpose                                                         |
+| ---------------------------------- | --------------------------------------------------------------- |
+| `npm run dev`                      | API and web together                                            |
+| `npm run build`                    | Build every workspace                                           |
+| `npm run lint`                     | ESLint (type-aware)                                             |
+| `npm run typecheck`                | TypeScript, all workspaces                                      |
+| `npm test`                         | Vitest, all workspaces                                          |
+| `npm run format` / `format:check`  | Prettier                                                        |
+| `npm run db:generate -w @acme/api` | Generate Drizzle migrations                                     |
+| `npm run db:migrate -w @acme/api`  | Apply Drizzle migrations                                        |
+| `npm run db:seed -w @acme/api`     | Migrate and seed an empty database, without starting the server |
+| `npm run db:reset -w @acme/api`    | Drop all data, migrate and seed again, keeping the HR login     |
 
 ## Production build
 

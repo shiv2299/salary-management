@@ -17,3 +17,13 @@ export function insertUser(db: DbHandle, user: NewUser): number {
 export function countUsers(db: DbHandle): number {
   return db.select({ value: count() }).from(users).get()?.value ?? 0;
 }
+
+export function listUsers(db: DbHandle): User[] {
+  return db.select().from(users).orderBy(users.id).all();
+}
+
+/** Inserts users with their ids and password hashes as given. */
+export function insertUsers(db: DbHandle, rows: User[]): void {
+  if (rows.length === 0) return;
+  db.insert(users).values(rows).run();
+}

@@ -52,10 +52,12 @@ function daysBetween(from: string, to: string): number {
 
 describe('seed', () => {
   let small: ReturnType<typeof seeded>;
+  let large: ReturnType<typeof seeded>;
 
   beforeAll(() => {
     small = seeded();
-  });
+    large = seeded({ employeeCount: 2000 });
+  }, 60_000);
 
   it('creates 3 countries, 7 departments, 6 levels and one FX rate per non-USD currency', () => {
     const { db } = small;
@@ -188,7 +190,7 @@ describe('seed', () => {
     }
   });
 
-  it('only gives a bulk revision to employees hired before its effective date', () => {
+  it('only gives a bulk revision to employees hired at least 180 days before it', () => {
     const hireDates = new Map(
       small.db
         .select()
@@ -198,34 +200,60 @@ describe('seed', () => {
     );
     for (const row of small.db.select().from(salaryHistory).all()) {
       if (row.batchId !== null)
-        expect(hireDates.get(row.employeeId)! < row.effectiveDate).toBe(true);
+        expect(
+          daysBetween(hireDates.get(row.employeeId)!, row.effectiveDate),
+        ).toBeGreaterThanOrEqual(180);
     }
   });
 
-  it('runs one increment cycle per year over the last five years', () => {
-    const dates = new Set(
-      small.db
-        .select()
-        .from(salaryRevisionBatches)
-        .all()
-        .map((b) => b.effectiveDate),
-    );
-    expect(dates.size).toBe(5);
+  it('runs one increment cycle a year for the last ten years', () => {
+    const dates = [
+      ...new Set(
+        small.db
+          .select()
+          .from(salaryRevisionBatches)
+          .all()
+          .map((b) => b.effectiveDate),
+      ),
+    ].sort();
+    expect(dates).toEqual([
+      '2017-05-03',
+      '2018-05-03',
+      '2019-05-03',
+      '2020-05-02',
+      '2021-05-02',
+      '2022-05-02',
+      '2023-05-02',
+      '2024-05-01',
+      '2025-05-01',
+      '2026-05-01',
+    ]);
   });
 
-  it('has salary changes in both the last three years and years three to five', () => {
-    const rows = small.db
+  it('has salary changes in every one of the last ten years', () => {
+    const ages = small.db
       .select()
       .from(salaryHistory)
       .all()
-      .filter((r) => r.reason !== 'hire');
-    const recent = rows.filter((r) => daysBetween(r.effectiveDate, REFERENCE_DATE) <= 3 * 365);
-    const older = rows.filter((r) => {
-      const age = daysBetween(r.effectiveDate, REFERENCE_DATE);
-      return age > 3 * 365 && age <= 5 * 365;
-    });
-    expect(recent.length).toBeGreaterThan(0);
-    expect(older.length).toBeGreaterThan(0);
+      .filter((r) => r.reason !== 'hire')
+      .map((r) => daysBetween(r.effectiveDate, REFERENCE_DATE));
+    for (let year = 0; year < 10; year++) {
+      expect(ages.some((age) => age > year * 365 && age <= (year + 1) * 365)).toBe(true);
+    }
+  });
+
+  it('gives individual changes to people in their early years, not only in the last five', () => {
+    const old = small.db
+      .select()
+      .from(salaryHistory)
+      .all()
+      .filter(
+        (r) =>
+          r.batchId === null &&
+          r.reason !== 'hire' &&
+          daysBetween(r.effectiveDate, REFERENCE_DATE) > 5 * 365,
+      );
+    expect(old.length).toBeGreaterThan(0);
   });
 
   it('includes promotions that raise the level and relocations that change country and currency', () => {
@@ -280,7 +308,7 @@ describe('seed', () => {
   });
 
   it('puts between 1% and 2.5% of active employees outside their country and level fences', () => {
-    const { db } = seeded({ employeeCount: 2000 });
+    const { db } = large;
     const active = db
       .select()
       .from(employees)

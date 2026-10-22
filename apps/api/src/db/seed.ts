@@ -1,5 +1,5 @@
 import { Faker, de, en, en_IN } from '@faker-js/faker';
-import { convert, type FxRates } from '../domain/fx';
+import { convert } from '../domain/fx';
 import { currencyExponent } from '../domain/money';
 import { proposedAmount } from '../domain/revision';
 import { insertCountries, listCountries } from '../repositories/countries';
@@ -11,6 +11,32 @@ import { insertSalaryRevisionBatch } from '../repositories/salary-revision-batch
 import { createEmployees, type NewEmployeeInput } from '../services/employees';
 import { applySalaryChanges, type SalaryChange } from '../services/salary-writer';
 import type { DbHandle } from './client';
+import {
+  COUNTRIES,
+  DEPARTMENTS,
+  ENTRY_PAY_MAJOR,
+  EVENT_BLOCK_DAYS,
+  CYCLE_COUNT,
+  FIRST_CYCLE_DAYS_BEFORE_REFERENCE,
+  FX_AS_OF_DATE,
+  FX_RATES,
+  HIRE_BATCH_SIZE,
+  HIRE_SPAN_DAYS,
+  INACTIVE_SHARE,
+  INACTIVE_UPDATE_CHUNK,
+  INDIVIDUAL_EVENT_COUNT_WEIGHTS,
+  INDIVIDUAL_EVENT_KIND_WEIGHTS,
+  INDIVIDUAL_EVENT_KINDS,
+  LEVELS,
+  MARKET_GROWTH_BP,
+  MEAN_CYCLE_BP,
+  MIN_QUIET_DAYS_BEFORE_CYCLE,
+  MIN_TENURE_FOR_CHANGE_DAYS,
+  MIN_TENURE_FOR_CYCLE_DAYS,
+  OUTLIER_SHARE,
+  PAY_SIGMA,
+  WRITE_BATCH_SIZE,
+} from './seed-config';
 
 export interface SeedOptions {
   rngSeed: number;
@@ -26,100 +52,6 @@ export interface SeedResult {
   revisionBatches: number;
   inactiveEmployees: number;
 }
-
-// ---- Reference data -------------------------------------------------------------------------
-
-const COUNTRIES = [
-  { code: 'IN', name: 'India', currencyCode: 'INR', share: 45 },
-  { code: 'US', name: 'United States', currencyCode: 'USD', share: 35 },
-  { code: 'DE', name: 'Germany', currencyCode: 'EUR', share: 20 },
-] as const;
-
-const DEPARTMENTS = [
-  {
-    name: 'Engineering',
-    share: 35,
-    payFactor: 1.06,
-    roles: ['Software Engineer', 'QA Engineer', 'DevOps Engineer', 'Data Engineer'],
-  },
-  {
-    name: 'Sales',
-    share: 18,
-    payFactor: 1.02,
-    roles: ['Account Executive', 'Sales Development Rep', 'Solutions Consultant'],
-  },
-  {
-    name: 'Marketing',
-    share: 8,
-    payFactor: 1,
-    roles: ['Content Strategist', 'Growth Marketer', 'Brand Designer'],
-  },
-  {
-    name: 'Finance',
-    share: 8,
-    payFactor: 1,
-    roles: ['Financial Analyst', 'Accountant', 'Payroll Specialist'],
-  },
-  {
-    name: 'People/HR',
-    share: 5,
-    payFactor: 0.98,
-    roles: ['Recruiter', 'HR Business Partner', 'People Operations Specialist'],
-  },
-  {
-    name: 'Support',
-    share: 14,
-    payFactor: 0.92,
-    roles: ['Support Specialist', 'Customer Success Manager', 'Technical Support Engineer'],
-  },
-  {
-    name: 'Operations',
-    share: 12,
-    payFactor: 0.95,
-    roles: ['Operations Analyst', 'Program Manager', 'Logistics Coordinator'],
-  },
-] as const;
-
-const LEVELS = [
-  { code: 'L1', label: 'Entry', rank: 1, share: 24 },
-  { code: 'L2', label: 'Associate', rank: 2, share: 28 },
-  { code: 'L3', label: 'Senior', rank: 3, share: 22 },
-  { code: 'L4', label: 'Lead', rank: 4, share: 14 },
-  { code: 'L5', label: 'Principal', rank: 5, share: 8 },
-  { code: 'L6', label: 'Director', rank: 6, share: 4 },
-] as const;
-
-/** Fixed, dated rates: the value of one major unit in USD times 10^9. */
-const FX_AS_OF_DATE = '2026-01-01';
-const FX_RATES: FxRates = { INR: 11_980_000, EUR: 1_080_000_000 };
-
-/** Median annual base pay in whole major units of each country's currency, by level rank 1..6. */
-const MEDIAN_PAY_MAJOR: Record<string, readonly number[]> = {
-  IN: [600_000, 1_000_000, 1_800_000, 3_000_000, 5_000_000, 8_500_000],
-  US: [70_000, 90_000, 120_000, 155_000, 195_000, 250_000],
-  DE: [42_000, 55_000, 70_000, 88_000, 110_000, 145_000],
-};
-
-// ---- Generation knobs -----------------------------------------------------------------------
-
-const HIRE_SPAN_DAYS = 3650;
-const CHANGE_WINDOW_DAYS = 1825;
-const CYCLE_COUNT = 5;
-const FIRST_CYCLE_DAYS_BEFORE_REFERENCE = 60;
-const PAY_SIGMA = 0.12;
-const OUTLIER_SHARE = 0.011;
-const INACTIVE_SHARE = 0.04;
-const MIN_TENURE_FOR_CYCLE_DAYS = 365;
-const MIN_QUIET_DAYS_BEFORE_CYCLE = 120;
-const MIN_TENURE_FOR_CHANGE_DAYS = 180;
-const MEAN_CYCLE_BP = 450;
-const HIRE_BATCH_SIZE = 1000;
-const WRITE_BATCH_SIZE = 1000;
-const INACTIVE_UPDATE_CHUNK = 500;
-
-const INDIVIDUAL_EVENT_COUNT_WEIGHTS = [55, 30, 12, 3];
-const INDIVIDUAL_EVENT_KINDS = ['raise', 'promotion', 'relocation'] as const;
-const INDIVIDUAL_EVENT_KIND_WEIGHTS = [71, 25, 4];
 
 // ---- Pure helpers (dates, randomness) -------------------------------------------------------
 
@@ -173,8 +105,8 @@ function createRng(rngSeed: number) {
 
 type Rng = ReturnType<typeof createRng>;
 
-function medianPayMinor(countryCode: string, currencyCode: string, rank: number): number {
-  return MEDIAN_PAY_MAJOR[countryCode]![rank - 1]! * 10 ** currencyExponent(currencyCode);
+function entryPayMinor(countryCode: string, currencyCode: string, rank: number): number {
+  return ENTRY_PAY_MAJOR[countryCode]![rank - 1]! * 10 ** currencyExponent(currencyCode);
 }
 
 // ---- Seed -----------------------------------------------------------------------------------
@@ -199,7 +131,7 @@ interface PlannedEvent {
 
 /**
  * Seeds an empty database (architecture §6): reference data, employees with their hire rows,
- * then five years of salary history. Everything random comes from `rngSeed`, every date is an
+ * then ten years of salary history. Everything random comes from `rngSeed`, every date is an
  * offset from `referenceDate`, and every write goes through the service layer, so the same two
  * inputs always produce the same rows. Does nothing if any employee already exists.
  */
@@ -280,16 +212,13 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
         const currencyCode = currencyOf.get(countryCode)!;
         const hireDate = addDays(referenceDate, -rng.int(1, HIRE_SPAN_DAYS));
 
-        // Hire pay is discounted by the raises the increment cycles will add, so current pay
-        // (not hire pay) is what sits around the level's median.
-        const cyclesAfterHire = cycleDates.filter(
-          (d) => daysBetween(hireDate, d) >= MIN_TENURE_FOR_CYCLE_DAYS,
-        ).length;
+        // Hire pay is what the market paid at the hire date: today's entry pay, discounted by
+        // the market's yearly growth since, so long-tenured staff end up above recent hires.
         let major =
-          MEDIAN_PAY_MAJOR[countryCode]![rank - 1]! *
+          ENTRY_PAY_MAJOR[countryCode]![rank - 1]! *
           payFactorByDepartmentId.get(departmentId)! *
           Math.exp(PAY_SIGMA * rng.truncatedNormal()) *
-          (1 + MEAN_CYCLE_BP / 10_000) ** -cyclesAfterHire;
+          (1 + MARKET_GROWTH_BP / 10_000) ** -(daysBetween(hireDate, referenceDate) / 365);
         if (rng.float() < OUTLIER_SHARE) {
           major *= rng.float() < 0.6 ? 1.9 + rng.float() * 0.7 : 0.4 + rng.float() * 0.15;
         }
@@ -333,7 +262,7 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
     }
 
     // ---- Individual changes, planned up front and applied in date order among the cycles.
-    const events = planIndividualEvents(rng, workers, referenceDate);
+    const events = planIndividualEvents(rng, workers);
 
     let buffer: SalaryChange[] = [];
     const flush = () => {
@@ -417,16 +346,17 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
 }
 
 /** Plans each employee's individual changes, sorted by date. */
-function planIndividualEvents(rng: Rng, people: Worker[], reference: string): PlannedEvent[] {
+function planIndividualEvents(rng: Rng, people: Worker[]): PlannedEvent[] {
   const planned: PlannedEvent[] = [];
   for (const worker of people) {
-    const count = rng.weighted([0, 1, 2, 3], INDIVIDUAL_EVENT_COUNT_WEIGHTS);
-    const windowStart = [
-      addDays(worker.hireDate, MIN_TENURE_FOR_CHANGE_DAYS),
-      addDays(reference, -CHANGE_WINDOW_DAYS),
-    ].reduce((a, b) => (a > b ? a : b));
+    const windowStart = addDays(worker.hireDate, MIN_TENURE_FOR_CHANGE_DAYS);
     const windowEnd = worker.endDate;
     if (windowStart > windowEnd) continue;
+
+    const blocks = Math.max(1, Math.round(daysBetween(windowStart, windowEnd) / EVENT_BLOCK_DAYS));
+    let count = 0;
+    for (let b = 0; b < blocks; b++)
+      count += rng.weighted([0, 1, 2, 3], INDIVIDUAL_EVENT_COUNT_WEIGHTS);
 
     for (let i = 0; i < count; i++) {
       planned.push({
@@ -454,8 +384,8 @@ function buildIndividualChange(
 
   if (event.kind === 'promotion' && worker.rank < LEVELS.length) {
     const ratio =
-      MEDIAN_PAY_MAJOR[worker.countryCode]![worker.rank]! /
-      MEDIAN_PAY_MAJOR[worker.countryCode]![worker.rank - 1]!;
+      ENTRY_PAY_MAJOR[worker.countryCode]![worker.rank]! /
+      ENTRY_PAY_MAJOR[worker.countryCode]![worker.rank - 1]!;
     worker.rank += 1;
     worker.amountMinor = Math.round(worker.amountMinor * ratio * (1 + rng.float() * 0.05));
     return {
@@ -474,13 +404,13 @@ function buildIndividualChange(
     // employee keeps their position within the peer range), with some variation, so a
     // relocation does not by itself make anyone a statistical outlier.
     const sourceMedianInDestination = convert(
-      medianPayMinor(worker.countryCode, currencyCode, worker.rank),
+      entryPayMinor(worker.countryCode, currencyCode, worker.rank),
       currencyCode,
       destination.currencyCode,
       FX_RATES,
     );
     const marketPull =
-      medianPayMinor(destination.code, destination.currencyCode, worker.rank) /
+      entryPayMinor(destination.code, destination.currencyCode, worker.rank) /
       sourceMedianInDestination;
     worker.countryCode = destination.code;
     worker.amountMinor = Math.round(converted * marketPull * (0.95 + rng.float() * 0.1));

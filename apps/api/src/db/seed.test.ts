@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { percentChangeBp } from '../domain/revision';
 import {
   computeDistribution,
   isOutlier,
@@ -44,6 +45,25 @@ function dump(db: ReturnType<typeof freshDb>): string {
     db.select().from(salaryHistory).orderBy(salaryHistory.id).all(),
     db.select().from(salaryRevisionBatches).orderBy(salaryRevisionBatches.id).all(),
   ]);
+}
+
+function promotionUplifts(db: ReturnType<typeof freshDb>): number[] {
+  const ordered = db
+    .select()
+    .from(salaryHistory)
+    .all()
+    .sort(
+      (a, b) =>
+        a.employeeId - b.employeeId ||
+        a.effectiveDate.localeCompare(b.effectiveDate) ||
+        a.id - b.id,
+    );
+  return ordered.flatMap((row, i) => {
+    const before = ordered[i - 1];
+    return row.reason === 'promotion' && before?.employeeId === row.employeeId
+      ? [percentChangeBp(before.amountMinor, row.amountMinor)]
+      : [];
+  });
 }
 
 function daysBetween(from: string, to: string): number {
@@ -331,5 +351,24 @@ describe('seed', () => {
     const share = outliers / active.length;
     expect(share).toBeGreaterThanOrEqual(0.01);
     expect(share).toBeLessThanOrEqual(0.025);
+  });
+
+  it('raises pay by 10% to 20% on every promotion', () => {
+    const uplifts = promotionUplifts(large.db);
+    expect(uplifts.length).toBeGreaterThan(0);
+    expect(uplifts.every((bp) => bp >= 1000 && bp <= 2000)).toBe(true);
+  });
+
+  it('promotes between 5% and 25% of employees at some point', () => {
+    const promoted = new Set(
+      large.db
+        .select()
+        .from(salaryHistory)
+        .all()
+        .filter((r) => r.reason === 'promotion')
+        .map((r) => r.employeeId),
+    );
+    expect(promoted.size / 2000).toBeGreaterThanOrEqual(0.05);
+    expect(promoted.size / 2000).toBeLessThanOrEqual(0.25);
   });
 });

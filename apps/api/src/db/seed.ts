@@ -35,6 +35,7 @@ import {
   MIN_TENURE_FOR_CYCLE_DAYS,
   OUTLIER_SHARE,
   PAY_SIGMA,
+  PROMOTION_UPLIFT_BP,
   WRITE_BATCH_SIZE,
 } from './seed-config';
 
@@ -107,6 +108,22 @@ type Rng = ReturnType<typeof createRng>;
 
 function entryPayMinor(countryCode: string, currencyCode: string, rank: number): number {
   return ENTRY_PAY_MAJOR[countryCode]![rank - 1]! * 10 ** currencyExponent(currencyCode);
+}
+
+/** What the market paid for a level on `date`: today's entry pay, discounted by market growth since. */
+function marketPayMinor(
+  countryCode: string,
+  currencyCode: string,
+  rank: number,
+  departmentPayFactor: number,
+  date: string,
+  referenceDate: string,
+): number {
+  return Math.round(
+    entryPayMinor(countryCode, currencyCode, rank) *
+      departmentPayFactor *
+      (1 + MARKET_GROWTH_BP / 10_000) ** -(daysBetween(date, referenceDate) / 365),
+  );
 }
 
 // ---- Seed -----------------------------------------------------------------------------------
@@ -215,10 +232,16 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
         // Hire pay is what the market paid at the hire date: today's entry pay, discounted by
         // the market's yearly growth since, so long-tenured staff end up above recent hires.
         let major =
-          ENTRY_PAY_MAJOR[countryCode]![rank - 1]! *
-          payFactorByDepartmentId.get(departmentId)! *
-          Math.exp(PAY_SIGMA * rng.truncatedNormal()) *
-          (1 + MARKET_GROWTH_BP / 10_000) ** -(daysBetween(hireDate, referenceDate) / 365);
+          (marketPayMinor(
+            countryCode,
+            currencyCode,
+            rank,
+            payFactorByDepartmentId.get(departmentId)!,
+            hireDate,
+            referenceDate,
+          ) /
+            10 ** currencyExponent(currencyCode)) *
+          Math.exp(PAY_SIGMA * rng.truncatedNormal());
         if (rng.float() < OUTLIER_SHARE) {
           major *= rng.float() < 0.6 ? 1.9 + rng.float() * 0.7 : 0.4 + rng.float() * 0.15;
         }
@@ -276,7 +299,12 @@ export function seed(db: DbHandle, options: SeedOptions): SeedResult {
     let nextEvent = 0;
     const applyEventsBefore = (limit: string | null) => {
       while (nextEvent < events.length && (limit === null || events[nextEvent]!.date < limit)) {
-        const change = buildIndividualChange(rng, events[nextEvent++]!, currencyOf, levelIdByRank);
+        const change = buildIndividualChange(rng, events[nextEvent++]!, {
+          currencyOf,
+          levelIdByRank,
+          payFactorByDepartmentId,
+          referenceDate,
+        });
         if (change) buffer.push(change);
         if (buffer.length >= WRITE_BATCH_SIZE) flush();
       }
@@ -374,20 +402,39 @@ function planIndividualEvents(rng: Rng, people: Worker[]): PlannedEvent[] {
 function buildIndividualChange(
   rng: Rng,
   event: PlannedEvent,
-  currencyOf: Map<string, string>,
-  levelIdByRank: Map<number, number>,
+  context: {
+    currencyOf: Map<string, string>;
+    levelIdByRank: Map<number, number>;
+    payFactorByDepartmentId: Map<number, number>;
+    referenceDate: string;
+  },
 ): SalaryChange | null {
+  const { currencyOf, levelIdByRank, payFactorByDepartmentId, referenceDate } = context;
   const { worker, date } = event;
   const currencyCode = currencyOf.get(worker.countryCode)!;
   const base = { employeeId: worker.id, effectiveDate: date };
   worker.lastChangeDate = date;
 
-  if (event.kind === 'promotion' && worker.rank < LEVELS.length) {
-    const ratio =
-      ENTRY_PAY_MAJOR[worker.countryCode]![worker.rank]! /
-      ENTRY_PAY_MAJOR[worker.countryCode]![worker.rank - 1]!;
+  // A promotion goes only to someone already paid at least the market rate for their level on
+  // that date; anyone below it gets an ordinary raise instead.
+  if (
+    event.kind === 'promotion' &&
+    worker.rank < LEVELS.length &&
+    worker.amountMinor >=
+      marketPayMinor(
+        worker.countryCode,
+        currencyCode,
+        worker.rank,
+        payFactorByDepartmentId.get(worker.departmentId)!,
+        date,
+        referenceDate,
+      )
+  ) {
     worker.rank += 1;
-    worker.amountMinor = Math.round(worker.amountMinor * ratio * (1 + rng.float() * 0.05));
+    worker.amountMinor = proposedAmount(
+      worker.amountMinor,
+      rng.int(PROMOTION_UPLIFT_BP.min, PROMOTION_UPLIFT_BP.max),
+    );
     return {
       ...base,
       reason: 'promotion',

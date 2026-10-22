@@ -66,9 +66,13 @@ export const LEVELS = [
 export const FX_AS_OF_DATE = '2026-01-01';
 export const FX_RATES: FxRates = { INR: 11_980_000, EUR: 1_080_000_000 };
 
-/** A new hire's annual pay in whole major units of each country's currency at each level today, by level rank 1..6. */
+/**
+ * A new hire's annual pay in whole major units of each country's currency at each level today,
+ * by level rank 1..6. India's steps are about 1.35x, like the other countries', so a 10-20%
+ * promotion lands inside the next level's band instead of below it.
+ */
 export const ENTRY_PAY_MAJOR: Record<string, readonly number[]> = {
-  IN: [600_000, 1_000_000, 1_800_000, 3_000_000, 5_000_000, 8_500_000],
+  IN: [800_000, 1_080_000, 1_450_000, 1_950_000, 2_600_000, 3_500_000],
   US: [70_000, 90_000, 120_000, 155_000, 195_000, 250_000],
   DE: [42_000, 55_000, 70_000, 88_000, 110_000, 145_000],
 };
@@ -88,6 +92,8 @@ export const MIN_TENURE_FOR_CHANGE_DAYS = 180;
 export const MEAN_CYCLE_BP = 450;
 /** Entry pay for a level grows this much a year (tunable 200-350). */
 export const MARKET_GROWTH_BP = 300;
+/** A promotion raises pay by a draw from this range, in basis points. */
+export const PROMOTION_UPLIFT_BP = { min: 1000, max: 2000 } as const;
 export const HIRE_BATCH_SIZE = 1000;
 export const WRITE_BATCH_SIZE = 1000;
 export const INACTIVE_UPDATE_CHUNK = 500;

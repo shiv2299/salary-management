@@ -41,6 +41,9 @@ export interface BulkSetupProps {
   target: BulkTarget;
   listParams: URLSearchParams;
   who: BulkSummary | undefined;
+  /** The count failed and nothing is loaded; offers a retry. */
+  whoFailed: boolean;
+  onRetryWho: () => void;
   percentageText: string;
   percentageError: string | null;
   onPercentageText: (text: string) => void;
@@ -56,6 +59,8 @@ export function BulkSetup({
   target,
   listParams,
   who,
+  whoFailed,
+  onRetryWho,
   percentageText,
   percentageError,
   onPercentageText,
@@ -91,9 +96,18 @@ export function BulkSetup({
     <aside aria-label="Setup" className="flex flex-col gap-5 bg-surface p-4">
       <section className="flex flex-col gap-2">
         <SectionLabel>Who</SectionLabel>
-        <p className="text-sm font-medium text-text-primary">
-          {who ? `${plural(who.headcount, 'person', 'people')}, active only` : 'Counting people…'}
-        </p>
+        {whoFailed ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-negative">
+            <span>Could not count the people selected.</span>
+            <Button type="button" variant="outline" size="sm" onClick={onRetryWho}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm font-medium text-text-primary">
+            {who ? `${plural(who.headcount, 'person', 'people')}, active only` : 'Counting people…'}
+          </p>
+        )}
         {chips.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {chips.map((label) => (

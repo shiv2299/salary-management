@@ -3,12 +3,15 @@
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import type { BulkOverride } from '@acme/shared';
 import { StepIndicator } from '@/components/ui/step-indicator';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { todayUtc } from '@/lib/clock';
 import { parsePercentageToBp } from '@/lib/money';
 import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
+import { BulkReview } from './bulk-review';
+import { overridesForSummary, type Overrides } from './bulk-state';
 import { BulkSetup } from './bulk-setup';
 import { bulkDefaultNote, listHrefFrom, selectionFromParams } from './selection';
 import { useBulkPreview, useBulkSummary } from './use-bulk-revision';
@@ -36,8 +39,29 @@ export function BulkRevisionPage({ today }: { today?: string }) {
   const debouncedPercentage = useDebouncedValue(percentageText, DEBOUNCE_MS);
   const percentageBp = parsePercentageToBp(debouncedPercentage);
 
-  useBulkPreview(target, percentageBp);
-  const who = useBulkSummary(target, percentageBp, []).data;
+  const [overrides, setOverrides] = useState<Overrides>({});
+  const onOverride = useCallback((employeeId: number, text: string | undefined) => {
+    setOverrides((current) => {
+      const next = { ...current };
+      if (text === undefined) delete next[employeeId];
+      else next[employeeId] = text;
+      return next;
+    });
+  }, []);
+
+  const preview = useBulkPreview(target, percentageBp);
+  const previewItems = preview.data?.items;
+  // Compared as text so the effect that waits for a pause stays stable.
+  const overridesJson = JSON.stringify(
+    previewItems ? overridesForSummary(previewItems, overrides) : [],
+  );
+  const debouncedOverridesJson = useDebouncedValue(overridesJson, DEBOUNCE_MS);
+  const summaryOverrides = useMemo(
+    () => (percentageBp === null ? [] : (JSON.parse(debouncedOverridesJson) as BulkOverride[])),
+    [debouncedOverridesJson, percentageBp],
+  );
+  const summary = useBulkSummary(target, percentageBp, summaryOverrides);
+  const who = summary.data;
 
   const defaultNote =
     target && countries && departments && levels
@@ -91,6 +115,10 @@ export function BulkRevisionPage({ today }: { today?: string }) {
           target={target}
           listParams={listParams}
           who={who}
+          whoFailed={summary.isError && !summary.data}
+          onRetryWho={() => {
+            void summary.refetch();
+          }}
           percentageText={percentageText}
           percentageError={percentageError}
           onPercentageText={setPercentageText}
@@ -102,7 +130,14 @@ export function BulkRevisionPage({ today }: { today?: string }) {
           onNote={setTypedNote}
         />
         <section aria-label="Review" className="min-w-0 bg-background">
-          <p className="text-sm text-text-secondary">Choose an increase to see the review.</p>
+          <BulkReview
+            preview={preview}
+            summary={summary}
+            summaryOverrides={summaryOverrides}
+            overrides={overrides}
+            onOverride={onOverride}
+            percentageChosen={percentageBp !== null}
+          />
         </section>
       </div>
     </div>

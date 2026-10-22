@@ -451,7 +451,7 @@ The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay b
 
 **Chosen**: deactivating sets `deactivated_on` to today from the injected clock; deactivating someone already inactive keeps it; reactivating clears it. Existing databases are reset with `npm run db:reset -w @acme/api` rather than backfilled, since every database is demo data.
 
-**Why**: a payroll at a past date needs to know who had left by then, and one date per person answers that. Someone who left, came back and left again keeps only the last date, so a past payroll counts them during the gap, which is acceptable for a rare event. A backfill from `updated_at` would write wrong dates into history.
+**Why**: a payroll at a past date, which counts someone when `status` is active or `deactivated_on` is later than that date, needs to know who had left by then, and one date per person answers that. Someone who left, came back and left again keeps only the last date, so a past payroll counts them during the gap, which is acceptable for a rare event. A backfill from `updated_at` would write wrong dates into history.
 
 ## Database reset: an explicit command that keeps the login, never automatic
 

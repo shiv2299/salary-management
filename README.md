@@ -15,7 +15,7 @@ cp apps/api/.env.example apps/api/.env   # sets the HR login; edit the password 
 npm run dev
 ```
 
-The first start migrates the database and seeds 10,000 demo employees, which takes about 15 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
+The first start migrates the database and seeds 10,000 demo employees, which takes about 17 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
 
 **Starting over.** `npm run db:reset -w @acme/api` drops every table, applies the migrations and seeds a fresh dataset, keeping the HR login (its email, password and any open session). Stop the API first. Run it after pulling a change to the schema or the seed: nothing wipes the database automatically, and the start-up seed does nothing once employees exist. With Docker, remove the volume instead (`docker volume rm salary-data`) and start the container again.
 
@@ -76,7 +76,7 @@ docker run -p 3000:3000 -v salary-data:/data --env-file .env salary-management
 | `API_URL`                           | build only | Where the web server forwards `/api/*`. Baked in at build time (`--build-arg API_URL=...`); the default `http://127.0.0.1:3001` is right for this image.   |
 | `LOG_LEVEL`                         | no         | `info` by default.                                                                                                                                         |
 
-- **Seed on boot**: on the first start with an empty database the API migrates and seeds 10,000 demo employees (about 15 seconds before it listens; the health check allows for it). Every later start is an idempotent no-op when employees already exist, so a restart never re-seeds.
+- **Seed on boot**: on the first start with an empty database the API migrates and seeds 10,000 demo employees (about 17 seconds before it listens; the health check allows for it). Every later start is an idempotent no-op when employees already exist, so a restart never re-seeds.
 - **Persistence**: the SQLite file must be on a persistent volume. On a host with an ephemeral filesystem the data would be lost on every deploy, and seed-on-boot would silently replace it with fresh demo data.
 - **HTTPS**: in production the session cookie is `Secure`, so browsers only send it over HTTPS (plain `http://localhost` is exempt). Put the container behind a TLS-terminating proxy or platform router.
 - **Health**: `GET /api/health` is public and returns `{"status":"ok","database":"ok"}`; the image `HEALTHCHECK` calls it through the web server.

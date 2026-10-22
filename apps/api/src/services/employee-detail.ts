@@ -15,6 +15,7 @@ export function getEmployeeDetail(db: DbHandle, id: number) {
 
   return {
     ...toEmployeeListItem(row),
+    deactivatedOn: row.deactivatedOn,
     history: history.map((h) => ({
       id: h.id,
       amountMinor: h.amountMinor,

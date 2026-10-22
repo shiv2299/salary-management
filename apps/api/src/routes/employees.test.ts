@@ -6,8 +6,8 @@ import { createEmployees } from '../services/employees';
 type TestApp = Awaited<ReturnType<typeof createTestApp>>;
 let current: TestApp | undefined;
 
-async function setup() {
-  current = await createTestApp();
+async function setup(options: { now?: () => Date } = {}) {
+  current = await createTestApp(options);
   createEmployees(
     current.database.db,
     ['Ann', 'Bob', 'Cy'].map((firstName, i) => ({
@@ -377,6 +377,14 @@ describe('PATCH /api/employees/:id', () => {
 });
 
 describe('DELETE /api/employees/:id and POST /api/employees/:id/reactivate', () => {
+  it('returns the deactivation date with the employee and clears it on reactivation', async () => {
+    const t = await setup({ now: () => new Date('2026-02-01T09:00:00.000Z') });
+    const deactivated = await send(t, 'DELETE', '/api/employees/1');
+    expect(deactivated.json<{ deactivatedOn: string | null }>().deactivatedOn).toBe('2026-02-01');
+    const reactivated = await send(t, 'POST', '/api/employees/1/reactivate');
+    expect(reactivated.json<{ deactivatedOn: string | null }>().deactivatedOn).toBeNull();
+  });
+
   it('deactivates an employee, who then leaves the default list, and reactivates them', async () => {
     const t = await setup();
 

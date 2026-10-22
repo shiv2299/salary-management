@@ -132,6 +132,7 @@ export const salaryHistoryEntrySchema = z.object({
 });
 
 export const employeeDetailSchema = employeeListItemSchema.extend({
+  deactivatedOn: z.string().nullable(),
   history: z.array(salaryHistoryEntrySchema),
 });
 

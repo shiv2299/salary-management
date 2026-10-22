@@ -166,6 +166,28 @@ describe('createEmployee', () => {
 
 describe('updateEmployee', () => {
   const later = { now: () => '2026-02-01T09:00:00.000Z' };
+  const at = (iso: string) => ({ now: () => iso });
+  const deactivatedOn = (id: number) =>
+    database.db.select().from(employees).where(eq(employees.id, id)).get()?.deactivatedOn;
+
+  it('records the deactivation date from the clock and clears it on reactivation', () => {
+    const id = createEmployee(database.db, input(), deps);
+    expect(deactivatedOn(id)).toBeNull();
+    deactivateEmployee(database.db, id, at('2026-02-01T09:00:00.000Z'));
+    expect(deactivatedOn(id)).toBe('2026-02-01');
+    reactivateEmployee(database.db, id, at('2026-03-01T09:00:00.000Z'));
+    expect(deactivatedOn(id)).toBeNull();
+  });
+
+  it('keeps the first date when an inactive employee is deactivated again, and records a new one after reactivating', () => {
+    const id = createEmployee(database.db, input(), deps);
+    deactivateEmployee(database.db, id, at('2026-02-01T09:00:00.000Z'));
+    deactivateEmployee(database.db, id, at('2026-02-10T09:00:00.000Z'));
+    expect(deactivatedOn(id)).toBe('2026-02-01');
+    reactivateEmployee(database.db, id, at('2026-03-01T09:00:00.000Z'));
+    deactivateEmployee(database.db, id, at('2026-04-15T09:00:00.000Z'));
+    expect(deactivatedOn(id)).toBe('2026-04-15');
+  });
 
   function row(id: number) {
     return database.db.select().from(employees).where(eq(employees.id, id)).get()!;

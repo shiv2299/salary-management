@@ -15,6 +15,13 @@
       "when": 1792584950161,
       "tag": "0001_glossy_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792681720055,
+      "tag": "0002_melted_the_spike",
+      "breakpoints": true
     }
   ]
 }

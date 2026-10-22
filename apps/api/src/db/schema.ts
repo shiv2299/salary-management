@@ -55,6 +55,8 @@ export const employees = sqliteTable(
     jobTitle: text('job_title').notNull(),
     hireDate: text('hire_date').notNull(),
     status: text('status', { enum: EMPLOYEE_STATUSES }).notNull().default('active'),
+    /** The day the employee became inactive (yyyy-mm-dd); null while active. */
+    deactivatedOn: text('deactivated_on'),
     currentAmountMinor: integer('current_amount_minor').notNull(),
     currentCurrencyCode: text('current_currency_code').notNull(),
     currentAmountBaseMinor: integer('current_amount_base_minor').notNull(),

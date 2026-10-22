@@ -1,0 +1,1 @@
+ALTER TABLE `employees` ADD `deactivated_on` text;

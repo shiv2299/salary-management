@@ -325,7 +325,8 @@ export function setEmployeeStatus(
   db: DbHandle,
   id: number,
   status: EmployeeStatus,
+  deactivatedOn: string | null,
   updatedAt: string,
 ): void {
-  db.update(employees).set({ status, updatedAt }).where(eq(employees.id, id)).run();
+  db.update(employees).set({ status, deactivatedOn, updatedAt }).where(eq(employees.id, id)).run();
 }

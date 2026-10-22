@@ -70,6 +70,7 @@ export function employeeItem(overrides: Partial<EmployeeListItem> = {}): Employe
 export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): EmployeeDetail {
   return {
     ...employeeItem(),
+    deactivatedOn: null,
     history: [
       {
         id: 2,

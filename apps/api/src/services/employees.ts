@@ -1,4 +1,5 @@
 import type { DbHandle } from '../db/client';
+import type { Employee } from '../db/schema';
 import { listCountries } from '../repositories/countries';
 import { conflict, notFound, unprocessable } from '../errors';
 import { listDepartments } from '../repositories/departments';
@@ -103,10 +104,10 @@ export function createEmployee(
   });
 }
 
-function requireEmployee(db: DbHandle, id: number): void {
-  if (findEmployeesByIds(db, [id]).length === 0) {
-    throw notFound('EMPLOYEE_NOT_FOUND', `Employee ${id} not found`);
-  }
+function requireEmployee(db: DbHandle, id: number): Employee {
+  const employee = findEmployeesByIds(db, [id])[0];
+  if (!employee) throw notFound('EMPLOYEE_NOT_FOUND', `Employee ${id} not found`);
+  return employee;
 }
 
 /** Edits profile fields only; country, level and salary change through salary changes. */
@@ -138,11 +139,13 @@ export function updateEmployee(
 
 /** Soft delete: the salary history stays, and the employee can be reactivated. */
 export function deactivateEmployee(db: DbHandle, id: number, deps: SalaryWriterDeps): void {
-  requireEmployee(db, id);
-  setEmployeeStatus(db, id, 'inactive', deps.now());
+  const employee = requireEmployee(db, id);
+  if (employee.status === 'inactive') return;
+  const now = deps.now();
+  setEmployeeStatus(db, id, 'inactive', now.slice(0, 10), now);
 }
 
 export function reactivateEmployee(db: DbHandle, id: number, deps: SalaryWriterDeps): void {
   requireEmployee(db, id);
-  setEmployeeStatus(db, id, 'active', deps.now());
+  setEmployeeStatus(db, id, 'active', null, deps.now());
 }

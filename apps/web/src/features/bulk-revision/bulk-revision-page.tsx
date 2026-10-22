@@ -3,18 +3,34 @@
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import type { BulkOverride } from '@acme/shared';
+import { Button } from '@/components/ui/button';
 import { StepIndicator } from '@/components/ui/step-indicator';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { ApiError } from '@/lib/api';
 import { todayUtc } from '@/lib/clock';
 import { parsePercentageToBp } from '@/lib/money';
-import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
+import {
+  formatDate,
+  useCountries,
+  useDepartments,
+  useLevels,
+} from '@/features/reference/use-reference';
 import { BulkReview } from './bulk-review';
-import { overridesForSummary, type Overrides } from './bulk-state';
+import { ConfirmDialog } from './confirm-dialog';
+import {
+  buildConfirmBody,
+  countInvalid,
+  keepUnaffectedOverrides,
+  overridesForSummary,
+  type Overrides,
+} from './bulk-state';
 import { BulkSetup } from './bulk-setup';
 import { bulkDefaultNote, listHrefFrom, selectionFromParams } from './selection';
-import { useBulkPreview, useBulkSummary } from './use-bulk-revision';
+import { useBulkPreview, useBulkSummary, useConfirmBulkRevision } from './use-bulk-revision';
 
 const STEPS = ['Choose people', 'Set increase & review', 'Confirm'];
 const DEBOUNCE_MS = 400;
@@ -80,6 +96,56 @@ export function BulkRevisionPage({ today }: { today?: string }) {
         ? 'Effective date cannot be in the future'
         : null;
 
+  const queryClient = useQueryClient();
+  const confirm = useConfirmBulkRevision();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [applied, setApplied] = useState<{ count: number; effectiveDate: string } | null>(null);
+
+  const invalidCount = previewItems ? countInvalid(previewItems, overrides) : 0;
+  const canReview =
+    preview.data !== undefined &&
+    !preview.isPlaceholderData &&
+    preview.data.items.length > 0 &&
+    invalidCount === 0 &&
+    dateError === null;
+  const summaryCurrent =
+    summary.data !== undefined &&
+    !summary.isPlaceholderData &&
+    !summary.isFetching &&
+    debouncedOverridesJson === overridesJson;
+
+  const openDialog = () => {
+    setConfirmError(null);
+    setDialogOpen(true);
+  };
+
+  const apply = () => {
+    if (!preview.data || percentageBp === null) return;
+    const before = preview.data.items;
+    confirm.mutate(buildConfirmBody(before, overrides, { percentageBp, effectiveDate, note }), {
+      onSuccess: (result) => {
+        setDialogOpen(false);
+        setApplied({ count: result.employeeCount, effectiveDate: result.effectiveDate });
+        for (const key of ['employees', 'insights', 'bulk-revision']) {
+          void queryClient.invalidateQueries({ queryKey: [key] });
+        }
+      },
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 409) {
+          setDialogOpen(false);
+          toast.error('Salaries changed since the preview. The preview has been reloaded.');
+          void preview.refetch().then((result) => {
+            const after = result.data?.items;
+            if (after) setOverrides(keepUnaffectedOverrides(before, after, overrides));
+          });
+          return;
+        }
+        setConfirmError(error.message);
+      },
+    });
+  };
+
   const backLink = (
     <Link
       href={backHref}
@@ -103,12 +169,43 @@ export function BulkRevisionPage({ today }: { today?: string }) {
     );
   }
 
+  if (applied) {
+    return (
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        <header className="flex flex-col items-start gap-2">
+          <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>
+          <StepIndicator steps={STEPS} current={3} />
+        </header>
+        <section className="flex flex-col items-start gap-3">
+          <h2 className="text-lg font-semibold text-text-primary">Revision applied</h2>
+          <p className="text-sm text-text-primary">
+            {`${applied.count} ${applied.count === 1 ? 'raise' : 'raises'} recorded, effective ${formatDate(applied.effectiveDate)}.`}
+          </p>
+          <div className="flex gap-4 text-sm font-medium">
+            <Link
+              href={backHref}
+              className="inline-flex min-h-11 items-center text-primary hover:underline md:min-h-0"
+            >
+              View employees
+            </Link>
+            <Link
+              href="/insights"
+              className="inline-flex min-h-11 items-center text-primary hover:underline md:min-h-0"
+            >
+              View insights
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <header className="flex flex-col items-start gap-2">
         {backLink}
         <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>
-        <StepIndicator steps={STEPS} current={1} />
+        <StepIndicator steps={STEPS} current={dialogOpen ? 2 : 1} />
       </header>
       <div className="flex flex-col gap-4 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:items-start">
         <BulkSetup
@@ -140,6 +237,42 @@ export function BulkRevisionPage({ today }: { today?: string }) {
           />
         </section>
       </div>
+      <footer className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 md:-mx-6 md:flex-row md:items-center md:justify-between md:px-6">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm text-text-secondary">
+            Nothing is saved until you confirm the changes.
+          </p>
+          {invalidCount > 0 ? (
+            <p className="text-sm text-negative">Fix the highlighted amounts before confirming.</p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+          <Link
+            href={backHref}
+            className="inline-flex min-h-11 items-center justify-center text-sm font-medium text-primary hover:underline md:min-h-0"
+          >
+            Cancel
+          </Link>
+          <Button className="w-full md:w-auto" disabled={!canReview} onClick={openDialog}>
+            {`Review & confirm ${preview.data?.items.length ?? 0} ${preview.data?.items.length === 1 ? 'change' : 'changes'} →`}
+          </Button>
+        </div>
+      </footer>
+      {preview.data && percentageBp !== null ? (
+        <ConfirmDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          percentageBp={percentageBp}
+          headcount={preview.data.items.length}
+          effectiveDate={effectiveDate}
+          note={note}
+          revision={summary.data?.revision ?? undefined}
+          summaryCurrent={summaryCurrent}
+          pending={confirm.isPending}
+          error={confirmError}
+          onApply={apply}
+        />
+      ) : null}
     </div>
   );
 }

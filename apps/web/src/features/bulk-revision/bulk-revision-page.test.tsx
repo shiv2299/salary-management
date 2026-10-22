@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bulkPreviewItem, bulkSummary, REFERENCE_ROUTES } from '@/test/fixtures';
 import { deferredResponse } from '@/test/deferred';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
+import { toast } from 'sonner';
 import { BulkRevisionPage } from './bulk-revision-page';
 
 vi.mock('next/link', () => ({
@@ -503,5 +504,204 @@ describe('BulkRevisionPage review', () => {
     fireEvent.blur(cell);
     expect(cell.value).toBe('19,82,182.62');
     expect(cell.getAttribute('data-overridden')).toBe('true');
+  });
+});
+
+describe('BulkRevisionPage confirmation', () => {
+  const CONFIRM = 'POST /api/employees/bulk-salary-changes';
+  const openDialog = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Review & confirm 2 changes →' }));
+  };
+
+  beforeEach(() => {
+    search = 'ids=1,2';
+    vi.mocked(toast.error).mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('summarises the revision in the confirmation dialog', async () => {
+    stubBulk();
+    render();
+    choose('7');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Review & confirm 2 changes →' }, WAIT),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm salary revision' });
+    for (const text of ['7%', '2', '19 Oct 2026', '+$14,000.00', 'Selected employees']) {
+      expect(within(dialog).getByText(text)).toBeDefined();
+    }
+    // the open modal hides the rest of the page from the accessibility tree
+    expect(
+      within(screen.getByRole('list', { name: 'Progress', hidden: true }))
+        .getByText('Confirm')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+    ).toBe('step');
+  });
+
+  it('confirms exactly the previewed list with its edits and shows the success state', async () => {
+    const { calls } = stubBulk({
+      [CONFIRM]: () =>
+        Response.json(
+          { batchId: 4, employeeCount: 2, effectiveDate: '2026-10-19' },
+          { status: 201 },
+        ),
+    });
+    search = 'country=US&ids=1,2';
+    render();
+    choose('7');
+    fireEvent.change(await screen.findByLabelText('New salary for Ravi Menon', {}, WAIT), {
+      target: { value: '110000' },
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+          .disabled,
+      ).toBe(false);
+    }, WAIT);
+    openDialog();
+    const apply = await screen.findByRole('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect((apply as HTMLButtonElement).disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+    expect(await screen.findByRole('heading', { name: 'Revision applied' })).toBeDefined();
+    expect(
+      calls.find(
+        (c) => c.method === 'POST' && c.url.pathname === '/api/employees/bulk-salary-changes',
+      )?.body,
+    ).toEqual({
+      percentageBp: 700,
+      effectiveDate: '2026-10-19',
+      note: 'Selected employees',
+      items: [
+        { employeeId: 1, expectedCurrentAmountMinor: 10_000_000, newAmountMinor: 10_700_000 },
+        { employeeId: 2, expectedCurrentAmountMinor: 10_000_000, newAmountMinor: 11_000_000 },
+      ],
+    });
+    expect(screen.getByText('2 raises recorded, effective 19 Oct 2026.')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'View employees' }).getAttribute('href')).toBe(
+      '/employees?country=US',
+    );
+    expect(screen.getByRole('link', { name: 'View insights' }).getAttribute('href')).toBe(
+      '/insights',
+    );
+  });
+
+  it('keeps the confirm button disabled while an edit is not a valid raise', async () => {
+    stubBulk();
+    render();
+    choose('7');
+    fireEvent.change(await screen.findByLabelText('New salary for Ravi Menon', {}, WAIT), {
+      target: { value: '90000' },
+    });
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+        .disabled,
+    ).toBe(true);
+    expect(screen.getByText('Fix the highlighted amounts before confirming.')).toBeDefined();
+  });
+
+  it('reloads a stale preview, says so, and keeps edits for people whose pay did not change', async () => {
+    let previews = 0;
+    stubBulk({
+      [PREVIEW]: () => {
+        previews += 1;
+        return Response.json({
+          items: [
+            bulkPreviewItem(),
+            bulkPreviewItem({
+              employeeId: 2,
+              firstName: 'Ravi',
+              lastName: 'Menon',
+              ...(previews === 1
+                ? {}
+                : { currentAmountMinor: 10_500_000, proposedAmountMinor: 11_235_000 }),
+            }),
+          ],
+          total: 2,
+        });
+      },
+      [CONFIRM]: apiError(409, 'CONFLICT', 'Salaries changed since the preview. Preview again.'),
+    });
+    render();
+    choose('7');
+    fireEvent.change(await screen.findByLabelText('New salary for Asha Rao', {}, WAIT), {
+      target: { value: '120000' },
+    });
+    fireEvent.change(screen.getByLabelText('New salary for Ravi Menon'), {
+      target: { value: '121000' },
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+          .disabled,
+      ).toBe(false);
+    }, WAIT);
+    openDialog();
+    const apply = await screen.findByRole('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect((apply as HTMLButtonElement).disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Salaries changed since the preview. The preview has been reloaded.',
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText<HTMLInputElement>('New salary for Ravi Menon').value).toBe(
+        '112,350.00',
+      );
+    }, WAIT);
+    expect(previews).toBe(2);
+    expect(screen.getByLabelText<HTMLInputElement>('New salary for Asha Rao').value).toBe('120000');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('shows the broken rule inside the dialog without reloading the preview', async () => {
+    let previews = 0;
+    stubBulk({
+      [PREVIEW]: () => {
+        previews += 1;
+        return Response.json({
+          items: [bulkPreviewItem(), bulkPreviewItem({ employeeId: 2 })],
+          total: 2,
+        });
+      },
+      [CONFIRM]: apiError(
+        422,
+        'INVALID_BULK_REVISION',
+        'employee 1: effective date is before the hire date',
+      ),
+    });
+    render();
+    choose('7');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Review & confirm 2 changes →' }, WAIT),
+    );
+    const apply = await screen.findByRole('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect((apply as HTMLButtonElement).disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+    const dialog = await screen.findByRole('dialog');
+    expect((await within(dialog).findByRole('alert')).textContent).toBe(
+      'employee 1: effective date is before the hire date',
+    );
+    expect(previews).toBe(1);
+  });
+
+  it('cancels back to the list with its filters', () => {
+    search = 'country=US&ids=1,2';
+    stubBulk();
+    render();
+    expect(screen.getByRole('link', { name: 'Cancel' }).getAttribute('href')).toBe(
+      '/employees?country=US',
+    );
   });
 });

@@ -51,6 +51,7 @@ export interface EmployeeRoutesDeps {
 export const employeeRoutes =
   ({ database, now }: EmployeeRoutesDeps): FastifyPluginAsyncZod =>
   (app) => {
+    const today = () => now().toISOString().slice(0, 10);
     const writerDeps = { now: () => now().toISOString() };
 
     app.get(
@@ -131,12 +132,11 @@ export const employeeRoutes =
       '/api/employees/export',
       { schema: { querystring: employeeExportQuerySchema } },
       (request, reply) => {
-        const today = now().toISOString().slice(0, 10);
         return reply
           .type('text/csv; charset=utf-8')
           .header(
             'content-disposition',
-            `attachment; filename="employees-${request.query.scope}-${today}.csv"`,
+            `attachment; filename="employees-${request.query.scope}-${today()}.csv"`,
           )
           .send(Readable.from(exportEmployeesCsv(database.db, request.query)));
       },
@@ -161,7 +161,7 @@ export const employeeRoutes =
           response: { 200: employeeDetailSchema },
         },
       },
-      (request) => getEmployeeDetail(database.db, request.params.id),
+      (request) => getEmployeeDetail(database.db, request.params.id, today()),
     );
 
     app.get(
@@ -181,7 +181,7 @@ export const employeeRoutes =
       (request, reply) => {
         const id = createEmployee(database.db, request.body, writerDeps);
         void reply.code(201);
-        return getEmployeeDetail(database.db, id);
+        return getEmployeeDetail(database.db, id, today());
       },
     );
 
@@ -196,7 +196,7 @@ export const employeeRoutes =
       },
       (request) => {
         updateEmployee(database.db, request.params.id, request.body, writerDeps);
-        return getEmployeeDetail(database.db, request.params.id);
+        return getEmployeeDetail(database.db, request.params.id, today());
       },
     );
 
@@ -205,7 +205,7 @@ export const employeeRoutes =
       { schema: { params: employeeIdParamsSchema, response: { 200: employeeDetailSchema } } },
       (request) => {
         deactivateEmployee(database.db, request.params.id, writerDeps);
-        return getEmployeeDetail(database.db, request.params.id);
+        return getEmployeeDetail(database.db, request.params.id, today());
       },
     );
 
@@ -214,7 +214,7 @@ export const employeeRoutes =
       { schema: { params: employeeIdParamsSchema, response: { 200: employeeDetailSchema } } },
       (request) => {
         reactivateEmployee(database.db, request.params.id, writerDeps);
-        return getEmployeeDetail(database.db, request.params.id);
+        return getEmployeeDetail(database.db, request.params.id, today());
       },
     );
 
@@ -242,7 +242,7 @@ export const employeeRoutes =
       (request, reply) => {
         recordSalaryChange(database.db, request.params.id, request.body, writerDeps);
         void reply.code(201);
-        return getEmployeeDetail(database.db, request.params.id);
+        return getEmployeeDetail(database.db, request.params.id, today());
       },
     );
 

@@ -113,12 +113,20 @@ export type EmployeeListQueryParams = z.infer<typeof employeeListQuerySchema>;
 export type EmployeeListItem = z.infer<typeof employeeListItemSchema>;
 export type EmployeeListResponse = z.infer<typeof employeeListResponseSchema>;
 
+const salaryHistoryReasonSchema = z.enum([
+  'hire',
+  'raise',
+  'promotion',
+  'relocation',
+  'correction',
+]);
+
 export const salaryHistoryEntrySchema = z.object({
   id: z.number().int(),
   amountMinor: z.number().int(),
   currencyCode: z.string(),
   effectiveDate: z.string(),
-  reason: z.enum(['hire', 'raise', 'promotion', 'relocation', 'correction']),
+  reason: salaryHistoryReasonSchema,
   levelId: z.number().int(),
   levelCode: z.string(),
   countryCode: z.string(),
@@ -129,11 +137,39 @@ export const salaryHistoryEntrySchema = z.object({
    * Compared in USD when the currency changed.
    */
   changeBp: z.number().int().nullable(),
+  /** The amount in USD at the latest FX rates, converted by the server. */
+  amountBaseMinor: z.number().int(),
+});
+
+/**
+ * Figures over an employee's whole salary history. All amounts are in `currencyCode`: the rows'
+ * own currency, or USD (`convertedToUsd`) when the pay moved between currencies.
+ */
+export const historySummarySchema = z.object({
+  currencyCode: z.string(),
+  convertedToUsd: z.boolean(),
+  hireAmountMinor: z.number().int(),
+  currentAmountMinor: z.number().int(),
+  /** Null with only the hire row. */
+  sinceHireBp: z.number().int().nullable(),
+  /** Compound yearly growth; null under a year of history. */
+  averageYearlyGrowthBp: z.number().int().nullable(),
+  biggestJump: z
+    .object({
+      historyId: z.number().int(),
+      changeBp: z.number().int(),
+      effectiveDate: z.string(),
+      reason: salaryHistoryReasonSchema,
+    })
+    .nullable(),
+  promotionCount: z.number().int(),
+  raiseCount: z.number().int(),
 });
 
 export const employeeDetailSchema = employeeListItemSchema.extend({
   deactivatedOn: z.string().nullable(),
   history: z.array(salaryHistoryEntrySchema),
+  historySummary: historySummarySchema,
 });
 
 export const employeeIdParamsSchema = z.object({ id: z.coerce.number().int().positive() });
@@ -161,6 +197,7 @@ export const peerContextSchema = z.object({
 });
 
 export type PeerContext = z.infer<typeof peerContextSchema>;
+export type HistorySummary = z.infer<typeof historySummarySchema>;
 export type SalaryHistoryEntry = z.infer<typeof salaryHistoryEntrySchema>;
 export type EmployeeDetail = z.infer<typeof employeeDetailSchema>;
 

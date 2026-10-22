@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FIXED_NOW, createTestDb } from '../test/test-db';
 import { getEmployeeDetail } from './employee-detail';
-import { createEmployees } from './employees';
+import { createEmployees, deactivateEmployee } from './employees';
 import { applySalaryChanges } from './salary-writer';
 
 const deps = { now: () => FIXED_NOW };
@@ -58,7 +58,7 @@ describe('getEmployeeDetail', () => {
       deps,
     );
 
-    const detail = getEmployeeDetail(database.db, id);
+    const detail = getEmployeeDetail(database.db, id, '2026-03-01');
 
     expect(detail).toMatchObject({
       id,
@@ -96,13 +96,13 @@ describe('getEmployeeDetail', () => {
       deps,
     );
 
-    const reasons = getEmployeeDetail(database.db, id).history.map((h) => h.reason);
+    const reasons = getEmployeeDetail(database.db, id, '2026-03-01').history.map((h) => h.reason);
 
     expect(reasons).toEqual(['correction', 'hire']);
   });
 
   it('throws a 404 for an employee that does not exist', () => {
-    expect(() => getEmployeeDetail(database.db, 999)).toThrowError(
+    expect(() => getEmployeeDetail(database.db, 999, '2026-03-01')).toThrowError(
       expect.objectContaining({ statusCode: 404, code: 'EMPLOYEE_NOT_FOUND' }),
     );
   });
@@ -123,8 +123,60 @@ describe('getEmployeeDetail', () => {
       deps,
     );
 
-    const detail = getEmployeeDetail(database.db, id);
+    const detail = getEmployeeDetail(database.db, id, '2026-03-01');
 
     expect(detail.history.map((h) => h.changeBp)).toEqual([500, null]);
+  });
+
+  it('gives each history row its amount in USD and summarises the history up to today', () => {
+    const id = addAsha();
+    applySalaryChanges(
+      database.db,
+      [
+        {
+          employeeId: id,
+          reason: 'raise',
+          amountMinor: 525_000_000,
+          currencyCode: 'INR',
+          effectiveDate: '2022-04-01',
+        },
+      ],
+      deps,
+    );
+
+    const detail = getEmployeeDetail(database.db, id, '2026-03-01');
+
+    expect(detail.history.map((h) => h.amountBaseMinor)).toEqual([6_289_500, 5_990_000]);
+    expect(detail.historySummary).toMatchObject({
+      currencyCode: 'INR',
+      hireAmountMinor: 500_000_000,
+      currentAmountMinor: 525_000_000,
+      sinceHireBp: 500,
+      averageYearlyGrowthBp: 98,
+      raiseCount: 1,
+    });
+  });
+
+  it("measures an inactive employee's growth up to the day they were deactivated", () => {
+    const id = addAsha();
+    applySalaryChanges(
+      database.db,
+      [
+        {
+          employeeId: id,
+          reason: 'raise',
+          amountMinor: 525_000_000,
+          currencyCode: 'INR',
+          effectiveDate: '2022-04-01',
+        },
+      ],
+      deps,
+    );
+    deactivateEmployee(database.db, id, { now: () => '2024-03-01T09:00:00.000Z' });
+
+    const detail = getEmployeeDetail(database.db, id, '2026-03-01');
+
+    expect(detail.deactivatedOn).toBe('2024-03-01');
+    expect(detail.historySummary.averageYearlyGrowthBp).toBe(164);
   });
 });

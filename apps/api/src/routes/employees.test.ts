@@ -132,6 +132,27 @@ describe('GET /api/employees/:id', () => {
     expect(body.history.map((h) => h.reason)).toEqual(['hire']);
   });
 
+  it('returns the history summary with the employee', async () => {
+    const t = await setup({ now: () => new Date('2026-03-01T09:00:00.000Z') });
+
+    const response = await get(t, '/api/employees/1');
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{
+      historySummary: unknown;
+      history: { amountBaseMinor: number }[];
+    }>();
+    expect(body.historySummary).toMatchObject({
+      currencyCode: 'USD',
+      convertedToUsd: false,
+      hireAmountMinor: 10_000_000,
+      sinceHireBp: null,
+      averageYearlyGrowthBp: null,
+      biggestJump: null,
+    });
+    expect(body.history[0]?.amountBaseMinor).toBe(10_000_000);
+  });
+
   it('answers an unknown employee with 404 in the standard error shape', async () => {
     const t = await setup();
 

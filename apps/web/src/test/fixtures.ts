@@ -84,6 +84,7 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
         batchId: null,
         createdAt: '2025-04-01T09:00:00.000Z',
         changeBp: 1111,
+        amountBaseMinor: 5_990_000,
       },
       {
         id: 1,
@@ -97,8 +98,20 @@ export function employeeDetail(overrides: Partial<EmployeeDetail> = {}): Employe
         batchId: null,
         createdAt: '2021-04-12T09:00:00.000Z',
         changeBp: null,
+        amountBaseMinor: 5_391_000,
       },
     ],
+    historySummary: {
+      currencyCode: 'INR',
+      convertedToUsd: false,
+      hireAmountMinor: 450_000_000,
+      currentAmountMinor: 500_000_000,
+      sinceHireBp: 1111,
+      averageYearlyGrowthBp: 193,
+      biggestJump: { historyId: 2, changeBp: 1111, effectiveDate: '2025-04-01', reason: 'raise' },
+      promotionCount: 0,
+      raiseCount: 1,
+    },
     ...overrides,
   };
 }

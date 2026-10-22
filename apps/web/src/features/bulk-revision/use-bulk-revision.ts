@@ -22,17 +22,27 @@ import type { BulkTarget } from './selection';
 
 const BASE = '/api/employees/bulk-salary-changes';
 
-// The review never changes under the user except after a stale-preview conflict, which refetches.
+// The review never changes under the user except after a stale-preview conflict, which refetches
+// the preview and the summary.
 const FROZEN = { staleTime: Infinity, refetchOnWindowFocus: false } as const;
+
+/** A preview with the percentage it was fetched with, which a confirm must send unchanged. */
+export type BulkPreview = BulkPreviewResponse & { percentageBp: number };
 
 export function useBulkPreview(
   target: BulkTarget | null,
   percentageBp: number | null,
-): UseQueryResult<BulkPreviewResponse> {
+): UseQueryResult<BulkPreview> {
   return useQuery({
     queryKey: ['bulk-revision', 'preview', JSON.stringify(target), percentageBp],
-    queryFn: () =>
-      apiSend('POST', `${BASE}/preview`, bulkPreviewResponseSchema, { ...target, percentageBp }),
+    queryFn: async () => ({
+      ...(await apiSend('POST', `${BASE}/preview`, bulkPreviewResponseSchema, {
+        ...target,
+        percentageBp,
+      })),
+      // `enabled` holds the query back until a percentage is chosen.
+      percentageBp: percentageBp!,
+    }),
     enabled: target !== null && percentageBp !== null,
     placeholderData: keepPreviousData,
     ...FROZEN,

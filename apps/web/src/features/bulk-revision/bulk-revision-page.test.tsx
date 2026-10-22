@@ -605,6 +605,103 @@ describe('BulkRevisionPage confirmation', () => {
     expect(screen.getByText('Fix the highlighted amounts before confirming.')).toBeDefined();
   });
 
+  it('keeps the confirm button disabled while a newly typed percentage waits for its pause', async () => {
+    stubBulk();
+    render();
+    choose('7');
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+          .disabled,
+      ).toBe(false);
+    }, WAIT);
+    choose('10');
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+        .disabled,
+    ).toBe(true);
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Review & confirm 2 changes →' })
+          .disabled,
+      ).toBe(false);
+    }, WAIT);
+  });
+
+  it('applies a newly chosen percentage only with the amounts of its own preview', async () => {
+    const twoAt = (proposedAmountMinor: number) => ({
+      items: [
+        bulkPreviewItem({ proposedAmountMinor }),
+        bulkPreviewItem({
+          employeeId: 2,
+          firstName: 'Ravi',
+          lastName: 'Menon',
+          proposedAmountMinor,
+        }),
+      ],
+      total: 2,
+    });
+    const ten = deferredResponse();
+    const { calls } = stubBulk({
+      [PREVIEW]: (_, init) =>
+        (JSON.parse(init.body as string) as { percentageBp: number }).percentageBp === 1000
+          ? ten.promise
+          : Response.json(twoAt(10_700_000)),
+      [SUMMARY]: (_, init) => {
+        const bp = (JSON.parse(init.body as string) as { percentageBp?: number }).percentageBp;
+        if (bp === undefined) return Response.json(bulkSummary({ revision: null }));
+        const added = bp === 1000 ? 2_000_000 : 1_400_000;
+        return Response.json(
+          bulkSummary({
+            revision: {
+              ...bulkSummary().revision!,
+              percentageBp: bp,
+              addedByCurrency: [{ currencyCode: 'USD', addedMinor: added }],
+              addedBaseMinor: added,
+            },
+          }),
+        );
+      },
+      [CONFIRM]: () =>
+        Response.json(
+          { batchId: 4, employeeCount: 2, effectiveDate: '2026-10-19' },
+          { status: 201 },
+        ),
+    });
+    render();
+    choose('7');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Review & confirm 2 changes →' }, WAIT),
+    );
+    const apply = await screen.findByRole<HTMLButtonElement>('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect(apply.disabled).toBe(false);
+    }, WAIT);
+
+    choose('10');
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('+$20,000.00', {}, WAIT)).toBeDefined();
+    expect(apply.disabled).toBe(true);
+
+    await ten.answer(twoAt(11_000_000));
+    await waitFor(() => {
+      expect(apply.disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+    expect(await screen.findByRole('heading', { name: 'Revision applied' })).toBeDefined();
+    expect(
+      calls.find(
+        (c) => c.method === 'POST' && c.url.pathname === '/api/employees/bulk-salary-changes',
+      )?.body,
+    ).toMatchObject({
+      percentageBp: 1000,
+      items: [
+        { employeeId: 1, newAmountMinor: 11_000_000 },
+        { employeeId: 2, newAmountMinor: 11_000_000 },
+      ],
+    });
+  });
+
   it('reloads a stale preview, says so, and keeps edits for people whose pay did not change', async () => {
     let previews = 0;
     stubBulk({

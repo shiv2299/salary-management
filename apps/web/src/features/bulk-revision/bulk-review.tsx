@@ -1,6 +1,6 @@
 'use client';
 
-import type { BulkOverride, BulkPreviewItem, BulkPreviewResponse, BulkSummary } from '@acme/shared';
+import type { BulkOverride, BulkPreviewItem, BulkSummary } from '@acme/shared';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -31,11 +31,12 @@ import {
   type ReviewView,
 } from './bulk-state';
 import { addedPayrollText, typicalPayText } from './figures-text';
+import type { BulkPreview } from './use-bulk-revision';
 
 export const PAGE_SIZE = 50;
 
 export interface BulkReviewProps {
-  preview: UseQueryResult<BulkPreviewResponse>;
+  preview: UseQueryResult<BulkPreview>;
   summary: UseQueryResult<BulkSummary>;
   /** The edits the summary was last asked about (after the pause that follows typing). */
   summaryOverrides: BulkOverride[];

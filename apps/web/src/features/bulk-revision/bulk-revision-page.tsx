@@ -103,12 +103,15 @@ export function BulkRevisionPage({ today }: { today?: string }) {
   const [applied, setApplied] = useState<{ count: number; effectiveDate: string } | null>(null);
 
   const invalidCount = previewItems ? countInvalid(previewItems, overrides) : 0;
-  const canReview =
+  // The preview answers the percentage as typed: no pause pending, no older answer on show.
+  const previewCurrent =
     preview.data !== undefined &&
     !preview.isPlaceholderData &&
-    preview.data.items.length > 0 &&
-    invalidCount === 0 &&
-    dateError === null;
+    !preview.isFetching &&
+    !preview.isError &&
+    percentageText === debouncedPercentage;
+  const canReview =
+    previewCurrent && preview.data.items.length > 0 && invalidCount === 0 && dateError === null;
   const summaryCurrent =
     summary.data !== undefined &&
     !summary.isPlaceholderData &&
@@ -121,9 +124,11 @@ export function BulkRevisionPage({ today }: { today?: string }) {
   };
 
   const apply = () => {
-    if (!preview.data || percentageBp === null) return;
+    if (!preview.data || !previewCurrent) return;
     const before = preview.data.items;
-    confirm.mutate(buildConfirmBody(before, overrides, { percentageBp, effectiveDate, note }), {
+    // The percentage the shown preview was fetched with, so the batch matches the amounts sent.
+    const meta = { percentageBp: preview.data.percentageBp, effectiveDate, note };
+    confirm.mutate(buildConfirmBody(before, overrides, meta), {
       onSuccess: (result) => {
         setDialogOpen(false);
         setApplied({ count: result.employeeCount, effectiveDate: result.effectiveDate });
@@ -258,16 +263,16 @@ export function BulkRevisionPage({ today }: { today?: string }) {
           </Button>
         </div>
       </footer>
-      {preview.data && percentageBp !== null ? (
+      {preview.data ? (
         <ConfirmDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          percentageBp={percentageBp}
+          percentageBp={preview.data.percentageBp}
           headcount={preview.data.items.length}
           effectiveDate={effectiveDate}
           note={note}
           revision={summary.data?.revision ?? undefined}
-          summaryCurrent={summaryCurrent}
+          figuresCurrent={previewCurrent && summaryCurrent}
           pending={confirm.isPending}
           error={confirmError}
           onApply={apply}

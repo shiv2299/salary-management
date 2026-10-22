@@ -15,8 +15,8 @@ export interface ConfirmDialogProps {
   effectiveDate: string;
   note: string;
   revision: NonNullable<BulkSummary['revision']> | undefined;
-  /** The summary answers the current inputs; the figures shown are the ones being confirmed. */
-  summaryCurrent: boolean;
+  /** The preview and the summary both answer the current inputs, so what is shown is what applies. */
+  figuresCurrent: boolean;
   pending: boolean;
   error: string | null;
   onApply: () => void;
@@ -71,7 +71,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
           <DialogClose asChild>
             <Button variant="outline">Back to review</Button>
           </DialogClose>
-          <Button disabled={props.pending || !props.summaryCurrent} onClick={props.onApply}>
+          <Button disabled={props.pending || !props.figuresCurrent} onClick={props.onApply}>
             {`Apply ${headcount} ${headcount === 1 ? 'raise' : 'raises'}`}
           </Button>
         </div>

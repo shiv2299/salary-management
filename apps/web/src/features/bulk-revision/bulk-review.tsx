@@ -74,7 +74,7 @@ function ReviewSkeleton() {
   return (
     <div role="status" className="flex flex-col gap-2">
       <span className="sr-only">Loading preview</span>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @3xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-20" />
         ))}
@@ -169,10 +169,10 @@ export function BulkReview({
     );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="@container flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @3xl:grid-cols-4">
         {summary.isError && !summary.data ? (
-          <div className="col-span-2 flex items-center rounded-md border border-border p-4 lg:col-span-3">
+          <div className="flex items-center rounded-md border border-border p-4 @md:col-span-2 @3xl:col-span-3">
             <RetryAlert
               message="Could not update the totals."
               onRetry={() => {
@@ -228,8 +228,14 @@ export function BulkReview({
           value={view}
           options={[
             { value: 'all', label: 'All' },
-            { value: 'overridden', label: `Overridden (${counts.overridden})` },
-            { value: 'outside', label: `Outside peer range (${counts.outside})` },
+            {
+              value: 'overridden',
+              label: `Overridden (${counts.overridden.toLocaleString('en-US')})`,
+            },
+            {
+              value: 'outside',
+              label: `Outside peer range (${counts.outside.toLocaleString('en-US')})`,
+            },
           ]}
           onChange={(next) => {
             setView(next);

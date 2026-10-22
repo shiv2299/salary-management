@@ -34,7 +34,12 @@ export function StatTile({
       >
         {label}
       </div>
-      <div className={cn('mt-1 text-[22px] leading-7 font-[650] tabular-nums', tones[tone])}>
+      <div
+        className={cn(
+          'mt-1 min-w-0 text-[22px] leading-7 font-[650] tabular-nums [overflow-wrap:anywhere]',
+          tones[tone],
+        )}
+      >
         {value}
       </div>
       {hint ? <div className="mt-1 text-xs text-text-secondary">{hint}</div> : null}

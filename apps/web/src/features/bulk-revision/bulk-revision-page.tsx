@@ -194,7 +194,7 @@ export function BulkRevisionPage({ today }: { today?: string }) {
         <section className="flex flex-col items-start gap-3">
           <h2 className="text-lg font-semibold text-text-primary">Revision applied</h2>
           <p className="text-sm text-text-primary">
-            {`${applied.count} ${applied.count === 1 ? 'raise' : 'raises'} recorded, effective ${formatDate(applied.effectiveDate)}.`}
+            {`${applied.count.toLocaleString('en-US')} ${applied.count === 1 ? 'raise' : 'raises'} recorded, effective ${formatDate(applied.effectiveDate)}.`}
           </p>
           <div className="flex gap-4 text-sm font-medium">
             <Link
@@ -269,7 +269,7 @@ export function BulkRevisionPage({ today }: { today?: string }) {
             Cancel
           </Link>
           <Button className="w-full md:w-auto" disabled={!canReview} onClick={openDialog}>
-            {`Review & confirm ${preview.data?.items.length ?? 0} ${preview.data?.items.length === 1 ? 'change' : 'changes'} →`}
+            {`Review & confirm ${(preview.data?.items.length ?? 0).toLocaleString('en-US')} ${preview.data?.items.length === 1 ? 'change' : 'changes'} →`}
           </Button>
         </div>
       </footer>

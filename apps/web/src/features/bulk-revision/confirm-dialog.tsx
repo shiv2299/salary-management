@@ -48,9 +48,9 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
         <dl className="flex flex-col gap-2">
           <Row label="Increase">
             {formatPercentageBp(props.percentageBp)}
-            {overridden > 0 ? ` · ${overridden} edited by hand` : ''}
+            {overridden > 0 ? ` · ${overridden.toLocaleString('en-US')} edited by hand` : ''}
           </Row>
-          <Row label="People">{headcount}</Row>
+          <Row label="People">{headcount.toLocaleString('en-US')}</Row>
           <Row label="Effective">{formatDate(props.effectiveDate)}</Row>
           <Row label="Added to annual payroll">
             {added ? (
@@ -79,7 +79,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
             <Button variant="outline">Back to review</Button>
           </DialogClose>
           <Button disabled={props.pending || !props.figuresCurrent} onClick={props.onApply}>
-            {`Apply ${headcount} ${headcount === 1 ? 'raise' : 'raises'}`}
+            {`Apply ${headcount.toLocaleString('en-US')} ${headcount === 1 ? 'raise' : 'raises'}`}
           </Button>
         </div>
       </DialogContent>

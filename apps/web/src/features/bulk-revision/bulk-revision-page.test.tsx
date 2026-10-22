@@ -600,6 +600,19 @@ describe('BulkRevisionPage confirmation', () => {
     ).toBe('step');
   });
 
+  it('groups the digits of a large count in the button and the confirmation', async () => {
+    const items = Array.from({ length: 1010 }, (_, i) => bulkPreviewItem({ employeeId: i + 1 }));
+    stubBulk({ [PREVIEW]: { items, total: 1010 } });
+    render();
+    choose('7');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Review & confirm 1,010 changes →' }, WAIT),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm salary revision' });
+    expect(within(dialog).getByText('1,010')).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: 'Apply 1,010 raises' })).toBeDefined();
+  });
+
   it('confirms exactly the previewed list with its edits and shows the success state', async () => {
     const { calls } = stubBulk({
       [CONFIRM]: () =>

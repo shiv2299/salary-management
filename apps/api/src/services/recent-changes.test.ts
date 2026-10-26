@@ -61,7 +61,7 @@ function change(employeeId: number, overrides: Partial<SalaryChange> = {}): numb
 function recent(query: Partial<RecentChangesQuery> = {}) {
   return getRecentChanges(database.db, {
     today: TODAY,
-    years: 3,
+    range: '3y',
     limit: 50,
     offset: 0,
     ...query,
@@ -72,28 +72,70 @@ describe('getRecentChanges window', () => {
   it('shows a change dated four years ago in the five-year window but not the three-year one', () => {
     change(add(), { effectiveDate: '2022-01-15' });
 
-    expect(recent({ years: 3 }).items).toEqual([]);
-    expect(recent({ years: 5 }).items).toHaveLength(1);
+    expect(recent({ range: '3y' }).items).toEqual([]);
+    expect(recent({ range: '5y' }).items).toHaveLength(1);
   });
 
   it('includes a change on the first day of the window and excludes the day before', () => {
     change(add(), { effectiveDate: '2023-01-15', amountMinor: 10_100_000 });
     change(add(), { effectiveDate: '2023-01-14', amountMinor: 10_200_000 });
 
-    const items = recent({ years: 3 }).items;
+    const items = recent({ range: '3y' }).items;
 
     expect(items.map((i) => i.effectiveDate)).toEqual(['2023-01-15']);
   });
 
   it('reports the window it applied', () => {
-    expect(recent({ years: 5 })).toMatchObject({ years: 5, windowStart: '2021-01-15' });
+    expect(recent({ range: '5y' })).toMatchObject({
+      range: '5y',
+      year: null,
+      windowStart: '2021-01-15',
+      windowEnd: TODAY,
+    });
+  });
+
+  it('includes a change dated nine years ago in ten years and every change in all', () => {
+    change(add(), { effectiveDate: '2017-03-01' });
+    change(add(), { effectiveDate: '2005-03-01', amountMinor: 10_100_000 });
+
+    expect(recent({ range: '5y' }).items).toEqual([]);
+    expect(recent({ range: '10y' }).items.map((i) => i.effectiveDate)).toEqual(['2017-03-01']);
+    expect(recent({ range: 'all' })).toMatchObject({
+      windowStart: null,
+      windowEnd: TODAY,
+      total: 4,
+    });
+  });
+
+  it('limits a year to its calendar dates up to today', () => {
+    change(add(), { effectiveDate: '2024-12-31' });
+    change(add(), { effectiveDate: '2025-01-01', amountMinor: 10_100_000 });
+
+    const past = recent({ year: 2024 });
+
+    expect(past.items.map((i) => i.effectiveDate)).toEqual(['2024-12-31']);
+    expect(past).toMatchObject({ year: 2024, windowStart: '2024-01-01', windowEnd: '2024-12-31' });
+    expect(recent({ year: 2026 })).toMatchObject({ windowStart: '2026-01-01', windowEnd: TODAY });
+  });
+
+  it('lets a year override the range', () => {
+    change(add(), { effectiveDate: '2019-05-01' });
+
+    expect(recent({ range: '3y', year: 2019 }).items).toHaveLength(1);
+  });
+
+  it('returns no entries for a year without changes or one that has not started', () => {
+    change(add(), { effectiveDate: '2025-06-01' });
+
+    expect(recent({ year: 2023 })).toMatchObject({ total: 0, items: [] });
+    expect(recent({ year: 2027 })).toMatchObject({ total: 0, items: [] });
   });
 
   it('dates a change by when it took effect, not when it was entered', () => {
     // Entered today (FIXED_NOW) but effective well before the window.
     change(add(), { effectiveDate: '2019-05-01' });
 
-    expect(recent({ years: 5 }).items).toEqual([]);
+    expect(recent({ range: '5y' }).items).toEqual([]);
   });
 });
 
@@ -243,5 +285,44 @@ describe('getRecentChanges bulk revisions', () => {
       .run();
 
     expect(recent().items[0]).toMatchObject({ kind: 'batch', headcount: 2 });
+  });
+});
+
+describe('getRecentChanges reasons and years', () => {
+  it('filters by reason and keeps a bulk revision as one entry', () => {
+    const ids = [add(), add(), add()];
+    const batchId = insertSalaryRevisionBatch(database.db, {
+      createdAt: FIXED_NOW,
+      effectiveDate: '2025-04-01',
+      percentageBp: 700,
+      employeeCount: 3,
+      note: null,
+    });
+    applySalaryChanges(
+      database.db,
+      ids.map((employeeId) => ({
+        employeeId,
+        reason: 'raise' as const,
+        amountMinor: 10_700_000,
+        currencyCode: 'USD',
+        effectiveDate: '2025-04-01',
+        batchId,
+      })),
+      deps,
+    );
+    change(add(), { reason: 'promotion', effectiveDate: '2025-05-01', levelId: 2 });
+
+    const result = recent({ reason: ['raise'] });
+
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toMatchObject({ kind: 'batch', batchId, headcount: 3 });
+  });
+
+  it('lists the years that have changes, newest first', () => {
+    change(add(), { effectiveDate: '2025-06-01' });
+    change(add(), { effectiveDate: '2019-06-01' });
+    change(add(), { effectiveDate: '2019-07-01' });
+
+    expect(recent().availableYears).toEqual([2025, 2019, 2015]);
   });
 });

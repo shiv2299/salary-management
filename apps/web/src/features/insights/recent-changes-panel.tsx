@@ -66,9 +66,9 @@ function ChangeEntry({ entry }: { entry: RecentChangeEntry }) {
 }
 
 export function RecentChangesPanel() {
-  const [years, setYears] = useState<3 | 5>(3);
+  const [range, setRange] = useState<'3y' | '5y'>('3y');
   const [offset, setOffset] = useState(0);
-  const { data, error, isPending, refetch } = useRecentChanges(years, offset, PAGE_SIZE);
+  const { data, error, isPending, refetch } = useRecentChanges(range, offset, PAGE_SIZE);
 
   return (
     <Panel
@@ -77,13 +77,13 @@ export function RecentChangesPanel() {
       actions={
         <SegmentedControl
           label="Time window"
-          value={years}
+          value={range}
           options={[
-            { value: 3, label: '3 years' },
-            { value: 5, label: '5 years' },
+            { value: '3y', label: '3 years' },
+            { value: '5y', label: '5 years' },
           ]}
           onChange={(value) => {
-            setYears(value);
+            setRange(value);
             setOffset(0);
           }}
         />

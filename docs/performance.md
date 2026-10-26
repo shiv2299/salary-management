@@ -34,7 +34,7 @@ Four rows were not re-run in the latest pass and keep their figures from 2026-10
 | `GET /api/insights/distribution?groupBy=country` | 28.8 ms | 29.6 ms |
 | `GET /api/insights/outliers` | 37.8 ms | 38.3 ms |
 | `GET /api/insights/payroll?groupBy=department` | 28.5 ms | 29.3 ms |
-| `GET /api/insights/recent-changes?years=5` | 20.4 ms | 21.2 ms |
+| `GET /api/insights/recent-changes?range=5y` | 20.4 ms | 21.2 ms |
 | `GET /api/employees/1` (detail with its history summary) | 0.4 ms | 0.5 ms |
 | `GET /api/employees/1/peer-context` | 0.9 ms | 1.1 ms |
 | `POST /api/employees/1/salary-changes/preview` | 1.1 ms | 1.2 ms |

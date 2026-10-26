@@ -48,12 +48,14 @@ export interface ChangeEntryPage {
  */
 export function listChangeEntries(
   db: DbHandle,
-  window: { from: string; to: string },
+  window: { from: string | null; to: string },
   page: { limit: number; offset: number },
+  reasons?: SalaryHistoryRow['reason'][],
 ): { entries: ChangeEntryPage[]; total: number } {
   const inWindow = and(
-    gte(salaryHistory.effectiveDate, window.from),
+    window.from === null ? undefined : gte(salaryHistory.effectiveDate, window.from),
     lte(salaryHistory.effectiveDate, window.to),
+    reasons && reasons.length > 0 ? inArray(salaryHistory.reason, reasons) : undefined,
   );
   // Batch ids are positive, so a negative row id can never collide with one.
   const entryKey = sql`coalesce(${salaryHistory.batchId}, -${salaryHistory.id})`;
@@ -81,6 +83,17 @@ export function listChangeEntries(
     .offset(page.offset)
     .all();
   return { entries, total };
+}
+
+/** Calendar years with at least one salary history row, newest first. */
+export function listChangeYears(db: DbHandle): number[] {
+  const year = sql<number>`cast(substr(${salaryHistory.effectiveDate}, 1, 4) as integer)`;
+  return db
+    .selectDistinct({ year })
+    .from(salaryHistory)
+    .orderBy(desc(year))
+    .all()
+    .map((r) => r.year);
 }
 
 export interface ChangeDetailRow {

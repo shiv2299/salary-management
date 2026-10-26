@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './employees';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, multiValueParam } from './employees';
 
 const baseCurrencySchema = z.string();
 
@@ -11,11 +11,13 @@ export const payrollQuerySchema = z.object({
   groupBy: z.enum(['country', 'department']),
 });
 
+export const RECENT_CHANGE_RANGES = ['3y', '5y', '10y', 'all'] as const;
+
 export const recentChangesQuerySchema = z.object({
-  years: z.coerce
-    .number()
-    .pipe(z.union([z.literal(3), z.literal(5)]))
-    .default(3),
+  range: z.enum(RECENT_CHANGE_RANGES).default('3y'),
+  /** A calendar year; overrides the range. */
+  year: z.coerce.number().int().min(1900).max(9999).optional(),
+  reason: multiValueParam(z.enum(['hire', 'raise', 'promotion', 'relocation', 'correction'])),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -113,8 +115,13 @@ export const recentChangeEntrySchema = z.discriminatedUnion('kind', [
 ]);
 
 export const recentChangesResponseSchema = z.object({
-  years: z.union([z.literal(3), z.literal(5)]),
-  windowStart: z.string(),
+  range: z.enum(RECENT_CHANGE_RANGES),
+  year: z.number().int().nullable(),
+  /** Inclusive; null for all time. */
+  windowStart: z.string().nullable(),
+  windowEnd: z.string(),
+  /** Calendar years with at least one change, newest first. */
+  availableYears: z.array(z.number().int()),
   total: z.number().int(),
   limit: z.number().int(),
   offset: z.number().int(),

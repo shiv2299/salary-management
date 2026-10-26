@@ -32,7 +32,7 @@ const GET_URLS = [
   '/api/insights/distribution?groupBy=country',
   '/api/insights/outliers',
   '/api/insights/payroll?groupBy=department',
-  '/api/insights/recent-changes?years=5',
+  '/api/insights/recent-changes?range=5y',
   `/api/employees/${EMPLOYEE_ID}`,
   `/api/employees/${EMPLOYEE_ID}/peer-context`,
 ];

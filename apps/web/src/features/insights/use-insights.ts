@@ -32,12 +32,12 @@ export function useOutliers() {
   });
 }
 
-export function useRecentChanges(years: 3 | 5, offset: number, limit: number) {
+export function useRecentChanges(range: '3y' | '5y', offset: number, limit: number) {
   return useQuery({
-    queryKey: ['insights', 'recent-changes', years, offset, limit],
+    queryKey: ['insights', 'recent-changes', range, offset, limit],
     queryFn: () =>
       apiGet(
-        `/api/insights/recent-changes?years=${years}&limit=${limit}&offset=${offset}`,
+        `/api/insights/recent-changes?range=${range}&limit=${limit}&offset=${offset}`,
         recentChangesResponseSchema,
       ),
     placeholderData: keepPreviousData,

@@ -1,30 +1,55 @@
+import type { RecentChangesResponse } from '@acme/shared';
 import type { DbHandle } from '../db/client';
 import { trailingWindowStart } from '../domain/trailing-window';
 import { findBatchesByIds } from '../repositories/salary-revision-batches';
-import { listChangeDetails, listChangeEntries } from '../repositories/salary-history';
+import type { SalaryHistoryRow } from '../db/schema';
+import {
+  listChangeDetails,
+  listChangeEntries,
+  listChangeYears,
+} from '../repositories/salary-history';
 
 export interface RecentChangesQuery {
   /** Today as `yyyy-mm-dd`, from the injected clock. */
   today: string;
-  years: 3 | 5;
+  range: RecentChangesResponse['range'];
+  /** A calendar year; overrides the range. */
+  year?: number | undefined;
+  reason?: SalaryHistoryRow['reason'][] | undefined;
   limit: number;
   offset: number;
 }
 
+const RANGE_YEARS = { '3y': 3, '5y': 5, '10y': 10 } as const;
+
+function windowFor({ today, range, year }: Pick<RecentChangesQuery, 'today' | 'range' | 'year'>) {
+  if (year !== undefined) {
+    const yearEnd = `${String(year).padStart(4, '0')}-12-31`;
+    return {
+      from: `${String(year).padStart(4, '0')}-01-01`,
+      to: yearEnd < today ? yearEnd : today,
+    };
+  }
+  return {
+    from: range === 'all' ? null : trailingWindowStart(today, RANGE_YEARS[range]),
+    to: today,
+  };
+}
+
 /**
- * Salary changes that took effect in the trailing window, newest first. A bulk revision is one
+ * Salary changes that took effect in the range or calendar year, newest first. A bulk revision is one
  * entry; deactivated employees are included and marked. Offset-paginated over the entries.
  */
 export function getRecentChanges(
   db: DbHandle,
-  { today, years, limit, offset }: RecentChangesQuery,
-) {
-  const windowStart = trailingWindowStart(today, years);
-  const { entries, total } = listChangeEntries(
-    db,
-    { from: windowStart, to: today },
-    { limit, offset },
-  );
+  { today, range, year, reason, limit, offset }: RecentChangesQuery,
+): RecentChangesResponse {
+  const window = windowFor({ today, range, year });
+  // A window that starts after it ends (a year not yet begun) has no entries.
+  const empty = window.from !== null && window.from > window.to;
+  const { entries, total } = empty
+    ? { entries: [], total: 0 }
+    : listChangeEntries(db, window, { limit, offset }, reason);
 
   const individualRowIds = entries.filter((e) => e.batchId === null).map((e) => e.lastRowId);
   const details = new Map(listChangeDetails(db, individualRowIds).map((d) => [d.historyId, d]));
@@ -70,5 +95,15 @@ export function getRecentChanges(
     };
   });
 
-  return { years, windowStart, total, limit, offset, items };
+  return {
+    range,
+    year: year ?? null,
+    windowStart: window.from,
+    windowEnd: window.to,
+    availableYears: listChangeYears(db),
+    total,
+    limit,
+    offset,
+    items,
+  };
 }

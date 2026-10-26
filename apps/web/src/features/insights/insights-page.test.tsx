@@ -22,10 +22,13 @@ const distribution = {
   p90: 7_500_000,
 };
 
-function recentChanges(years: number) {
+function recentChanges(range: string) {
   return {
-    years,
+    range,
+    year: null,
     windowStart: '2023-10-19',
+    windowEnd: '2026-10-19',
+    availableYears: [2026, 2025],
     total: 2,
     limit: 10,
     offset: 0,
@@ -97,7 +100,7 @@ function stubInsights() {
       ],
     },
     'GET /api/insights/recent-changes': (url) =>
-      Response.json(recentChanges(Number(url.searchParams.get('years')))),
+      Response.json(recentChanges(url.searchParams.get('range') ?? '3y')),
     'GET /api/reference/fx-rates': {
       baseCurrency: 'USD',
       rates: [
@@ -146,10 +149,10 @@ describe('InsightsPage', () => {
     fireEvent.click(screen.getByRole('radio', { name: '5 years' }));
 
     await screen.findByText(/47 people/);
-    expect(calls.some((c) => c.url.searchParams.get('years') === '5')).toBe(true);
+    expect(calls.some((c) => c.url.searchParams.get('range') === '5y')).toBe(true);
     expect(
-      calls.find((c) => c.url.pathname.endsWith('recent-changes'))?.url.searchParams.get('years'),
-    ).toBe('3');
+      calls.find((c) => c.url.pathname.endsWith('recent-changes'))?.url.searchParams.get('range'),
+    ).toBe('3y');
   });
 
   it('flags an outlier with a text label, not colour alone', async () => {

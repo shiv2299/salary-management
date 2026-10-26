@@ -163,17 +163,17 @@ describe('GET /api/insights/recent-changes', () => {
     );
 
     const three = (await get(t, '/api/insights/recent-changes')).json<{
-      years: number;
+      range: string;
       total: number;
       limit: number;
       offset: number;
       items: { effectiveDate: string }[];
     }>();
-    const five = (await get(t, '/api/insights/recent-changes?years=5')).json<{
+    const five = (await get(t, '/api/insights/recent-changes?range=5y')).json<{
       items: { effectiveDate: string }[];
     }>();
 
-    expect(three).toMatchObject({ years: 3, total: 1, limit: 50, offset: 0 });
+    expect(three).toMatchObject({ range: '3y', total: 1, limit: 50, offset: 0 });
     expect(three.items.map((i) => i.effectiveDate)).toEqual(['2025-06-01']);
     expect(five.items.map((i) => i.effectiveDate)).toEqual(['2025-06-01', '2022-01-15']);
   });
@@ -199,10 +199,14 @@ describe('GET /api/insights/recent-changes', () => {
     expect(body.items.map((i) => i.effectiveDate)).toEqual(['2025-02-01']);
   });
 
-  it('rejects a window other than 3 or 5 years', async () => {
+  it('accepts repeated reason values and rejects an unknown range with 400', async () => {
     const { t } = await setup();
 
-    expect((await get(t, '/api/insights/recent-changes?years=4')).statusCode).toBe(400);
+    const ok = await get(t, '/api/insights/recent-changes?reason=raise&reason=hire&year=2025');
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ range: '3y', year: 2025 });
+    expect((await get(t, '/api/insights/recent-changes?range=4y')).statusCode).toBe(400);
+    expect((await get(t, '/api/insights/recent-changes?reason=bonus')).statusCode).toBe(400);
     expect((await get(t, '/api/insights/recent-changes?limit=0')).statusCode).toBe(400);
     expect((await get(t, '/api/insights/recent-changes?offset=-1')).statusCode).toBe(400);
   });

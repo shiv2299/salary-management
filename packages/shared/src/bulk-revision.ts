@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoDateSchema } from './employees';
+import { attentionSchema, isoDateSchema } from './employees';
 
 /**
  * The largest new amount a bulk revision accepts, in minor units (900,000,000.00 in a two-decimal
@@ -18,6 +18,7 @@ const bulkFilterSchema = z
     country: z.array(z.string().min(1)).min(1).max(100).optional(),
     department: z.array(z.number().int().positive()).min(1).max(100).optional(),
     level: z.array(z.number().int().positive()).min(1).max(100).optional(),
+    attention: z.array(attentionSchema).min(1).max(4).optional(),
     search: z.string().trim().min(1).optional(),
   })
   .strict();

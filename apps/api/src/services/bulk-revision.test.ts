@@ -13,6 +13,7 @@ import { createEmployee, deactivateEmployee } from './employees';
 
 // FIXED_NOW is 2026-01-15, so that is "today" for every rule below.
 const deps = { now: () => FIXED_NOW };
+const TODAY = '2026-01-15';
 
 let database: ReturnType<typeof createTestDb>;
 
@@ -57,10 +58,14 @@ describe('previewBulkRevision', () => {
   it('gives each row its current and proposed pay in USD and the change in basis points', () => {
     const india = add({ countryCode: 'IN', amountMinor: 500_000_000 });
     const odd = add({ amountMinor: 333 });
-    const items = previewBulkRevision(database.db, {
-      employeeIds: [india, odd],
-      percentageBp: 700,
-    }).items;
+    const items = previewBulkRevision(
+      database.db,
+      {
+        employeeIds: [india, odd],
+        percentageBp: 700,
+      },
+      TODAY,
+    ).items;
     expect(items.find((i) => i.employeeId === india)).toMatchObject({
       currencyCode: 'INR',
       currentAmountMinor: 500_000_000,
@@ -81,10 +86,14 @@ describe('previewBulkRevision', () => {
       add({ amountMinor: m * 1_000_000 }),
     );
     const high = add({ amountMinor: 100_000_000 }); // US/L1 fences are $50,000.00 to $250,000.00
-    const items = previewBulkRevision(database.db, {
-      filter: { level: [1] },
-      percentageBp: 100,
-    }).items;
+    const items = previewBulkRevision(
+      database.db,
+      {
+        filter: { level: [1] },
+        percentageBp: 100,
+      },
+      TODAY,
+    ).items;
     expect(items.find((i) => i.employeeId === high)?.outsidePeerRange).toBe('above');
     expect(
       items.filter((i) => peers.includes(i.employeeId)).map((i) => i.outsidePeerRange),
@@ -95,7 +104,7 @@ describe('previewBulkRevision', () => {
     add({ amountMinor: 10_000_000 });
     add({ amountMinor: 11_000_000 });
     add({ amountMinor: 100_000_000 });
-    const items = previewBulkRevision(database.db, { filter: {}, percentageBp: 100 }).items;
+    const items = previewBulkRevision(database.db, { filter: {}, percentageBp: 100 }, TODAY).items;
     expect(items.map((i) => i.outsidePeerRange)).toEqual([null, null, null]);
   });
 
@@ -103,10 +112,14 @@ describe('previewBulkRevision', () => {
     const l1 = add({ levelId: 1, amountMinor: 10_000_000 });
     add({ levelId: 2 });
 
-    const preview = previewBulkRevision(database.db, {
-      filter: { level: [1] },
-      percentageBp: 700,
-    });
+    const preview = previewBulkRevision(
+      database.db,
+      {
+        filter: { level: [1] },
+        percentageBp: 700,
+      },
+      TODAY,
+    );
 
     expect(preview.items).toHaveLength(1);
     expect(preview.items[0]).toMatchObject({
@@ -122,10 +135,14 @@ describe('previewBulkRevision', () => {
     const germany = add({ countryCode: 'DE' });
     add({ countryCode: 'US' });
 
-    const preview = previewBulkRevision(database.db, {
-      filter: { country: ['IN', 'DE'] },
-      percentageBp: 100,
-    });
+    const preview = previewBulkRevision(
+      database.db,
+      {
+        filter: { country: ['IN', 'DE'] },
+        percentageBp: 100,
+      },
+      TODAY,
+    );
 
     expect(preview.items.map((i) => i.employeeId).sort()).toEqual([india, germany].sort());
   });
@@ -135,9 +152,42 @@ describe('previewBulkRevision', () => {
     const gone = add();
     deactivateEmployee(database.db, gone, deps);
 
-    const preview = previewBulkRevision(database.db, { filter: {}, percentageBp: 100 });
+    const preview = previewBulkRevision(database.db, { filter: {}, percentageBp: 100 }, TODAY);
 
     expect(preview.items.map((i) => i.employeeId)).toEqual([active]);
+  });
+
+  it('previews exactly the active people an attention filter names', () => {
+    const stale = add();
+    add();
+    const staleGone = add();
+    deactivateEmployee(database.db, staleGone, deps);
+    const recent = createEmployee(
+      database.db,
+      {
+        firstName: 'Recent',
+        lastName: 'Hire',
+        email: 'recent@acme.test',
+        countryCode: 'US',
+        departmentId: 1,
+        levelId: 1,
+        jobTitle: 'Engineer',
+        hireDate: '2025-06-01',
+        amountMinor: 10_000_000,
+      },
+      deps,
+    );
+
+    const preview = previewBulkRevision(
+      database.db,
+      { filter: { attention: ['no-raise-2y'], country: ['US'] }, percentageBp: 100 },
+      TODAY,
+    );
+
+    expect(preview.items.map((i) => i.employeeId)).not.toContain(recent);
+    expect(preview.items.map((i) => i.employeeId)).not.toContain(staleGone);
+    expect(preview.items).toHaveLength(2);
+    expect(preview.items.map((i) => i.employeeId)).toContain(stale);
   });
 
   it('previews exactly the listed employees when given ids, dropping inactive and unknown ones', () => {
@@ -146,10 +196,14 @@ describe('previewBulkRevision', () => {
     const gone = add();
     deactivateEmployee(database.db, gone, deps);
 
-    const preview = previewBulkRevision(database.db, {
-      employeeIds: [a, gone, 9999],
-      percentageBp: 100,
-    });
+    const preview = previewBulkRevision(
+      database.db,
+      {
+        employeeIds: [a, gone, 9999],
+        percentageBp: 100,
+      },
+      TODAY,
+    );
 
     expect(preview.items.map((i) => i.employeeId)).toEqual([a]);
   });
@@ -157,7 +211,7 @@ describe('previewBulkRevision', () => {
   it('does not write anything', () => {
     const id = add();
 
-    previewBulkRevision(database.db, { filter: {}, percentageBp: 500 });
+    previewBulkRevision(database.db, { filter: {}, percentageBp: 500 }, TODAY);
 
     expect(historyOf(id)).toHaveLength(1);
     expect(batches()).toHaveLength(0);
@@ -170,11 +224,15 @@ describe('summariseBulkRevision', () => {
     const b = add({ amountMinor: 20_000_000 });
     const c = add({ countryCode: 'IN', amountMinor: 500_000_000 });
     expect(
-      summariseBulkRevision(database.db, {
-        employeeIds: [a, b, c],
-        percentageBp: 700,
-        overrides: [{ employeeId: b, newAmountMinor: 21_000_000 }],
-      }),
+      summariseBulkRevision(
+        database.db,
+        {
+          employeeIds: [a, b, c],
+          percentageBp: 700,
+          overrides: [{ employeeId: b, newAmountMinor: 21_000_000 }],
+        },
+        TODAY,
+      ),
     ).toEqual({
       headcount: 3,
       byDepartment: [{ departmentName: 'Engineering', headcount: 3 }],
@@ -195,7 +253,7 @@ describe('summariseBulkRevision', () => {
   it('gives only the headcount and departments when no percentage is chosen', () => {
     const a = add();
     const b = add();
-    expect(summariseBulkRevision(database.db, { employeeIds: [a, b] })).toEqual({
+    expect(summariseBulkRevision(database.db, { employeeIds: [a, b] }, TODAY)).toEqual({
       headcount: 2,
       byDepartment: [{ departmentName: 'Engineering', headcount: 2 }],
       revision: null,
@@ -205,7 +263,7 @@ describe('summariseBulkRevision', () => {
   it('orders the department breakdown by headcount, then by name', () => {
     database.db.insert(departments).values({ name: 'Sales' }).run();
     const ids = [add({ departmentId: 1 }), add({ departmentId: 2 }), add({ departmentId: 2 })];
-    expect(summariseBulkRevision(database.db, { employeeIds: ids }).byDepartment).toEqual([
+    expect(summariseBulkRevision(database.db, { employeeIds: ids }, TODAY).byDepartment).toEqual([
       { departmentName: 'Sales', headcount: 2 },
       { departmentName: 'Engineering', headcount: 1 },
     ]);
@@ -214,14 +272,18 @@ describe('summariseBulkRevision', () => {
   it('ignores edits for people outside the selection and edits equal to the proposed amount', () => {
     const a = add({ amountMinor: 10_000_000 });
     const outside = add({ amountMinor: 10_000_000 });
-    const summary = summariseBulkRevision(database.db, {
-      employeeIds: [a],
-      percentageBp: 700,
-      overrides: [
-        { employeeId: a, newAmountMinor: 10_700_000 },
-        { employeeId: outside, newAmountMinor: 12_000_000 },
-      ],
-    });
+    const summary = summariseBulkRevision(
+      database.db,
+      {
+        employeeIds: [a],
+        percentageBp: 700,
+        overrides: [
+          { employeeId: a, newAmountMinor: 10_700_000 },
+          { employeeId: outside, newAmountMinor: 12_000_000 },
+        ],
+      },
+      TODAY,
+    );
     expect(summary.revision?.overriddenCount).toBe(0);
     expect(summary.revision?.overrideChangeBp).toEqual([]);
     expect(summary.revision?.addedByCurrency).toEqual([
@@ -233,13 +295,13 @@ describe('summariseBulkRevision', () => {
     const a = add();
     const gone = add();
     deactivateEmployee(database.db, gone, deps);
-    expect(summariseBulkRevision(database.db, { employeeIds: [a, gone] }).headcount).toBe(1);
+    expect(summariseBulkRevision(database.db, { employeeIds: [a, gone] }, TODAY).headcount).toBe(1);
   });
 
   it('does not write anything', () => {
     const a = add();
     const before = database.db.select().from(salaryHistory).all().length;
-    summariseBulkRevision(database.db, { employeeIds: [a], percentageBp: 500 });
+    summariseBulkRevision(database.db, { employeeIds: [a], percentageBp: 500 }, TODAY);
     expect(database.db.select().from(salaryHistory).all().length).toBe(before);
     expect(employee(a).currentAmountMinor).toBe(10_000_000);
   });

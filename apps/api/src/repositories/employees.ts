@@ -88,6 +88,8 @@ export interface EmployeeListFilter {
   level?: number[];
   status: EmployeeStatus | 'all';
   search?: string;
+  /** Only these ids match; an empty list matches nobody. */
+  employeeIds?: number[];
 }
 
 export interface EmployeeListPage {
@@ -121,6 +123,12 @@ function listWhere(filter: EmployeeListFilter): SQL | undefined {
       or ${employees.email} like ${pattern} escape '\\'
       or ${employees.jobTitle} like ${pattern} escape '\\'
     )`);
+  }
+  if (filter.employeeIds) {
+    // One JSON parameter instead of one per id, so a long list stays under SQLite's variable limit.
+    conditions.push(
+      sql`${employees.id} in (select value from json_each(${JSON.stringify(filter.employeeIds)}))`,
+    );
   }
   return and(...conditions);
 }

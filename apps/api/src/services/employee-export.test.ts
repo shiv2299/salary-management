@@ -4,6 +4,7 @@ import { createEmployee, deactivateEmployee } from './employees';
 import { exportEmployeesCsv, type EmployeeExportQuery } from './employee-export';
 
 const deps = { now: () => FIXED_NOW };
+const TODAY = '2026-01-15';
 
 let database: ReturnType<typeof createTestDb>;
 
@@ -18,6 +19,7 @@ function add(
     jobTitle?: string;
     countryCode?: string;
     amountMinor?: number;
+    hireDate?: string;
   } = {},
 ) {
   return createEmployee(
@@ -30,7 +32,7 @@ function add(
       departmentId: 1,
       levelId: 1,
       jobTitle: overrides.jobTitle ?? 'Engineer',
-      hireDate: '2020-01-01',
+      hireDate: overrides.hireDate ?? '2020-01-01',
       amountMinor: overrides.amountMinor ?? 12_345_678,
     },
     deps,
@@ -46,7 +48,7 @@ const listQuery = (over: Partial<EmployeeExportQuery> = {}): EmployeeExportQuery
 });
 
 const csv = (query: EmployeeExportQuery, options?: { batchSize: number }) =>
-  [...exportEmployeesCsv(database.db, query, options)].join('');
+  [...exportEmployeesCsv(database.db, query, TODAY, options)].join('');
 
 const lines = (text: string) => text.trimEnd().split('\r\n');
 
@@ -105,6 +107,18 @@ describe('exportEmployeesCsv', () => {
     expect(new Set(rows.map((r) => r.split(',')[0])).size).toBe(7);
   });
 
+  it('exports exactly the rows of an attention-filtered list', () => {
+    const stale = add({ countryCode: 'US' });
+    add({ countryCode: 'US', hireDate: '2025-06-01' });
+    const staleIndia = add({ countryCode: 'IN' });
+
+    const rows = lines(csv(listQuery({ attention: ['no-raise-2y'], country: ['US'] }))).slice(1);
+    const all = lines(csv(listQuery({ attention: ['no-raise-2y'] }), { batchSize: 1 })).slice(1);
+
+    expect(rows.map((r) => Number(r.split(',')[0]))).toEqual([stale]);
+    expect(all.map((r) => Number(r.split(',')[0]))).toEqual([stale, staleIndia]);
+  });
+
   it('quotes fields containing commas, quotes or line breaks', () => {
     add({ jobTitle: 'Lead, "Platform"\nTeam' });
 
@@ -122,7 +136,7 @@ describe('exportEmployeesCsv', () => {
   it('lets other statements run on the connection between chunks', () => {
     const id = add();
     add();
-    const chunks = exportEmployeesCsv(database.db, listQuery(), { batchSize: 1 });
+    const chunks = exportEmployeesCsv(database.db, listQuery(), TODAY, { batchSize: 1 });
     chunks.next();
     chunks.next();
 

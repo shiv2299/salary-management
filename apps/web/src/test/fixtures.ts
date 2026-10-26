@@ -233,6 +233,12 @@ export function employeeFacets(overrides: Partial<EmployeeFacets> = {}): Employe
       { value: 3, count: 2500 },
       { value: 4, count: 1077 },
     ],
+    attention: [
+      { value: 'outlier-above', count: 0 },
+      { value: 'outlier-below', count: 0 },
+      { value: 'no-raise-2y', count: 0 },
+      { value: 'compression', count: 0 },
+    ],
     ...overrides,
   };
 }

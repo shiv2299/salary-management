@@ -6,6 +6,7 @@ import {
   type EmployeeListFilter,
   type EmployeeListRow,
 } from '../repositories/employees';
+import { withAttention } from './attention';
 import type { EmployeeListQuery } from './employee-list';
 
 export type EmployeeExportQuery = Omit<EmployeeListQuery, 'limit' | 'offset'> & {
@@ -68,19 +69,25 @@ function toCsvLine(row: EmployeeListRow): string {
 export function* exportEmployeesCsv(
   db: DbHandle,
   query: EmployeeExportQuery,
+  today: string,
   { batchSize = DEFAULT_BATCH_SIZE }: { batchSize?: number } = {},
 ): Generator<string> {
-  const { scope, country, department, level, status, search } = query;
+  const { scope, country, department, level, status, search, attention } = query;
   const filter: EmployeeListFilter =
     scope === 'all'
       ? { status: 'all' }
-      : {
-          status,
-          ...(country !== undefined && { country }),
-          ...(department !== undefined && { department }),
-          ...(level !== undefined && { level }),
-          ...(search !== undefined && { search }),
-        };
+      : withAttention(
+          db,
+          {
+            status,
+            ...(country !== undefined && { country }),
+            ...(department !== undefined && { department }),
+            ...(level !== undefined && { level }),
+            ...(search !== undefined && { search }),
+          },
+          attention,
+          today,
+        );
 
   yield HEADER.join(',') + LINE_BREAK;
 

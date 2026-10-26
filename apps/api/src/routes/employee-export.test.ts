@@ -52,6 +52,16 @@ describe('GET /api/employees/export', () => {
     expect(response.body).toContain('Ann');
   });
 
+  it('exports only the people an attention filter names', async () => {
+    const t = await setup();
+
+    const none = await get(t, '/api/employees/export?scope=filtered&attention=outlier-above');
+    const stale = await get(t, '/api/employees/export?scope=filtered&attention=no-raise-2y');
+
+    expect(none.body.trimEnd().split('\r\n')).toHaveLength(1);
+    expect(stale.body.trimEnd().split('\r\n')).toHaveLength(3);
+  });
+
   it('exports the rows matching several values of one filter', async () => {
     const t = await setup();
 

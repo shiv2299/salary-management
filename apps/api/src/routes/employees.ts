@@ -62,7 +62,7 @@ export const employeeRoutes =
           response: { 200: employeeListResponseSchema },
         },
       },
-      (request) => listEmployees(database.db, request.query),
+      (request) => listEmployees(database.db, request.query, today()),
     );
 
     // Static paths: find-my-way ranks them above `/api/employees/:id`.
@@ -81,6 +81,7 @@ export const employeeRoutes =
           employeeIds !== undefined
             ? { employeeIds, percentageBp }
             : { filter: filter ?? {}, percentageBp },
+          today(),
         );
       },
     );
@@ -104,6 +105,7 @@ export const employeeRoutes =
           employeeIds !== undefined
             ? { employeeIds, ...figures }
             : { filter: filter ?? {}, ...figures },
+          today(),
         );
       },
     );
@@ -138,7 +140,7 @@ export const employeeRoutes =
             'content-disposition',
             `attachment; filename="employees-${request.query.scope}-${today()}.csv"`,
           )
-          .send(Readable.from(exportEmployeesCsv(database.db, request.query)));
+          .send(Readable.from(exportEmployeesCsv(database.db, request.query, today())));
       },
     );
 
@@ -150,7 +152,7 @@ export const employeeRoutes =
           response: { 200: employeeFacetsResponseSchema },
         },
       },
-      (request) => getEmployeeFacets(database.db, request.query),
+      (request) => getEmployeeFacets(database.db, request.query, today()),
     );
 
     app.get(

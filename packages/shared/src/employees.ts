@@ -31,7 +31,7 @@ function splitListParam(raw: unknown): unknown {
 /** The most values one list filter accepts. */
 export const MAX_FILTER_VALUES = 100;
 
-function multiValueParam<T extends z.ZodType>(item: T) {
+export function multiValueParam<T extends z.ZodType>(item: T) {
   return z.preprocess(splitListParam, z.array(item).min(1).max(MAX_FILTER_VALUES).optional());
 }
 
@@ -49,6 +49,7 @@ export const employeeListQuerySchema = z.object({
   country: multiValueParam(z.string().min(1)),
   department: multiValueParam(z.coerce.number().int().positive()),
   level: multiValueParam(z.coerce.number().int().positive()),
+  attention: multiValueParam(attentionSchema),
   status: z.enum(['active', 'inactive', 'all']).default('active'),
   search: z.string().trim().min(1).optional(),
   sortBy: z
@@ -77,7 +78,8 @@ const facetCount = <T extends z.ZodType>(value: T) =>
 
 /**
  * How many employees each filter option would match. A group's counts apply the search and every
- * other group's selection but not its own; options nobody matches are left out.
+ * other group's selection but not its own; options nobody matches are left out, except the
+ * attention values, which are always listed.
  */
 export const employeeFacetsResponseSchema = z.object({
   /** Employees in the chosen status, before any other filter or search. */
@@ -86,6 +88,8 @@ export const employeeFacetsResponseSchema = z.object({
   country: facetCount(z.string()),
   department: facetCount(z.number().int()),
   level: facetCount(z.number().int()),
+  /** Always all four values, in `ATTENTION_VALUES` order, zero counts included. */
+  attention: facetCount(attentionSchema),
 });
 
 export const employeeListItemSchema = z.object({

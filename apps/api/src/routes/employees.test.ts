@@ -75,6 +75,26 @@ describe('GET /api/employees', () => {
     expect((await get(t, '/api/employees?country=IN')).json<{ total: number }>().total).toBe(0);
   });
 
+  it('accepts attention as repeated or comma-separated values', async () => {
+    const t = await setup();
+
+    const repeated = await get(t, '/api/employees?attention=outlier-above&attention=no-raise-2y');
+    const commas = await get(t, '/api/employees?attention=outlier-above,no-raise-2y');
+
+    expect(repeated.statusCode).toBe(200);
+    expect(commas.json()).toEqual(repeated.json());
+    // Ann, Bob and Cy were hired in 2021 and never raised.
+    expect(repeated.json<{ total: number }>().total).toBe(3);
+  });
+
+  it('rejects an unknown attention value with 400', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees?attention=underpaid');
+
+    expect(response.statusCode).toBe(400);
+  });
+
   it('rejects a malformed department or level id with a validation error', async () => {
     const t = await setup();
 
@@ -546,6 +566,19 @@ describe('GET /api/employees/facets', () => {
     }>();
     expect(body.statusTotal).toBe(3);
     expect(body.level).toEqual([{ value: 1, count: 3 }]);
+  });
+
+  it('lists every attention value with its count', async () => {
+    const t = await setup();
+
+    const response = await get(t, '/api/employees/facets?attention=no-raise-2y');
+
+    expect(response.json<{ attention: unknown }>().attention).toEqual([
+      { value: 'outlier-above', count: 0 },
+      { value: 'outlier-below', count: 0 },
+      { value: 'no-raise-2y', count: 3 },
+      { value: 'compression', count: 0 },
+    ]);
   });
 
   it('is not mistaken for an employee id', async () => {

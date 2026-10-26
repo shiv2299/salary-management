@@ -4,7 +4,7 @@ import { compressionGroups, hasNoRecentIncrease } from '../domain/attention-rule
 import { peerGroupKey, peerPosition } from '../domain/peer-groups';
 import { divideRoundHalfAwayFromZero } from '../domain/money';
 import { listCountries } from '../repositories/countries';
-import { listActiveEmployeeRows } from '../repositories/employees';
+import { listActiveEmployeeRows, type EmployeeListFilter } from '../repositories/employees';
 import { listLevels } from '../repositories/levels';
 import { listLastIncreaseDates } from '../repositories/salary-history';
 import { getPeerGroups } from './peer-groups';
@@ -72,6 +72,20 @@ export function getAttentionSets(db: DbHandle, today: string): AttentionSets {
 /** The union of the chosen sets, ascending. */
 export function attentionEmployeeIds(sets: AttentionSets, values: readonly Attention[]): number[] {
   return [...new Set(values.flatMap((value) => sets[value]))].sort((a, b) => a - b);
+}
+
+/**
+ * `filter` restricted to the people on the chosen attention lists, or unchanged when none are
+ * chosen. The lists are computed only when needed.
+ */
+export function withAttention(
+  db: DbHandle,
+  filter: EmployeeListFilter,
+  attention: readonly Attention[] | undefined,
+  today: string,
+): EmployeeListFilter {
+  if (!attention?.length) return filter;
+  return { ...filter, employeeIds: attentionEmployeeIds(getAttentionSets(db, today), attention) };
 }
 
 export function getAttention(db: DbHandle, today: string): AttentionResponse {

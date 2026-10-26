@@ -6,6 +6,7 @@ import { createEmployees, type NewEmployeeInput } from './employees';
 import { listEmployees, type EmployeeListQuery } from './employee-list';
 
 const deps = { now: () => FIXED_NOW };
+const TODAY = '2026-01-15';
 
 let database: ReturnType<typeof createTestDb>;
 let emailSequence = 0;
@@ -42,14 +43,18 @@ function deactivate(id: number) {
 }
 
 function list(query: Partial<EmployeeListQuery> = {}) {
-  return listEmployees(database.db, {
-    status: 'active',
-    sortBy: 'name',
-    sortOrder: 'asc',
-    limit: 50,
-    offset: 0,
-    ...query,
-  });
+  return listEmployees(
+    database.db,
+    {
+      status: 'active',
+      sortBy: 'name',
+      sortOrder: 'asc',
+      limit: 50,
+      offset: 0,
+      ...query,
+    },
+    TODAY,
+  );
 }
 
 const names = (result: ReturnType<typeof list>) =>
@@ -307,5 +312,54 @@ describe('listEmployees rows', () => {
         effectiveDate: '2021-03-01',
       },
     });
+  });
+});
+
+describe('listEmployees attention filter', () => {
+  /** Ten US L1 peers, then one far above and one far below them, and an outlier in India. */
+  function addOutliers() {
+    for (let i = 0; i < 10; i++)
+      add({ amountMinor: 1_000_000 + i * 10_000, hireDate: '2025-06-01' });
+    const usAbove = add({ firstName: 'UsAbove', amountMinor: 50_000_000, hireDate: '2025-06-01' });
+    for (let i = 0; i < 10; i++) {
+      add({ countryCode: 'IN', amountMinor: 100_000_000 + i * 1_000_000, hireDate: '2025-06-01' });
+    }
+    const inAbove = add({
+      firstName: 'InAbove',
+      countryCode: 'IN',
+      amountMinor: 9_000_000_000,
+      hireDate: '2025-06-01',
+    });
+    return { usAbove, inAbove };
+  }
+
+  it('returns only the people the attention filter names, ANDed with the other filters', () => {
+    const { usAbove, inAbove } = addOutliers();
+
+    const both = list({ attention: ['outlier-above', 'outlier-below'] });
+    const us = list({ attention: ['outlier-above', 'outlier-below'], country: ['US'] });
+
+    expect(both.items.map((e) => e.id).sort((a, b) => a - b)).toEqual([usAbove, inAbove]);
+    expect(us.items.map((e) => e.id)).toEqual([usAbove]);
+    expect(us.total).toBe(1);
+  });
+
+  it('returns nobody for an attention filter with inactive status', () => {
+    const { usAbove } = addOutliers();
+    deactivate(usAbove);
+
+    const result = list({ attention: ['outlier-above'], status: 'inactive' });
+
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it('matches nobody when an attention set is empty', () => {
+    add({ hireDate: '2025-06-01' });
+
+    const result = list({ attention: ['compression'] });
+
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
   });
 });

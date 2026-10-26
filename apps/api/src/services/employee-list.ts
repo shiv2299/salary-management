@@ -1,4 +1,6 @@
+import type { Attention } from '@acme/shared';
 import type { DbHandle } from '../db/client';
+import { withAttention } from './attention';
 import {
   listEmployeeRows,
   type EmployeeListRow,
@@ -6,7 +8,8 @@ import {
   type EmployeeListPage,
 } from '../repositories/employees';
 
-export type EmployeeListQuery = EmployeeListFilter & EmployeeListPage;
+export type EmployeeListQuery = Omit<EmployeeListFilter, 'employeeIds'> &
+  EmployeeListPage & { attention?: Attention[] };
 
 export function toEmployeeListItem(row: EmployeeListRow) {
   return {
@@ -31,17 +34,22 @@ export function toEmployeeListItem(row: EmployeeListRow) {
   };
 }
 
-export function listEmployees(db: DbHandle, query: EmployeeListQuery) {
-  const { country, department, level, status, search, ...page } = query;
+export function listEmployees(db: DbHandle, query: EmployeeListQuery, today: string) {
+  const { country, department, level, status, search, attention, ...page } = query;
   const { rows, total } = listEmployeeRows(
     db,
-    {
-      status,
-      ...(country !== undefined && { country }),
-      ...(department !== undefined && { department }),
-      ...(level !== undefined && { level }),
-      ...(search !== undefined && { search }),
-    },
+    withAttention(
+      db,
+      {
+        status,
+        ...(country !== undefined && { country }),
+        ...(department !== undefined && { department }),
+        ...(level !== undefined && { level }),
+        ...(search !== undefined && { search }),
+      },
+      attention,
+      today,
+    ),
     page,
   );
 

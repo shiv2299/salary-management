@@ -44,6 +44,27 @@ async function post(t: TestApp, url: string, payload: unknown) {
 }
 
 describe('POST /api/employees/bulk-salary-changes/preview', () => {
+  it('selects the people an attention filter names, and nobody for an empty set', async () => {
+    const t = await setup();
+
+    const stale = await post(t, '/api/employees/bulk-salary-changes/preview', {
+      filter: { attention: ['no-raise-2y'] },
+      percentageBp: 500,
+    });
+    const none = await post(t, '/api/employees/bulk-salary-changes/preview', {
+      filter: { attention: ['compression'] },
+      percentageBp: 500,
+    });
+    const unknown = await post(t, '/api/employees/bulk-salary-changes/preview', {
+      filter: { attention: ['underpaid'] },
+      percentageBp: 500,
+    });
+
+    expect(stale.json<{ total: number }>().total).toBe(2);
+    expect(none.json<{ total: number }>().total).toBe(0);
+    expect(unknown.statusCode).toBe(400);
+  });
+
   it('returns every matching active employee with the proposed amount', async () => {
     const t = await setup();
 

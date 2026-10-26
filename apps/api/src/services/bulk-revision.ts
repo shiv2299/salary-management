@@ -1,4 +1,4 @@
-import type { BulkOverride, BulkSummary, LatestBulkRevision } from '@acme/shared';
+import type { Attention, BulkOverride, BulkSummary, LatestBulkRevision } from '@acme/shared';
 import type { DbHandle } from '../db/client';
 import { bulkRevisionFigures } from '../domain/bulk-summary';
 import { BASE_CURRENCY, convert } from '../domain/fx';
@@ -17,12 +17,21 @@ import {
   findLatestSalaryRevisionBatch,
   insertSalaryRevisionBatch,
 } from '../repositories/salary-revision-batches';
+import { withAttention } from './attention';
 import { getPeerGroups, type PeerGroup } from './peer-groups';
 import { currencyInForce } from './salary-changes';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
 
 export type BulkSelectionInput =
-  | { filter: { country?: string[]; department?: number[]; level?: number[]; search?: string } }
+  | {
+      filter: {
+        country?: string[];
+        department?: number[];
+        level?: number[];
+        attention?: Attention[];
+        search?: string;
+      };
+    }
   | { employeeIds: number[] };
 
 export type BulkPreviewInput = BulkSelectionInput & { percentageBp: number };
@@ -40,10 +49,18 @@ export interface BulkConfirmInput {
 }
 
 /** The active employees a selection names: explicit ids, or everyone matching the filter. */
-function selectedRows(db: DbHandle, selection: BulkSelectionInput): EmployeeListRow[] {
-  return 'employeeIds' in selection
-    ? listActiveEmployeeRowsByIds(db, selection.employeeIds)
-    : listActiveEmployeeRowsMatching(db, definedOnly(selection.filter));
+function selectedRows(
+  db: DbHandle,
+  selection: BulkSelectionInput,
+  today: string,
+): EmployeeListRow[] {
+  if ('employeeIds' in selection) return listActiveEmployeeRowsByIds(db, selection.employeeIds);
+  const { attention, ...rest } = definedOnly(selection.filter);
+  const { employeeIds } = withAttention(db, { status: 'active' }, attention, today);
+  return listActiveEmployeeRowsMatching(db, {
+    ...rest,
+    ...(employeeIds !== undefined && { employeeIds }),
+  });
 }
 
 /**
@@ -52,8 +69,8 @@ function selectedRows(db: DbHandle, selection: BulkSelectionInput): EmployeeList
  * country and level peer range (the outliers rule). Read-only and not paginated: the UI pages
  * through it and holds overrides locally.
  */
-export function previewBulkRevision(db: DbHandle, input: BulkPreviewInput) {
-  const rows = selectedRows(db, input);
+export function previewBulkRevision(db: DbHandle, input: BulkPreviewInput, today: string) {
+  const rows = selectedRows(db, input, today);
   const rates = loadLatestFxRates(db);
   const distinctPairs = new Map(
     rows.map((row) => [
@@ -104,8 +121,12 @@ export function previewBulkRevision(db: DbHandle, input: BulkPreviewInput) {
  * the change each hand edit amounts to. An edit counts only for a selected person and only when it
  * differs from the amount the percentage gives. Read-only.
  */
-export function summariseBulkRevision(db: DbHandle, input: BulkSummaryInput): BulkSummary {
-  const rows = selectedRows(db, input);
+export function summariseBulkRevision(
+  db: DbHandle,
+  input: BulkSummaryInput,
+  today: string,
+): BulkSummary {
+  const rows = selectedRows(db, input, today);
 
   const perDepartment = new Map<string, number>();
   for (const row of rows) {

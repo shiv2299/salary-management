@@ -128,7 +128,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**:
 - Hidden from the employee list by default (the status filter can show them).
-- Excluded from all insights.
+- Excluded from insights about the present (headcount, payroll today, pay bands, attention). Included in history-based insights (payroll trend, change by cause, raises) for the time they were paid.
 - Included in recent changes, marked as inactive.
 - Included in "export all"; included in "export current result" only if the current filter includes them.
 - Cannot receive salary changes and are skipped by bulk revisions.
@@ -166,13 +166,77 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Revisit if**: measured search latency approaches the target, which is likely somewhere past a few hundred thousand rows. Then add an FTS5 table with the `trigram` tokenizer, which supports substring matching.
 
-## Salary changes view: 3 or 5 years, by effective date
+## Salary changes: 3, 5 or 10 years or all, a year and a reason, on their own page
 
 **Alternatives considered**: a short window such as 90 days; windowing by `created_at` (when the change was entered).
 
-**Chosen**: the window is the last 3 or 5 years (default 3), and a change counts if its `effective_date` falls inside it.
+**Chosen**: the latest five changes sit on Insights; the full list is at `/insights/changes` with a range of 3, 5 or 10 years or all time (default 3 years), a reason and a calendar year. A chosen year overrides the range. A change counts if its `effective_date` falls inside.
 
-**Why**: revisions happen a few times a year, so a 90-day window would usually show one cycle or none. Compensation questions are about multi-year patterns: how pay moved across the last few increment cycles, and who was promoted when. Bulk revisions collapse into one entry each, and the list is paginated, so even 5 years stays readable. The window is based on effective date because the question is when pay actually changed. The cost is that a correction entered today but backdated to before the window won't appear. That's acceptable because the change is still visible in that employee's history.
+**Why**: revisions happen a few times a year, so a 90-day window would usually show one cycle or none. Compensation questions are about multi-year patterns: how pay moved across the last few increment cycles, and who was promoted when. Bulk revisions collapse into one entry each, and the list is paginated, so even all time stays readable. The window is based on effective date because the question is when pay actually changed. The cost is that a correction entered today but backdated to before the window won't appear. That's acceptable because the change is still visible in that employee's history.
+
+## Insights trends: constant currency
+
+**Alternatives considered**: converting each historical amount at the rate of its own date (needs a rate history the product doesn't have, and mixes currency moves into pay trends); local currency per country (no total).
+
+**Chosen**: every past amount converts to USD at the latest static rate, and the meta line says so.
+
+**Why**: the question is how pay changed, and at fixed rates every movement in a trend is a pay movement.
+
+## Insights windows: trailing 12 months for tiles and sentences, calendar years for charts
+
+**Alternatives considered**: calendar year to date for everything (compares a partial year with a full one, so figures always "fall" early in the year); rolling windows on the charts too.
+
+**Chosen**: tiles and answers compare the last 12 months with the 12 before; yearly charts use calendar years with the current year marked "YTD".
+
+**Why**: like-for-like comparisons in the sentences, and familiar years on the axis.
+
+## Payroll change by cause: walk each person's pay through the window
+
+**Alternatives considered**: compare first and last pay per person and attribute the whole difference to the latest reason (hides a raise followed by a correction); sum row deltas (double counts same-day corrections and ignores leavers).
+
+**Chosen**: from a year ago to today, each person's paid amount changes only on the day they join the payroll (New hires, + their pay), the day a salary row takes effect (+ the step, under the reason of the row in force at the end of that day), or the day they leave (People who left, − their pay). The steps telescope, so the parts sum exactly to the payroll difference.
+
+**Why**: an exact reconciliation is the acceptance rule, and this keeps each step under the reason that caused it.
+
+## Needs attention: thresholds in one domain module
+
+**Alternatives considered**: thresholds as API parameters; configuration in the database.
+
+**Chosen**: `domain/attention-rules.ts` holds `NO_RAISE_YEARS = 2`, `RECENT_HIRE_YEARS = 1`, `LONG_TENURE_YEARS = 3`, `COMPRESSION_MIN_SUBGROUP = 5` and `COMPRESSION_MARGIN_BP = 500`. A group is compressed only when its recent hires' median is more than 5% above its long-tenured median.
+
+**Why**: these are product rules, not user settings. A gap of a few percent between two small groups' medians is noise, and the margin keeps the card to groups where recent hires are clearly paid more.
+
+## Attention filter: resolved to ids on the server, ANDed with the other filters
+
+**Alternatives considered**: SQL for each rule (the outlier fences and medians need in-memory statistics anyway); a precomputed flag column (stale after every change and every day that passes).
+
+**Chosen**: `services/attention.ts` computes the four id sets from active employees, today's date and the peer groups. The list, facets, export and bulk selection AND the union of the chosen sets with their other filters, passed to SQLite as one JSON array through `json_each`.
+
+**Why**: one definition serves the list, the counts, the export and the bulk revision, so "export current result" and "select all matching" take exactly the people shown. One bound parameter stays within SQLite's limit at any size.
+
+## Insights endpoints: one per card, history read in full per request
+
+**Alternatives considered**: one endpoint for the whole page (any change reloads everything); pre-aggregated tables (a second write path the single salary writer would have to keep in step).
+
+**Chosen**: payroll trend, payroll change, raises, level bands and attention each have their own endpoint. The tiles read the trend summary, the raises' last 12 months and the attention counts. `GET /api/insights/payroll` and `/outliers` are removed, since today's trend point and the attention filter replace them.
+
+**Why**: each card loads and fails on its own. Reading about 61,000 rows stays within the latency target (`docs/performance.md`). Removing the old endpoints leaves one definition of each figure.
+
+## Charts: one value axis, a strip chart for the second measure
+
+**Alternatives considered**: headcount as a line on a second axis (two scales on one chart invite false comparisons); headcount only in the tooltip.
+
+**Chosen**: payroll bars with a 64px headcount strip beneath, and average raise with a 64px raise-count strip beneath, sharing the years.
+
+**Why**: both measures stay visible without one appearing to cause the other.
+
+## Chart series colours: seven categorical slots
+
+**Alternatives considered**: shades of the accent (unreadable with seven departments); a library default palette (includes the green and red the product reserves for pay going up and down).
+
+**Chosen**: `series-1` … `series-7` (`docs/design.md` §2), in fixed order, starting with the accent, and checked for colour-blind separation between neighbours.
+
+**Why**: departments need seven distinguishable colours that never read as good or bad.
 
 ## Seed data: deterministic relative to a reference date
 

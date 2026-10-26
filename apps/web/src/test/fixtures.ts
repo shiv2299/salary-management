@@ -236,7 +236,7 @@ export function employeeFacets(overrides: Partial<EmployeeFacets> = {}): Employe
     attention: [
       { value: 'outlier-above', count: 0 },
       { value: 'outlier-below', count: 0 },
-      { value: 'no-raise-2y', count: 0 },
+      { value: 'no-raise-2y', count: 381 },
       { value: 'compression', count: 0 },
     ],
     ...overrides,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { EmployeeFacets } from '@acme/shared';
+import { ATTENTION_VALUES, type EmployeeFacets } from '@acme/shared';
 import { PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { useStoredFlag } from '@/hooks/use-stored-flag';
 import { useIsDesktop } from '@/hooks/use-is-desktop';
 import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
+import { ATTENTION_LABELS } from './attention-labels';
 import {
   activeFilterCount,
   statusChecks,
@@ -83,6 +84,18 @@ function FilterGroups({ filters, onChange, facets }: Props) {
           value: level.id,
           label: level.code,
           count: countOf(facets?.level, level.id),
+        }))}
+      />
+      <CheckboxGroup
+        legend="Needs attention"
+        selected={filters.attention}
+        onChange={(next) => {
+          onChange({ attention: next });
+        }}
+        options={ATTENTION_VALUES.map((value) => ({
+          value,
+          label: ATTENTION_LABELS[value],
+          count: countOf(facets?.attention, value),
         }))}
       />
     </div>

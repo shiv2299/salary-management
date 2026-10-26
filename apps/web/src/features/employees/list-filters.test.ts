@@ -39,6 +39,7 @@ describe('filtersFromParams', () => {
       country: ['IN'],
       department: [3],
       level: [4],
+      attention: [],
       status: 'all',
       sortBy: 'salary',
       sortOrder: 'desc',
@@ -116,6 +117,7 @@ describe('paramsFromFilters', () => {
       country: ['DE', 'IN'],
       department: [2, 7],
       level: [5],
+      attention: ['no-raise-2y' as const, 'compression' as const],
       status: 'inactive' as const,
       sortBy: 'hireDate' as const,
       sortOrder: 'desc' as const,
@@ -287,5 +289,61 @@ describe('bulkFilterFrom', () => {
         page: 5,
       }),
     ).toEqual({ department: [1, 3], level: [2] });
+  });
+});
+
+describe('needs-attention filter', () => {
+  it('reads repeated and comma-separated attention values and drops unknown ones', () => {
+    const filters = filtersFromParams(
+      new URLSearchParams('attention=no-raise-2y,bogus&attention=compression'),
+    );
+    expect(filters.attention).toEqual(['no-raise-2y', 'compression']);
+  });
+
+  it('writes attention values back as repeated params', () => {
+    expect(
+      paramsFromFilters({
+        ...DEFAULT_FILTERS,
+        attention: ['outlier-above', 'outlier-below'],
+      }).toString(),
+    ).toBe('attention=outlier-above&attention=outlier-below');
+  });
+
+  it('sends attention to the list, facets and export queries', () => {
+    const filters = { ...DEFAULT_FILTERS, attention: ['compression' as const] };
+    expect(listApiQuery(filters).getAll('attention')).toEqual(['compression']);
+    expect(facetsApiQuery(filters).getAll('attention')).toEqual(['compression']);
+    const url = new URL(exportHref('filtered', filters), 'http://localhost');
+    expect(url.searchParams.getAll('attention')).toEqual(['compression']);
+  });
+
+  it('includes attention in the bulk filter only when something is selected', () => {
+    expect(bulkFilterFrom({ ...DEFAULT_FILTERS, attention: ['no-raise-2y'] })).toEqual({
+      attention: ['no-raise-2y'],
+    });
+    expect(bulkFilterFrom(DEFAULT_FILTERS)).toEqual({});
+  });
+
+  it('makes a chip per attention value, after levels and before status', () => {
+    const chips = filterChips(
+      {
+        ...DEFAULT_FILTERS,
+        level: [2],
+        attention: ['no-raise-2y', 'compression'],
+        status: 'all',
+      },
+      REFERENCE,
+    );
+    expect(chips.map((c) => c.label)).toEqual([
+      'L2',
+      'No raise in over 2 years',
+      'Paid less than new hires',
+      'Active and inactive',
+    ]);
+    expect(chips[1]!.remove).toEqual({ attention: ['compression'] });
+  });
+
+  it('counts attention values as active filters', () => {
+    expect(activeFilterCount({ ...DEFAULT_FILTERS, attention: ['compression'] })).toBe(1);
   });
 });

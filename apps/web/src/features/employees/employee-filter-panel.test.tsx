@@ -110,4 +110,29 @@ describe('EmployeeFilterPanel', () => {
     expect(within(dialog).getByRole('button', { name: 'Done' })).toBeDefined();
     expect(await within(dialog).findByRole('checkbox', { name: 'India' })).toBeDefined();
   });
+
+  it('shows a Needs attention group with a count per option', async () => {
+    renderPanel({
+      facets: employeeFacets({
+        attention: [
+          { value: 'outlier-above', count: 4 },
+          { value: 'outlier-below', count: 5 },
+          { value: 'no-raise-2y', count: 381 },
+          { value: 'compression', count: 7 },
+        ],
+      }),
+    });
+    const group = await screen.findByRole('group', { name: 'Needs attention' });
+    expect(within(group).getAllByRole('checkbox')).toHaveLength(4);
+    const box = within(group).getByRole('checkbox', { name: 'No raise in over 2 years' });
+    expect(document.getElementById(box.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      '381',
+    );
+  });
+
+  it('reports the new attention selection when an option is ticked', async () => {
+    renderPanel({ filters: { ...DEFAULT_FILTERS, attention: ['compression'] } });
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Paid above peer range' }));
+    expect(onChange).toHaveBeenCalledWith({ attention: ['compression', 'outlier-above'] });
+  });
 });

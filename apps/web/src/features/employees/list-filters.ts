@@ -1,13 +1,16 @@
 import {
+  ATTENTION_VALUES,
   DEFAULT_PAGE_SIZE,
   employeeListQuerySchema,
   MAX_FILTER_VALUES,
+  type Attention,
   type BulkPreviewBody,
   type Country,
   type Department,
   type EmployeeListQueryParams,
   type Level,
 } from '@acme/shared';
+import { ATTENTION_LABELS } from './attention-labels';
 
 export const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -23,6 +26,7 @@ export interface ListFilters {
   country: string[];
   department: number[];
   level: number[];
+  attention: Attention[];
   status: 'active' | 'inactive' | 'all';
   sortBy: SortKey;
   sortOrder: 'asc' | 'desc';
@@ -36,6 +40,7 @@ export const DEFAULT_FILTERS: ListFilters = {
   country: [],
   department: [],
   level: [],
+  attention: [],
   status: 'active',
   sortBy: 'name',
   sortOrder: 'asc',
@@ -43,8 +48,8 @@ export const DEFAULT_FILTERS: ListFilters = {
   page: 1,
 };
 
-type MultiValueKey = 'country' | 'department' | 'level';
-const MULTI_VALUE_KEYS: MultiValueKey[] = ['country', 'department', 'level'];
+type MultiValueKey = 'country' | 'department' | 'level' | 'attention';
+const MULTI_VALUE_KEYS: MultiValueKey[] = ['country', 'department', 'level', 'attention'];
 
 function pick<K extends 'status' | 'sortBy' | 'sortOrder' | 'search'>(
   params: URLSearchParams,
@@ -90,6 +95,7 @@ export function filtersFromParams(params: URLSearchParams): ListFilters {
     country: pickAll(params, 'country'),
     department: pickAll(params, 'department'),
     level: pickAll(params, 'level'),
+    attention: pickAll(params, 'attention'),
     pageSize: DEFAULT_FILTERS.pageSize,
     page: DEFAULT_FILTERS.page,
   };
@@ -168,7 +174,7 @@ export interface FilterChip {
   remove: Partial<ListFilters>;
 }
 
-/** One removable chip per selected value, then the status when it is not the default. */
+/** One removable chip per selected value, then attention, then the status when it is not the default. */
 export function filterChips(
   filters: ListFilters,
   ref: { countries: Country[]; departments: Department[]; levels: Level[] },
@@ -195,6 +201,14 @@ export function filterChips(
       remove: { level: filters.level.filter((value) => value !== id) },
     });
   }
+  for (const value of ATTENTION_VALUES) {
+    if (!filters.attention.includes(value)) continue;
+    chips.push({
+      key: `attention:${value}`,
+      label: ATTENTION_LABELS[value],
+      remove: { attention: filters.attention.filter((entry) => entry !== value) },
+    });
+  }
   if (filters.status !== DEFAULT_FILTERS.status) {
     chips.push({
       key: 'status',
@@ -211,6 +225,7 @@ export function activeFilterCount(filters: ListFilters): number {
     filters.country.length +
     filters.department.length +
     filters.level.length +
+    filters.attention.length +
     Number(filters.status !== DEFAULT_FILTERS.status)
   );
 }
@@ -230,6 +245,7 @@ export function exportHref(scope: 'filtered' | 'all', filters?: ListFilters): st
       'country',
       'department',
       'level',
+      'attention',
       'status',
       'sortBy',
       'sortOrder',
@@ -247,5 +263,6 @@ export function bulkFilterFrom(filters: ListFilters): NonNullable<BulkPreviewBod
     ...(filters.country.length > 0 ? { country: filters.country } : {}),
     ...(filters.department.length > 0 ? { department: filters.department } : {}),
     ...(filters.level.length > 0 ? { level: filters.level } : {}),
+    ...(filters.attention.length > 0 ? { attention: filters.attention } : {}),
   };
 }

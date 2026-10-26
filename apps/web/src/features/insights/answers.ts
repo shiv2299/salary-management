@@ -1,7 +1,14 @@
 // Sentence templates for the Insights page. Every number in them is an API figure, formatted here;
-// the only arithmetic is the difference of two headcounts and comparisons between two figures.
+// the only arithmetic is the difference or sum of two headcounts and comparisons between two figures.
 
-import type { PAYROLL_CAUSES, PayrollChangeResponse, PayrollTrendResponse } from '@acme/shared';
+import type {
+  AttentionResponse,
+  LevelBandsResponse,
+  PAYROLL_CAUSES,
+  PayrollChangeResponse,
+  PayrollTrendResponse,
+  RaiseStatsResponse,
+} from '@acme/shared';
 import { formatMoneyCompact, formatPercentageBp } from '@/lib/money';
 
 export type PayrollCause = (typeof PAYROLL_CAUSES)[number];
@@ -90,4 +97,63 @@ export function averageRaiseVsBefore(current: number | null, previous: number | 
 /** Tile hint: "↑ from 380 the 12 months before". */
 export function countVsBefore(current: number, previous: number): string {
   return versusBefore(current, previous, count(previous));
+}
+
+/** 13,500 → "1.35×", 16,000 → "1.6×": the point is moved four places, then shown to two decimals. */
+export function formatRatioBp(bp: number): string {
+  const digits = String(bp).padStart(5, '0');
+  const decimal = `${digits.slice(0, -4)}.${digits.slice(-4)}`;
+  const text = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(
+    decimal as unknown as number,
+  );
+  return `${text}×`;
+}
+
+/** "Raises in the last 12 months averaged 4.4%, down from 4.6% the 12 months before. …" */
+export function raisesAnswer(
+  trailing: RaiseStatsResponse['trailing'],
+  currencyCode = 'USD',
+): string {
+  const { current, previous } = trailing;
+  const added =
+    current.totalAddedBaseMinor === 0
+      ? ''
+      : ` Raises and promotions added ${formatMoneyCompact(current.totalAddedBaseMinor, currencyCode)} to annual payroll.`;
+  if (current.averageRaiseBp === null) return `No raises in the last 12 months.${added}`;
+  const average = `Raises in the last 12 months averaged ${formatPercentageBp(current.averageRaiseBp)}`;
+  if (previous.averageRaiseBp === null) return `${average}.${added}`;
+  const comparison =
+    current.averageRaiseBp === previous.averageRaiseBp
+      ? 'the same as the 12 months before'
+      : `${current.averageRaiseBp > previous.averageRaiseBp ? 'up' : 'down'} from ${formatPercentageBp(previous.averageRaiseBp)} the 12 months before`;
+  return `${average}, ${comparison}.${added}`;
+}
+
+/** "Each level pays 1.35–1.4× the one below. 12.34% of L2s earn more than the typical L3. …" */
+export function levelBandsAnswer(bands: LevelBandsResponse, countryName: string): string {
+  const { stepRange, largestOverlap, widestSpread } = bands.summary;
+  if (stepRange === null) return `Too few people in ${countryName} to compare levels.`;
+  const step =
+    stepRange.minBp === stepRange.maxBp
+      ? formatRatioBp(stepRange.minBp)
+      : `${formatRatioBp(stepRange.minBp).replace('×', '')}–${formatRatioBp(stepRange.maxBp)}`;
+  const sentences = [`Each level pays ${step} the one below.`];
+  if (largestOverlap) {
+    sentences.push(
+      `${formatPercentageBp(largestOverlap.shareBp)} of ${largestOverlap.levelCode}s earn more than the typical ${largestOverlap.nextLevelCode}.`,
+    );
+  }
+  if (widestSpread) sentences.push(`Pay varies most within ${widestSpread.levelCode}.`);
+  return sentences.join(' ');
+}
+
+/** "187 people are paid outside their peer range and 381 have had no raise in over 2 years. …" */
+export function attentionAnswer(attention: AttentionResponse): string {
+  const outside = attention.outlierAbove + attention.outlierBelow;
+  const people = outside === 1 ? '1 person is' : `${count(outside)} people are`;
+  const noRaise = `${count(attention.noRaise2y)} ${attention.noRaise2y === 1 ? 'has' : 'have'}`;
+  const first = `${people} paid outside their peer range and ${noRaise} had no raise in over 2 years.`;
+  const groups = attention.compression.groups.length;
+  if (groups === 0) return first;
+  return `${first} In ${count(groups)} country and level ${groups === 1 ? 'group' : 'groups'}, new hires are paid more than long-tenured staff.`;
 }

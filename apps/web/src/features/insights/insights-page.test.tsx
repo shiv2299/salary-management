@@ -1,7 +1,9 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { REFERENCE_ROUTES } from '@/test/fixtures';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
 import { InsightsPage } from './insights-page';
+import { RaisesCard } from './raises-card';
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -140,13 +142,57 @@ function stats(averageRaiseBp: number | null, promotionCount: number) {
   };
 }
 
+function raiseYear(year: number) {
+  const group = (key: string, label: string) => ({ ...stats(400, 10), key, label });
+  return {
+    year,
+    yearToDate: year === 2026,
+    all: stats(400 + (year - 2020) * 10, 300),
+    byCountry: [group('IN', 'India'), group('US', 'United States')],
+    byDepartment: [group('1', 'Engineering'), group('2', 'Sales')],
+  };
+}
+
 const raiseStats = {
   baseCurrency: 'USD',
   asOf: '2026-01-15',
-  years: [{ year: 2026, yearToDate: true, all: stats(440, 30), byCountry: [], byDepartment: [] }],
+  years: Array.from({ length: 7 }, (_, index) => raiseYear(2020 + index)),
   trailing: {
     current: { ...stats(440, 412), after: '2025-01-15', through: '2026-01-15' },
     previous: { ...stats(460, 380), after: '2024-01-15', through: '2025-01-15' },
+  },
+};
+
+function band(
+  levelId: number,
+  levelCode: string,
+  median: number | null,
+  stepFromBelowBp: number | null,
+) {
+  return {
+    levelId,
+    levelCode,
+    headcount: median === null ? 4 : 40,
+    typical:
+      median === null ? null : { p25: median - 20_000_000, median, p75: median + 20_000_000 },
+    stepFromBelowBp,
+    aboveNextMedianCount: null,
+    aboveNextMedianShareBp: null,
+  };
+}
+
+const levelBands = {
+  countryCode: 'IN',
+  currencyCode: 'INR',
+  levels: [
+    band(1, 'L1', 100_000_000, null),
+    band(2, 'L2', 135_000_000, 13_500),
+    band(3, 'L3', null, null),
+  ],
+  summary: {
+    stepRange: { minBp: 13_500, maxBp: 13_500 },
+    largestOverlap: null,
+    widestSpread: { levelCode: 'L1', spreadBp: 4000 },
   },
 };
 
@@ -157,7 +203,33 @@ const attention = {
   outlierBelow: 45,
   outsidePeerRangeShareBp: 195,
   noRaise2y: 381,
-  compression: { peopleCount: 0, groups: [] },
+  compression: {
+    peopleCount: 23,
+    groups: [
+      {
+        countryCode: 'IN',
+        countryName: 'India',
+        levelId: 2,
+        levelCode: 'L2',
+        recentCount: 6,
+        tenuredCount: 15,
+        recentMedianBaseMinor: 1_800_000,
+        tenuredMedianBaseMinor: 1_600_000,
+        gapBp: 1250,
+      },
+      {
+        countryCode: 'IN',
+        countryName: 'India',
+        levelId: 3,
+        levelCode: 'L3',
+        recentCount: 5,
+        tenuredCount: 8,
+        recentMedianBaseMinor: 2_600_000,
+        tenuredMedianBaseMinor: 2_400_000,
+        gapBp: 833,
+      },
+    ],
+  },
 };
 
 function stubInsights(overrides: Parameters<typeof stubApi>[0] = {}) {
@@ -166,46 +238,17 @@ function stubInsights(overrides: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/insights/payroll-change': payrollChange,
     'GET /api/insights/raises': raiseStats,
     'GET /api/insights/attention': attention,
-    'GET /api/insights/distribution': {
-      baseCurrency: 'USD',
-      groupBy: 'country',
-      groups: [{ key: 'IN', label: 'India', distribution }],
-    },
-    'GET /api/insights/outliers': {
-      baseCurrency: 'USD',
-      total: 1,
-      items: [
-        {
-          employeeId: 9,
-          firstName: 'Meera',
-          lastName: 'Iyer',
-          countryCode: 'IN',
-          departmentName: 'Sales',
-          levelCode: 'L2',
-          jobTitle: 'Account Executive',
-          salary: { amountMinor: 900_000_000, currencyCode: 'INR', amountBaseMinor: 10_800_000 },
-          direction: 'above',
-          peerGroup: {
-            headcount: 30,
-            p25: 1,
-            median: 2,
-            p75: 3,
-            lowerFence: 100_000,
-            upperFence: 5_000_000,
-          },
-        },
-      ],
-    },
+    'GET /api/insights/level-bands': (url) =>
+      Response.json({ ...levelBands, countryCode: url.searchParams.get('country') }),
+    'GET /api/insights/distribution': (url) =>
+      Response.json({
+        baseCurrency: 'USD',
+        groupBy: url.searchParams.get('groupBy'),
+        groups: [{ key: 'IN', label: 'India', distribution }],
+      }),
     'GET /api/insights/recent-changes': (url) =>
       Response.json(recentChanges(url.searchParams.get('range') ?? '3y')),
-    'GET /api/reference/fx-rates': {
-      baseCurrency: 'USD',
-      rates: [
-        { currencyCode: 'INR', asOfDate: '2026-01-15', rateToBaseNano: 11_980_000 },
-        { currencyCode: 'EUR', asOfDate: '2026-01-15', rateToBaseNano: 1_080_000_000 },
-        { currencyCode: 'USD', asOfDate: '2026-01-15', rateToBaseNano: 1_000_000_000 },
-      ],
-    },
+    ...REFERENCE_ROUTES,
     ...overrides,
   });
 }
@@ -400,11 +443,241 @@ describe('InsightsPage', () => {
     expect(requests.some((c) => c.url.searchParams.get('range') === '5y')).toBe(true);
   });
 
-  it('flags an outlier with a text label, not colour alone', async () => {
+  it('answers the raises question and switches to the cost view', async () => {
     stubInsights();
     renderWithQuery(<InsightsPage />);
 
-    const row = (await screen.findByText('Meera Iyer')).closest('tr');
-    expect(within(row as HTMLElement).getByText('Above peers')).toBeDefined();
+    const card = screen.getByRole('region', { name: 'What are we giving in raises?' });
+    expect(
+      await within(card).findByText(
+        'Raises in the last 12 months averaged 4.4%, down from 4.6% the 12 months before. Raises and promotions added $19.2M to annual payroll.',
+      ),
+    ).toBeDefined();
+    expect(
+      within(card).getByText('Average raise per calendar year; raises within one currency only.'),
+    ).toBeDefined();
+
+    fireEvent.click(within(card).getByRole('radio', { name: '$ cost' }));
+
+    expect(
+      within(card).getByText(
+        "Payroll added each calendar year by raises and promotions, in USD at today's FX rates.",
+      ),
+    ).toBeDefined();
+    expect(
+      within(card).queryByText('Average raise per calendar year; raises within one currency only.'),
+    ).toBeNull();
+  });
+
+  it('selects a year from the raises table', async () => {
+    stubApi({ 'GET /api/insights/raises': raiseStats });
+    const onSelectYear = vi.fn();
+    renderWithQuery(<RaisesCard onSelectYear={onSelectYear} />);
+
+    const card = screen.getByRole('region', { name: 'What are we giving in raises?' });
+    fireEvent.click(await within(card).findByRole('button', { name: 'View as table' }));
+
+    const table = within(card).getByRole('table');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .slice(0, 5)
+        .map((header) => header.textContent),
+    ).toEqual(['Year', 'Raises', 'Average raise', 'Added by raises', 'Added by promotions']);
+    // 5Y is the default: this year and the four before it.
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => row.firstElementChild?.textContent),
+    ).toEqual(['2022', '2023', '2024', '2025', '2026 (YTD)']);
+    const row2024 = within(table).getByRole('row', { name: /^2024/ });
+    expect(within(row2024).getByText('4.4%')).toBeDefined();
+    expect(within(row2024).getByText('$15,200,000')).toBeDefined();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Show changes in 2024' }));
+
+    expect(onSelectYear).toHaveBeenCalledWith(2024);
+  });
+
+  it('shows level bands for the chosen country with a level too small to band', async () => {
+    const { calls } = stubInsights();
+    renderWithQuery(<InsightsPage />);
+
+    const card = screen.getByRole('region', { name: 'Do levels mean consistent pay?' });
+    expect(
+      await within(card).findByText(
+        'Each level pays 1.35× the one below. Pay varies most within L1.',
+      ),
+    ).toBeDefined();
+    expect(within(card).getByRole('radio', { name: 'India' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    expect(
+      within(card).getByText(
+        'Each bar spans the middle half of people at that level, in INR; the tick marks typical pay (median).',
+      ),
+    ).toBeDefined();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'View as table' }));
+
+    const table = within(card).getByRole('table');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual([
+      'Level',
+      'People',
+      'Bottom quarter',
+      'Typical (median)',
+      'Top quarter',
+      'Step from level below',
+    ]);
+    const l2 = within(table).getByRole('row', { name: /L2/ });
+    expect(within(l2).getByText('1.35×')).toBeDefined();
+    const l3 = within(table).getByRole('row', { name: /L3/ });
+    expect(within(l3).getByText('Too few people')).toBeDefined();
+
+    fireEvent.click(within(card).getByRole('radio', { name: 'Germany' }));
+
+    await vi.waitFor(() => {
+      expect(
+        calls.some(
+          (call) =>
+            call.url.pathname === '/api/insights/level-bands' && call.url.search === '?country=DE',
+        ),
+      ).toBe(true);
+    });
+    expect(
+      calls.find((call) => call.url.pathname === '/api/insights/level-bands')?.url.search,
+    ).toBe('?country=IN');
+  });
+
+  it('opens the full breakdown with plain column names', async () => {
+    const { calls } = stubInsights();
+    renderWithQuery(<InsightsPage />);
+
+    const card = screen.getByRole('region', { name: 'Do levels mean consistent pay?' });
+    const toggle = within(card).getByRole('button', { name: 'Full breakdown' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(calls.some((call) => call.url.pathname === '/api/insights/distribution')).toBe(false);
+
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const table = await within(card).findByRole('table');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual([
+      'Group',
+      'People',
+      'Lowest',
+      'Bottom quarter earn under',
+      'Typical pay (median)',
+      'Average',
+      'Top quarter earn over',
+      'Top 10% earn over',
+      'Highest',
+    ]);
+    const india = within(table).getByRole('row', { name: /India/ });
+    expect(within(india).getByText('$42,000')).toBeDefined();
+
+    fireEvent.click(within(card).getByRole('radio', { name: 'Level' }));
+
+    await vi.waitFor(() => {
+      expect(
+        calls.some(
+          (call) =>
+            call.url.pathname === '/api/insights/distribution' &&
+            call.url.searchParams.get('groupBy') === 'level',
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it('links each attention row to the filtered employee list', async () => {
+    stubInsights();
+    const { unmount } = renderWithQuery(<InsightsPage />);
+
+    const card = screen.getByRole('region', { name: 'Who needs attention?' });
+    expect(
+      await within(card).findByText(
+        '187 people are paid outside their peer range and 381 have had no raise in over 2 years. In 2 country and level groups, new hires are paid more than long-tenured staff.',
+      ),
+    ).toBeDefined();
+
+    const row = (title: string) => within(card).getByText(title).closest('li') as HTMLElement;
+    const link = (title: string) =>
+      within(row(title)).queryByRole('link', { name: 'View these people →' });
+
+    expect(within(row('Outside peer range')).getByText('187')).toBeDefined();
+    expect(within(row('Outside peer range')).getByText('142 above · 45 below')).toBeDefined();
+    expect(link('Outside peer range')?.getAttribute('href')).toBe(
+      '/employees?attention=outlier-above&attention=outlier-below',
+    );
+    expect(within(row('No raise in over 2 years')).getByText('381')).toBeDefined();
+    expect(link('No raise in over 2 years')?.getAttribute('href')).toBe(
+      '/employees?attention=no-raise-2y',
+    );
+    expect(within(row('Paid less than new hires')).getByText('23')).toBeDefined();
+    expect(
+      within(row('Paid less than new hires')).getByText(
+        'Long-tenured staff in groups where people hired in the last year are paid more: India L2, India L3.',
+      ),
+    ).toBeDefined();
+    expect(link('Paid less than new hires')?.getAttribute('href')).toBe(
+      '/employees?attention=compression',
+    );
+    expect(within(card).queryByRole('button', { name: 'View as table' })).toBeNull();
+
+    unmount();
+    stubInsights({
+      'GET /api/insights/attention': {
+        ...attention,
+        noRaise2y: 0,
+        compression: { peopleCount: 0, groups: [] },
+      },
+    });
+    renderWithQuery(<InsightsPage />);
+
+    const emptyCard = screen.getByRole('region', { name: 'Who needs attention?' });
+    await within(emptyCard).findByText(
+      '187 people are paid outside their peer range and 0 have had no raise in over 2 years.',
+    );
+    const emptyRow = (title: string) =>
+      within(emptyCard).getByText(title).closest('li') as HTMLElement;
+    expect(within(emptyRow('No raise in over 2 years')).queryByRole('link')).toBeNull();
+    expect(within(emptyRow('Paid less than new hires')).queryByRole('link')).toBeNull();
+    expect(
+      within(emptyRow('Paid less than new hires')).getByText(
+        'No country and level where new hires are paid more.',
+      ),
+    ).toBeDefined();
+    expect(within(emptyRow('Outside peer range')).getByRole('link')).toBeDefined();
+  });
+
+  it('shows the outside-peer-range tile in the warning colour only when above zero', async () => {
+    stubInsights();
+    const { unmount } = renderWithQuery(<InsightsPage />);
+
+    const flagged = await within(tile('Paid outside peer range')).findByText('187');
+    expect(flagged.className).toContain('text-warning');
+
+    unmount();
+    stubInsights({
+      'GET /api/insights/attention': {
+        ...attention,
+        outlierAbove: 0,
+        outlierBelow: 0,
+        outsidePeerRangeShareBp: 0,
+      },
+    });
+    renderWithQuery(<InsightsPage />);
+
+    const clear = await within(tile('Paid outside peer range')).findByText('0');
+    expect(clear.className).not.toContain('text-warning');
   });
 });

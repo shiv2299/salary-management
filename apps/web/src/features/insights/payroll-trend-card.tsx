@@ -13,7 +13,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ChartCard, ChartLegend } from '@/components/ui/chart-card';
+import { ChartCard } from '@/components/ui/chart-card';
+import { ChartLegend } from '@/components/ui/chart-legend';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
   Table,

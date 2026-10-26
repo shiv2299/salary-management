@@ -2,7 +2,6 @@ import {
   attentionResponseSchema,
   distributionResponseSchema,
   levelBandsResponseSchema,
-  outliersResponseSchema,
   payrollChangeResponseSchema,
   payrollResponseSchema,
   payrollTrendResponseSchema,
@@ -28,13 +27,6 @@ export function usePayroll(groupBy: PayrollGroupBy) {
   return useQuery({
     queryKey: ['insights', 'payroll', groupBy],
     queryFn: () => apiGet(`/api/insights/payroll?groupBy=${groupBy}`, payrollResponseSchema),
-  });
-}
-
-export function useOutliers() {
-  return useQuery({
-    queryKey: ['insights', 'outliers'],
-    queryFn: () => apiGet('/api/insights/outliers', outliersResponseSchema),
   });
 }
 

@@ -1,15 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import { useFxAsOfDate } from '@/features/reference/use-reference';
-import { DistributionPanel } from './distribution-panel';
+import { AttentionCard } from './attention-card';
 import { HeadlineTiles } from './headline-tiles';
-import { OutliersPanel } from './outliers-panel';
+import { LevelBandsCard } from './level-bands-card';
 import { PayrollChangeCard } from './payroll-change-card';
 import { PayrollTrendCard } from './payroll-trend-card';
+import { RaisesCard } from './raises-card';
 import { RecentChangesPanel } from './recent-changes-panel';
 
 export function InsightsPage() {
   const fxDate = useFxAsOfDate();
+  // The calendar year chosen in the raises card, for the recent changes to follow.
+  const [, setChangesYear] = useState<number | null>(null);
 
   return (
     // Insights sits on the canvas colour edge to edge, so it reaches past the shell's padding.
@@ -24,9 +28,10 @@ export function InsightsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <PayrollTrendCard />
         <PayrollChangeCard />
+        <RaisesCard onSelectYear={setChangesYear} />
+        <LevelBandsCard />
+        <AttentionCard />
       </div>
-      <DistributionPanel />
-      <OutliersPanel />
       <RecentChangesPanel />
     </div>
   );

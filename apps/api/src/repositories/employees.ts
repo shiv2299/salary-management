@@ -338,3 +338,18 @@ export function setEmployeeStatus(
 ): void {
   db.update(employees).set({ status, deactivatedOn, updatedAt }).where(eq(employees.id, id)).run();
 }
+
+/** Every employee of any status, with what a payroll on a past date needs. */
+export function listPayrollEmployees(db: DbHandle) {
+  return db
+    .select({
+      id: employees.id,
+      hireDate: employees.hireDate,
+      status: employees.status,
+      deactivatedOn: employees.deactivatedOn,
+      departmentId: employees.departmentId,
+    })
+    .from(employees)
+    .orderBy(asc(employees.id))
+    .all();
+}

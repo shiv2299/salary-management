@@ -1,3 +1,8 @@
+import {
+  payrollChangeResponseSchema,
+  payrollTrendResponseSchema,
+  raiseStatsResponseSchema,
+} from '@acme/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createEmployees } from '../services/employees';
 import { applySalaryChanges } from '../services/salary-writer';
@@ -45,6 +50,9 @@ describe.each([
   '/api/insights/payroll?groupBy=country',
   '/api/insights/outliers',
   '/api/insights/recent-changes',
+  '/api/insights/payroll-trend',
+  '/api/insights/payroll-change',
+  '/api/insights/raises',
 ])('GET %s', (url) => {
   it('requires a session', async () => {
     current = await createTestApp();
@@ -193,5 +201,28 @@ describe('GET /api/insights/recent-changes', () => {
     expect((await get(t, '/api/insights/recent-changes?years=4')).statusCode).toBe(400);
     expect((await get(t, '/api/insights/recent-changes?limit=0')).statusCode).toBe(400);
     expect((await get(t, '/api/insights/recent-changes?offset=-1')).statusCode).toBe(400);
+  });
+});
+
+describe('the history insights endpoints', () => {
+  it.each([
+    ['/api/insights/payroll-trend', payrollTrendResponseSchema],
+    ['/api/insights/payroll-change', payrollChangeResponseSchema],
+    ['/api/insights/raises', raiseStatsResponseSchema],
+  ] as const)('returns %s in its documented shape', async (url, schema) => {
+    const { t } = await setup();
+
+    const response = await get(t, url);
+
+    expect(response.statusCode).toBe(200);
+    expect(schema.safeParse(response.json()).success).toBe(true);
+  });
+
+  it('takes today from the injected clock', async () => {
+    current = await createTestApp({ now: () => new Date('2026-03-10T09:00:00.000Z') });
+
+    const response = await get(current, '/api/insights/payroll-trend');
+
+    expect(response.json().asOf).toBe('2026-03-10');
   });
 });

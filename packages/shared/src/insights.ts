@@ -121,8 +121,105 @@ export const recentChangesResponseSchema = z.object({
   items: z.array(recentChangeEntrySchema),
 });
 
+export const PAYROLL_CAUSES = [
+  'hires',
+  'raises',
+  'promotions',
+  'relocations',
+  'corrections',
+  'leavers',
+] as const;
+
+const groupTotalSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  headcount: z.number().int(),
+  totalBaseMinor: z.number().int(),
+});
+
+export const payrollTrendResponseSchema = z.object({
+  baseCurrency: baseCurrencySchema,
+  asOf: z.string(),
+  points: z.array(
+    z.object({
+      /** yyyy-12-31, or today for the last point. */
+      date: z.string(),
+      year: z.number().int(),
+      isToday: z.boolean(),
+      headcount: z.number().int(),
+      totalBaseMinor: z.number().int(),
+      byCountry: z.array(groupTotalSchema),
+      byDepartment: z.array(groupTotalSchema),
+    }),
+  ),
+  summary: z.object({
+    totalBaseMinor: z.number().int(),
+    yearAgoTotalBaseMinor: z.number().int(),
+    /** Null when there was no payroll a year ago. */
+    changeBp: z.number().int().nullable(),
+    headcount: z.number().int(),
+    yearAgoHeadcount: z.number().int(),
+  }),
+});
+
+export const payrollChangeResponseSchema = z.object({
+  baseCurrency: baseCurrencySchema,
+  /** A year ago (exclusive) and today. */
+  from: z.string(),
+  to: z.string(),
+  fromTotalBaseMinor: z.number().int(),
+  toTotalBaseMinor: z.number().int(),
+  changeBaseMinor: z.number().int(),
+  /** All six, in PAYROLL_CAUSES order. */
+  causes: z.array(
+    z.object({
+      cause: z.enum(PAYROLL_CAUSES),
+      amountBaseMinor: z.number().int(),
+      count: z.number().int(),
+    }),
+  ),
+  /** The cause with the largest positive amount (the earlier in PAYROLL_CAUSES on a tie); null when none is positive. */
+  largestAddition: z.enum(PAYROLL_CAUSES).nullable(),
+});
+
+export const increaseStatsSchema = z.object({
+  raiseCount: z.number().int(),
+  averageRaiseBp: z.number().int().nullable(),
+  raisesAddedBaseMinor: z.number().int(),
+  promotionCount: z.number().int(),
+  promotionsAddedBaseMinor: z.number().int(),
+  totalAddedBaseMinor: z.number().int(),
+});
+
+const groupIncreaseStatsSchema = increaseStatsSchema.extend({
+  key: z.string(),
+  label: z.string(),
+});
+
+export const raiseStatsResponseSchema = z.object({
+  baseCurrency: baseCurrencySchema,
+  asOf: z.string(),
+  years: z.array(
+    z.object({
+      year: z.number().int(),
+      yearToDate: z.boolean(),
+      all: increaseStatsSchema,
+      byCountry: z.array(groupIncreaseStatsSchema),
+      byDepartment: z.array(groupIncreaseStatsSchema),
+    }),
+  ),
+  trailing: z.object({
+    current: increaseStatsSchema.extend({ after: z.string(), through: z.string() }),
+    previous: increaseStatsSchema.extend({ after: z.string(), through: z.string() }),
+  }),
+});
+
 export type DistributionResponse = z.infer<typeof distributionResponseSchema>;
 export type PayrollResponse = z.infer<typeof payrollResponseSchema>;
 export type OutliersResponse = z.infer<typeof outliersResponseSchema>;
 export type RecentChangeEntry = z.infer<typeof recentChangeEntrySchema>;
 export type RecentChangesResponse = z.infer<typeof recentChangesResponseSchema>;
+export type PayrollTrendResponse = z.infer<typeof payrollTrendResponseSchema>;
+export type PayrollChangeResponse = z.infer<typeof payrollChangeResponseSchema>;
+export type IncreaseStats = z.infer<typeof increaseStatsSchema>;
+export type RaiseStatsResponse = z.infer<typeof raiseStatsResponseSchema>;

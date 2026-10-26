@@ -37,7 +37,12 @@ export {
   type UpdateEmployeeBody,
 } from './employees';
 export {
+  PAYROLL_CAUSES,
   distributionQuerySchema,
+  increaseStatsSchema,
+  payrollChangeResponseSchema,
+  payrollTrendResponseSchema,
+  raiseStatsResponseSchema,
   distributionResponseSchema,
   outliersResponseSchema,
   payrollQuerySchema,
@@ -46,6 +51,10 @@ export {
   recentChangesQuerySchema,
   recentChangesResponseSchema,
   type DistributionResponse,
+  type IncreaseStats,
+  type PayrollChangeResponse,
+  type PayrollTrendResponse,
+  type RaiseStatsResponse,
   type OutliersResponse,
   type PayrollResponse,
   type RecentChangeEntry,

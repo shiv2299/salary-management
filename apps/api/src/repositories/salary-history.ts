@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { DbHandle } from '../db/client';
 import {
   employees,
@@ -130,5 +130,22 @@ export function listChangeDetails(db: DbHandle, historyIds: number[]): ChangeDet
     .from(salaryHistory)
     .innerJoin(employees, eq(employees.id, salaryHistory.employeeId))
     .where(inArray(salaryHistory.id, historyIds))
+    .all();
+}
+
+/** Every history row of every employee, ordered by employee, effective date and id. */
+export function listAllSalaryHistory(db: DbHandle) {
+  return db
+    .select({
+      id: salaryHistory.id,
+      employeeId: salaryHistory.employeeId,
+      effectiveDate: salaryHistory.effectiveDate,
+      reason: salaryHistory.reason,
+      amountMinor: salaryHistory.amountMinor,
+      currencyCode: salaryHistory.currencyCode,
+      countryCode: salaryHistory.countryCode,
+    })
+    .from(salaryHistory)
+    .orderBy(asc(salaryHistory.employeeId), asc(salaryHistory.effectiveDate), asc(salaryHistory.id))
     .all();
 }

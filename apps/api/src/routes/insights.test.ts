@@ -223,6 +223,6 @@ describe('the history insights endpoints', () => {
 
     const response = await get(current, '/api/insights/payroll-trend');
 
-    expect(response.json().asOf).toBe('2026-03-10');
+    expect(payrollTrendResponseSchema.parse(response.json()).asOf).toBe('2026-03-10');
   });
 });

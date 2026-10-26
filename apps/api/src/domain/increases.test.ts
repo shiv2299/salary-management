@@ -62,7 +62,7 @@ describe('increaseEvents', () => {
   });
 
   it('orders rows by date then id before comparing', () => {
-    const shuffled = [rows[3], rows[0], rows[4], rows[2], rows[1]];
+    const shuffled = [3, 0, 4, 2, 1].map((i) => rows[i]!);
     expect(increaseEvents({ departmentId: 3, rows: shuffled })).toEqual(increaseEvents(person));
   });
 
@@ -75,8 +75,8 @@ describe('increaseEvents', () => {
       ],
     });
     expect(events).toHaveLength(1);
-    expect(events[0].changeBp).toBeNull();
-    expect(events[0].addedBaseMinor).toBe(1_100_000 - 96_000);
+    expect(events[0]!.changeBp).toBeNull();
+    expect(events[0]!.addedBaseMinor).toBe(1_100_000 - 96_000);
   });
 });
 

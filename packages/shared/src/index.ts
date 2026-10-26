@@ -48,9 +48,6 @@ export {
   payrollTrendResponseSchema,
   raiseStatsResponseSchema,
   distributionResponseSchema,
-  outliersResponseSchema,
-  payrollQuerySchema,
-  payrollResponseSchema,
   recentChangeEntrySchema,
   levelBandsQuerySchema,
   levelBandsResponseSchema,
@@ -63,8 +60,6 @@ export {
   type PayrollChangeResponse,
   type PayrollTrendResponse,
   type RaiseStatsResponse,
-  type OutliersResponse,
-  type PayrollResponse,
   type RecentChangeEntry,
   type RecentChangesResponse,
 } from './insights';

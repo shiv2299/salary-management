@@ -4,10 +4,7 @@ import {
   distributionResponseSchema,
   levelBandsQuerySchema,
   levelBandsResponseSchema,
-  outliersResponseSchema,
   payrollChangeResponseSchema,
-  payrollQuerySchema,
-  payrollResponseSchema,
   payrollTrendResponseSchema,
   raiseStatsResponseSchema,
   recentChangesQuerySchema,
@@ -16,7 +13,7 @@ import {
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Database } from '../db/client';
 import { getAttention } from '../services/attention';
-import { getDistribution, getOutliers, getPayroll } from '../services/insights';
+import { getDistribution } from '../services/insights';
 import { getPayrollChange, getPayrollTrend, getRaiseStats } from '../services/insights-history';
 import { getLevelBands } from '../services/level-bands';
 import { getRecentChanges } from '../services/recent-changes';
@@ -40,18 +37,6 @@ export const insightRoutes =
         },
       },
       ({ query }) => getDistribution(db, query.groupBy),
-    );
-
-    app.get(
-      '/api/insights/payroll',
-      { schema: { querystring: payrollQuerySchema, response: { 200: payrollResponseSchema } } },
-      ({ query }) => getPayroll(db, query.groupBy),
-    );
-
-    app.get(
-      '/api/insights/outliers',
-      { schema: { response: { 200: outliersResponseSchema } } },
-      () => getOutliers(db),
     );
 
     app.get(

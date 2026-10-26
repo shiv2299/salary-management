@@ -18,6 +18,7 @@ import {
   payrollChangeAnswer,
   payrollTrendAnswer,
   raisesAnswer,
+  recentChangesAnswer,
 } from './answers';
 
 const summary: PayrollTrendResponse['summary'] = {
@@ -309,5 +310,40 @@ describe('formatRatioBp', () => {
     expect(formatRatioBp(16_000)).toBe('1.6×');
     expect(formatRatioBp(16_897)).toBe('1.69×');
     expect(formatRatioBp(10_000)).toBe('1×');
+  });
+});
+
+describe('recentChangesAnswer', () => {
+  it('counts the changes in the chosen range', () => {
+    expect(recentChangesAnswer(1234, { year: null, range: '3y' })).toBe(
+      '1,234 changes in the last 3 years.',
+    );
+    expect(recentChangesAnswer(1, { year: null, range: '10y' })).toBe(
+      '1 change in the last 10 years.',
+    );
+  });
+
+  it('names the chosen year, which overrides the range', () => {
+    expect(recentChangesAnswer(1, { year: 2024, range: '3y' })).toBe(
+      '1 change took effect in 2024.',
+    );
+    expect(recentChangesAnswer(1234, { year: 2024, range: 'all' })).toBe(
+      '1,234 changes took effect in 2024.',
+    );
+  });
+
+  it('counts every change on record for all time', () => {
+    expect(recentChangesAnswer(1234, { year: null, range: 'all' })).toBe(
+      '1,234 changes on record.',
+    );
+  });
+
+  it('says nothing matches when there are no changes', () => {
+    expect(recentChangesAnswer(0, { year: 2024, range: '3y' })).toBe(
+      'No salary changes match these filters.',
+    );
+    expect(recentChangesAnswer(0, { year: null, range: 'all' })).toBe(
+      'No salary changes match these filters.',
+    );
   });
 });

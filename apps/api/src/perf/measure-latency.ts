@@ -30,8 +30,6 @@ const GET_URLS = [
   '/api/employees/facets',
   '/api/employees/facets?search=ann&country=IN',
   '/api/insights/distribution?groupBy=country',
-  '/api/insights/outliers',
-  '/api/insights/payroll?groupBy=department',
   '/api/insights/recent-changes?range=5y',
   `/api/employees/${EMPLOYEE_ID}`,
   `/api/employees/${EMPLOYEE_ID}/peer-context`,

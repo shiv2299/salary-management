@@ -7,10 +7,6 @@ export const distributionQuerySchema = z.object({
   groupBy: z.enum(['country', 'department', 'level']),
 });
 
-export const payrollQuerySchema = z.object({
-  groupBy: z.enum(['country', 'department']),
-});
-
 export const RECENT_CHANGE_RANGES = ['3y', '5y', '10y', 'all'] as const;
 
 export const recentChangesQuerySchema = z.object({
@@ -39,51 +35,6 @@ export const distributionResponseSchema = z.object({
   groups: z.array(
     z.object({ key: z.string(), label: z.string(), distribution: distributionSchema }),
   ),
-});
-
-export const payrollResponseSchema = z.object({
-  baseCurrency: baseCurrencySchema,
-  groupBy: payrollQuerySchema.shape.groupBy,
-  headcount: z.number().int(),
-  totalBaseMinor: z.number().int(),
-  groups: z.array(
-    z.object({
-      key: z.string(),
-      label: z.string(),
-      headcount: z.number().int(),
-      totalBaseMinor: z.number().int(),
-    }),
-  ),
-});
-
-export const outlierSchema = z.object({
-  employeeId: z.number().int(),
-  firstName: z.string(),
-  lastName: z.string(),
-  countryCode: z.string(),
-  departmentName: z.string(),
-  levelCode: z.string(),
-  jobTitle: z.string(),
-  salary: z.object({
-    amountMinor: z.number().int(),
-    currencyCode: z.string(),
-    amountBaseMinor: z.number().int(),
-  }),
-  direction: z.enum(['above', 'below']),
-  peerGroup: z.object({
-    headcount: z.number().int(),
-    p25: z.number().int(),
-    median: z.number().int(),
-    p75: z.number().int(),
-    lowerFence: z.number().int(),
-    upperFence: z.number().int(),
-  }),
-});
-
-export const outliersResponseSchema = z.object({
-  baseCurrency: baseCurrencySchema,
-  total: z.number().int(),
-  items: z.array(outlierSchema),
 });
 
 const moneySchema = z.object({ amountMinor: z.number().int(), currencyCode: z.string() });
@@ -284,8 +235,6 @@ export const levelBandsResponseSchema = z.object({
 });
 
 export type DistributionResponse = z.infer<typeof distributionResponseSchema>;
-export type PayrollResponse = z.infer<typeof payrollResponseSchema>;
-export type OutliersResponse = z.infer<typeof outliersResponseSchema>;
 export type RecentChangeEntry = z.infer<typeof recentChangeEntrySchema>;
 export type RecentChangesResponse = z.infer<typeof recentChangesResponseSchema>;
 export type PayrollTrendResponse = z.infer<typeof payrollTrendResponseSchema>;

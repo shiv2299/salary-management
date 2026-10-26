@@ -1,25 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RANGE_OPTIONS, toPayrollChartRows, trendPointsInRange, yearsInRange } from './chart-data';
-
-describe('toPayrollChartRows', () => {
-  it('maps each group to a labeled bar with its headcount', () => {
-    const rows = toPayrollChartRows({
-      baseCurrency: 'USD',
-      groupBy: 'department',
-      headcount: 5,
-      totalBaseMinor: 500,
-      groups: [
-        { key: '1', label: 'Engineering', headcount: 3, totalBaseMinor: 300 },
-        { key: '2', label: 'Sales', headcount: 2, totalBaseMinor: 200 },
-      ],
-    });
-
-    expect(rows).toEqual([
-      { key: '1', label: 'Engineering', headcount: 3, totalBaseMinor: 300 },
-      { key: '2', label: 'Sales', headcount: 2, totalBaseMinor: 200 },
-    ]);
-  });
-});
+import { RANGE_OPTIONS, trendPointsInRange, yearsInRange } from './chart-data';
 
 describe('RANGE_OPTIONS', () => {
   it('offers three, five and ten years and all', () => {

@@ -94,6 +94,41 @@ describe('getAttentionSets', () => {
     expect(sets['outlier-below']).toEqual([]);
   });
 
+  it('does not flag an employee inside the fences', () => {
+    addTenPeers();
+    // The fences are 9,500.00 and 11,500.00 USD.
+    add({ amountMinor: 1_140_000 });
+
+    const sets = getAttentionSets(database.db, TODAY);
+
+    expect(sets['outlier-above']).toEqual([]);
+    expect(sets['outlier-below']).toEqual([]);
+  });
+
+  it('counts only active employees towards the peer group minimum and never flags inactive ones', () => {
+    for (let i = 0; i < 9; i++) add({ amountMinor: 1_000_000 + i * 10_000 });
+    deactivate(add({ amountMinor: 1_090_000 }));
+    deactivate(add({ amountMinor: 50_000_000 }));
+
+    const sets = getAttentionSets(database.db, TODAY);
+
+    expect(sets['outlier-above']).toEqual([]);
+    expect(sets['outlier-below']).toEqual([]);
+  });
+
+  it('compares pay only within the same country and level', () => {
+    addTenPeers();
+    // Paid far more than the US L1 peers, but the only India L1 employee, so there is no peer group.
+    add({ countryCode: 'IN', amountMinor: 900_000_000 });
+    // The same pay is normal for US L2, which has no peers either.
+    add({ levelId: 2, amountMinor: 5_000_000 });
+
+    const sets = getAttentionSets(database.db, TODAY);
+
+    expect(sets['outlier-above']).toEqual([]);
+    expect(sets['outlier-below']).toEqual([]);
+  });
+
   it('lists active employees with no raise or promotion in over two years', () => {
     const stale = add({ hireDate: '2020-01-01' });
     const raisedLongAgo = add({ hireDate: '2020-01-01' });

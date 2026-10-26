@@ -10,6 +10,7 @@ import type {
   RaiseStatsResponse,
 } from '@acme/shared';
 import { formatMoneyCompact, formatPercentageBp } from '@/lib/money';
+import type { YearRange } from './chart-data';
 
 export type PayrollCause = (typeof PAYROLL_CAUSES)[number];
 
@@ -156,4 +157,22 @@ export function attentionAnswer(attention: AttentionResponse): string {
   const groups = attention.compression.groups.length;
   if (groups === 0) return first;
   return `${first} In ${count(groups)} country and level ${groups === 1 ? 'group' : 'groups'}, new hires are paid more than long-tenured staff.`;
+}
+
+const RANGE_PHRASES: Record<Exclude<YearRange, 'all'>, string> = {
+  '3y': 'in the last 3 years',
+  '5y': 'in the last 5 years',
+  '10y': 'in the last 10 years',
+};
+
+/** "1,234 changes in the last 3 years.", or "… took effect in 2024." when a year overrides the range. */
+export function recentChangesAnswer(
+  total: number,
+  filter: { year: number | null; range: YearRange },
+): string {
+  if (total === 0) return 'No salary changes match these filters.';
+  const changes = `${count(total)} ${total === 1 ? 'change' : 'changes'}`;
+  if (filter.year !== null) return `${changes} took effect in ${filter.year}.`;
+  if (filter.range === 'all') return `${changes} on record.`;
+  return `${changes} ${RANGE_PHRASES[filter.range]}.`;
 }

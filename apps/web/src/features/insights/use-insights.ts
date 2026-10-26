@@ -3,7 +3,6 @@ import {
   distributionResponseSchema,
   levelBandsResponseSchema,
   payrollChangeResponseSchema,
-  payrollResponseSchema,
   payrollTrendResponseSchema,
   raiseStatsResponseSchema,
   recentChangesResponseSchema,
@@ -13,20 +12,12 @@ import { apiGet } from '@/lib/api';
 import type { YearRange } from './chart-data';
 
 export type DistributionGroupBy = 'country' | 'department' | 'level';
-export type PayrollGroupBy = 'country' | 'department';
 
 export function useDistribution(groupBy: DistributionGroupBy) {
   return useQuery({
     queryKey: ['insights', 'distribution', groupBy],
     queryFn: () =>
       apiGet(`/api/insights/distribution?groupBy=${groupBy}`, distributionResponseSchema),
-  });
-}
-
-export function usePayroll(groupBy: PayrollGroupBy) {
-  return useQuery({
-    queryKey: ['insights', 'payroll', groupBy],
-    queryFn: () => apiGet(`/api/insights/payroll?groupBy=${groupBy}`, payrollResponseSchema),
   });
 }
 

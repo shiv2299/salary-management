@@ -1,5 +1,3 @@
-import type { PayrollResponse } from '@acme/shared';
-
 export type YearRange = '3y' | '5y' | '10y' | 'all';
 
 export const RANGE_OPTIONS: { value: YearRange; label: string }[] = [
@@ -30,22 +28,4 @@ export function yearsInRange<T extends { year: number }>(
   if (range === 'all') return years;
   const firstYear = currentYear - RANGE_YEARS[range] + 1;
   return years.filter((entry) => entry.year >= firstYear && entry.year <= currentYear);
-}
-
-// The helper below feeds the payroll panel, which the question cards replace.
-
-export interface PayrollChartRow {
-  key: string;
-  label: string;
-  headcount: number;
-  totalBaseMinor: number;
-}
-
-export function toPayrollChartRows(response: PayrollResponse): PayrollChartRow[] {
-  return response.groups.map(({ key, label, headcount, totalBaseMinor }) => ({
-    key,
-    label,
-    headcount,
-    totalBaseMinor,
-  }));
 }

@@ -325,11 +325,11 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: a hire is the first change to someone's pay and is part of "what changed, when". Using the row's country keeps a relocation entry under the country the person moved to, and keeps an old change under the country it was made in. Taking "from" by effective date rather than entry order means a backdated change compares against the row actually before it.
 
-## Outlier fences are shown rounded, compared exactly
+## Outlier fences are compared exactly
 
-**Chosen**: the outliers response gives each peer group's fences rounded to a whole minor unit, while the outlier test itself uses the exact fence values.
+**Chosen**: the outlier test uses the exact fence values, which no response exposes; the peer range people see is the p25 to p75 (see "Peer context: one peer-group service, typical range in local currency, outlier test in USD").
 
-**Why**: Tukey's fences are 1.5 × IQR and can fall on a half unit. Every other amount in the API is an integer minor unit, so the displayed fence follows suit, and the decision about who is an outlier is never affected by that display rounding.
+**Why**: Tukey's fences are 1.5 × IQR and can fall on a half unit. Every amount in the API is an integer minor unit, so rounding a fence for display would be the only way to show it, and the decision about who is an outlier must never depend on that rounding.
 
 
 ## Bulk revision confirm: which failures are 409, 422 and 404
@@ -419,7 +419,7 @@ The preview is already the full selection held in the browser (see "Bulk revisio
 
 ## Bulk revision: "outside peer range" is the FR-8 rule on current pay
 
-The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay before the revision, so it matches the drawer and the outliers list; groups under 10 are not evaluated. It is a heads-up, not a block.
+The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay before the revision, so it matches the drawer and the attention counts; groups under 10 are not evaluated. It is a heads-up, not a block.
 
 ## Last bulk revision: the batch with the latest effective date
 

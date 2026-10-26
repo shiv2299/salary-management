@@ -8,12 +8,12 @@ import { LevelBandsCard } from './level-bands-card';
 import { PayrollChangeCard } from './payroll-change-card';
 import { PayrollTrendCard } from './payroll-trend-card';
 import { RaisesCard } from './raises-card';
-import { RecentChangesPanel } from './recent-changes-panel';
+import { RecentChangesCard } from './recent-changes-card';
 
 export function InsightsPage() {
   const fxDate = useFxAsOfDate();
   // The calendar year chosen in the raises card, for the recent changes to follow.
-  const [, setChangesYear] = useState<number | null>(null);
+  const [changesYear, setChangesYear] = useState<number | null>(null);
 
   return (
     // Insights sits on the canvas colour edge to edge, so it reaches past the shell's padding.
@@ -31,8 +31,13 @@ export function InsightsPage() {
         <RaisesCard onSelectYear={setChangesYear} />
         <LevelBandsCard />
         <AttentionCard />
+        <RecentChangesCard
+          year={changesYear}
+          onClearYear={() => {
+            setChangesYear(null);
+          }}
+        />
       </div>
-      <RecentChangesPanel />
     </div>
   );
 }

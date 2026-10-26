@@ -24,29 +24,30 @@ const distribution = {
   p90: 7_500_000,
 };
 
-function recentChanges(range: string) {
+function recentChanges(url: URL) {
+  const year = url.searchParams.get('year');
   return {
-    range,
-    year: null,
-    windowStart: '2023-10-19',
-    windowEnd: '2026-10-19',
-    availableYears: [2026, 2025],
+    range: url.searchParams.get('range') ?? '3y',
+    year: year === null ? null : Number(year),
+    windowStart: '2023-01-15',
+    windowEnd: '2026-01-15',
+    availableYears: [2026, 2025, 2024],
     total: 2,
-    limit: 10,
+    limit: 5,
     offset: 0,
     items: [
       {
         kind: 'batch',
         batchId: 7,
-        effectiveDate: '2026-04-01',
-        headcount: 47,
-        percentageBp: 700,
-        note: 'Engineering L3 India',
+        effectiveDate: '2026-01-01',
+        headcount: 1233,
+        percentageBp: 357,
+        note: 'Annual increment 2026',
       },
       {
         kind: 'individual',
         historyId: 11,
-        effectiveDate: '2026-03-02',
+        effectiveDate: '2025-03-02',
         reason: 'promotion',
         employee: {
           id: 5,
@@ -246,8 +247,7 @@ function stubInsights(overrides: Parameters<typeof stubApi>[0] = {}) {
         groupBy: url.searchParams.get('groupBy'),
         groups: [{ key: 'IN', label: 'India', distribution }],
       }),
-    'GET /api/insights/recent-changes': (url) =>
-      Response.json(recentChanges(url.searchParams.get('range') ?? '3y')),
+    'GET /api/insights/recent-changes': (url) => Response.json(recentChanges(url)),
     ...REFERENCE_ROUTES,
     ...overrides,
   });
@@ -413,34 +413,60 @@ describe('InsightsPage', () => {
     expect(calls.filter((call) => call.url.pathname.endsWith('payroll-change'))).toHaveLength(2);
   });
 
-  it('shows a bulk revision as one entry with headcount and percentage', async () => {
-    stubInsights();
-    renderWithQuery(<InsightsPage />);
-
-    const entry = await screen.findByText(/47 people/);
-    expect(entry.textContent).toContain('+7%');
-    expect(entry.textContent).toContain('Engineering L3 India');
-  });
-
-  it('marks changes for employees who have since been deactivated', async () => {
-    stubInsights();
-    renderWithQuery(<InsightsPage />);
-
-    const row = (await screen.findByText('Asha Rao')).closest('li');
-    expect(within(row as HTMLElement).getByText('Inactive')).toBeDefined();
-  });
-
-  it('asks for the five year window when that option is chosen', async () => {
+  it('shows the five latest changes with a bulk revision as one row', async () => {
     const { calls } = stubInsights();
     renderWithQuery(<InsightsPage />);
-    await screen.findByText(/47 people/);
 
-    fireEvent.click(screen.getByRole('radio', { name: '5 years' }));
+    const card = screen.getByRole('region', { name: 'What changed recently?' });
+    expect(await within(card).findByText('2 changes in the last 3 years.')).toBeDefined();
+    const bulk = within(card).getByText('1,233 people · +3.57% · Annual increment 2026');
+    expect(within(bulk.closest('li') as HTMLElement).getByText('Bulk revision')).toBeDefined();
+    const row = within(card).getByRole('link', { name: 'Asha Rao' }).closest('li');
+    expect(within(row as HTMLElement).getByText('Inactive')).toBeDefined();
 
-    await screen.findByText(/47 people/);
-    const requests = calls.filter((c) => c.url.pathname.endsWith('recent-changes'));
-    expect(requests[0]?.url.search).toBe('?range=3y&limit=10&offset=0');
-    expect(requests.some((c) => c.url.searchParams.get('range') === '5y')).toBe(true);
+    const requests = calls.filter((call) => call.url.pathname.endsWith('recent-changes'));
+    expect(requests.map((call) => call.url.search)).toEqual(['?range=3y&limit=5&offset=0']);
+  });
+
+  it('sets the recent changes card to a year chosen in the raises card and clears it with the chip', async () => {
+    const { calls } = stubInsights();
+    renderWithQuery(<InsightsPage />);
+    const lastRequest = () =>
+      calls.filter((call) => call.url.pathname.endsWith('recent-changes')).at(-1)?.url.search;
+
+    const raises = screen.getByRole('region', { name: 'What are we giving in raises?' });
+    fireEvent.click(await within(raises).findByRole('button', { name: 'View as table' }));
+    fireEvent.click(within(raises).getByRole('button', { name: 'Show changes in 2024' }));
+
+    const card = screen.getByRole('region', { name: 'What changed recently?' });
+    expect(await within(card).findByText('2 changes took effect in 2024.')).toBeDefined();
+    expect(lastRequest()).toBe('?range=3y&year=2024&limit=5&offset=0');
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Remove year 2024' }));
+
+    expect(await within(card).findByText('2 changes in the last 3 years.')).toBeDefined();
+    expect(within(card).queryByRole('button', { name: 'Remove year 2024' })).toBeNull();
+    await vi.waitFor(() => {
+      expect(lastRequest()).toBe('?range=3y&limit=5&offset=0');
+    });
+  });
+
+  it('links to the full list of changes', async () => {
+    stubInsights();
+    renderWithQuery(<InsightsPage />);
+
+    const card = screen.getByRole('region', { name: 'What changed recently?' });
+    const link = await within(card).findByRole('link', { name: 'See all changes →' });
+    expect(link.getAttribute('href')).toBe('/insights/changes');
+
+    const raises = screen.getByRole('region', { name: 'What are we giving in raises?' });
+    fireEvent.click(await within(raises).findByRole('button', { name: 'View as table' }));
+    fireEvent.click(within(raises).getByRole('button', { name: 'Show changes in 2024' }));
+
+    await within(card).findByText('2 changes took effect in 2024.');
+    expect(within(card).getByRole('link', { name: 'See all changes →' }).getAttribute('href')).toBe(
+      '/insights/changes?year=2024',
+    );
   });
 
   it('answers the raises question and switches to the cost view', async () => {

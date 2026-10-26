@@ -49,8 +49,6 @@ async function get(t: TestApp, url: string) {
 
 describe.each([
   '/api/insights/distribution?groupBy=country',
-  '/api/insights/payroll?groupBy=country',
-  '/api/insights/outliers',
   '/api/insights/recent-changes',
   '/api/insights/payroll-trend',
   '/api/insights/payroll-change',
@@ -106,35 +104,12 @@ describe('GET /api/insights/distribution', () => {
   });
 });
 
-describe('GET /api/insights/payroll', () => {
-  it('returns the total payroll per group and overall', async () => {
+describe('the removed insights endpoints', () => {
+  it('returns 404 for the removed payroll and outliers endpoints', async () => {
     const { t } = await setup();
 
-    const response = await get(t, '/api/insights/payroll?groupBy=department');
-
-    expect(response.json()).toEqual({
-      baseCurrency: 'USD',
-      groupBy: 'department',
-      headcount: 3,
-      totalBaseMinor: 600_000,
-      groups: [{ key: '1', label: 'Engineering', headcount: 3, totalBaseMinor: 600_000 }],
-    });
-  });
-
-  it('does not offer a grouping by level', async () => {
-    const { t } = await setup();
-
-    expect((await get(t, '/api/insights/payroll?groupBy=level')).statusCode).toBe(400);
-  });
-});
-
-describe('GET /api/insights/outliers', () => {
-  it('returns an empty list when no peer group is large enough to evaluate', async () => {
-    const { t } = await setup();
-
-    const response = await get(t, '/api/insights/outliers');
-
-    expect(response.json()).toEqual({ baseCurrency: 'USD', total: 0, items: [] });
+    expect((await get(t, '/api/insights/payroll?groupBy=department')).statusCode).toBe(404);
+    expect((await get(t, '/api/insights/outliers')).statusCode).toBe(404);
   });
 });
 

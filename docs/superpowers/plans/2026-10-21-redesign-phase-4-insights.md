@@ -1198,7 +1198,7 @@ export function ChartSkeleton(...); export function RowsSkeleton(...); // moved 
   - `useLevelBands(country: string)`;
   - `useRecentChanges(params: { range, year?, reason?, offset, limit })`.
 
-  The last replaces Task 8's signature, and Task 12 updates its caller.
+  The last replaces Task 8's signature. Task 10 updates the existing recent changes panel to call it with an object, and Task 12 replaces that panel.
 
   In `chart-data.ts`:
 
@@ -1336,7 +1336,7 @@ export function formatRatioBp(bp: number): string;
 
 `insights-page.test.tsx`:
 - "answers the raises question and switches to the cost view": "Show" is set to "$ cost"; the caption changes to the cost caption.
-- "selects a year from the raises table": clicking "Show changes in 2024" (the table's button) calls the recent-changes request with `year=2024` once Task 12's card exists. Until then, assert `onSelectYear` through the page state. Task 12 extends this test.
+- "selects a year from the raises table": render `RaisesCard` on its own with a spy; clicking "Show changes in 2024" (the table's button) calls `onSelectYear(2024)`. Task 12 adds the page-level test that the recent changes card follows the chosen year.
 - "shows level bands for the chosen country with a level too small to band": a level with `typical: null` reads "Too few people". Choosing "Germany" requests `/api/insights/level-bands?country=DE`.
 - "opens the full breakdown with plain column names":
   - the button "Full breakdown" has `aria-expanded=false`, then true after a click;
@@ -1415,7 +1415,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - (1234, `{ year: null, range: '3y' }`) → "1,234 changes in the last 3 years."
 - (1, `{ year: 2024 }`) → "1 change took effect in 2024."
 - (0, `{ year: 2024 }`) → "No salary changes match these filters."
-- (n, `{ range: 'all' }`) → "1,234 changes in all."
+- (n, `{ range: 'all' }`) → "1,234 changes on record."
 
 `insights-page.test.tsx`:
 - "shows the five latest changes with a bulk revision as one row": "1,233 people · +3.57% · Annual increment 2026" and the "Bulk revision" badge. An inactive employee is marked "Inactive". It requests `range=3y&limit=5&offset=0`.

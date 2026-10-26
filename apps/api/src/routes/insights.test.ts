@@ -1,5 +1,6 @@
 import {
   attentionResponseSchema,
+  levelBandsResponseSchema,
   payrollChangeResponseSchema,
   payrollTrendResponseSchema,
   raiseStatsResponseSchema,
@@ -55,6 +56,7 @@ describe.each([
   '/api/insights/payroll-change',
   '/api/insights/raises',
   '/api/insights/attention',
+  '/api/insights/level-bands?country=US',
 ])('GET %s', (url) => {
   it('requires a session', async () => {
     current = await createTestApp();
@@ -238,5 +240,34 @@ describe('GET /api/insights/attention', () => {
     expect(response.statusCode).toBe(200);
     const body = attentionResponseSchema.parse(response.json());
     expect(body).toMatchObject({ asOf: '2026-01-15', activeHeadcount: 3, outlierAbove: 0 });
+  });
+});
+
+describe('GET /api/insights/level-bands', () => {
+  it("returns each level's band for the country", async () => {
+    const { t } = await setup();
+
+    const response = await get(t, '/api/insights/level-bands?country=US');
+
+    expect(response.statusCode).toBe(200);
+    const body = levelBandsResponseSchema.parse(response.json());
+    expect(body).toMatchObject({ countryCode: 'US', currencyCode: 'USD' });
+    expect(body.levels[0]).toMatchObject({ levelId: 1, headcount: 3, typical: null });
+  });
+
+  it('rejects a missing country with a validation error', async () => {
+    const { t } = await setup();
+
+    const response = await get(t, '/api/insights/level-bands');
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('answers 404 for an unknown country', async () => {
+    const { t } = await setup();
+
+    const response = await get(t, '/api/insights/level-bands?country=ZZ');
+
+    expect(response.statusCode).toBe(404);
   });
 });

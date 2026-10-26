@@ -241,6 +241,41 @@ export const attentionResponseSchema = z.object({
   }),
 });
 
+export const levelBandsQuerySchema = z.object({ country: z.string().min(1) });
+
+export const levelBandsResponseSchema = z.object({
+  countryCode: z.string(),
+  currencyCode: z.string(),
+  levels: z.array(
+    z.object({
+      levelId: z.number().int(),
+      levelCode: z.string(),
+      headcount: z.number().int(),
+      /** Local minor units; null under the peer-group minimum or with no one paid in the local currency. */
+      typical: z
+        .object({ p25: z.number().int(), median: z.number().int(), p75: z.number().int() })
+        .nullable(),
+      /** This median ÷ the level below's median × 10,000 (16,900 = 1.69×); null without both. */
+      stepFromBelowBp: z.number().int().nullable(),
+      /** Local-currency members paid above the next level's median; null without both bands. */
+      aboveNextMedianCount: z.number().int().nullable(),
+      aboveNextMedianShareBp: z.number().int().nullable(),
+    }),
+  ),
+  summary: z.object({
+    stepRange: z.object({ minBp: z.number().int(), maxBp: z.number().int() }).nullable(),
+    largestOverlap: z
+      .object({
+        levelCode: z.string(),
+        nextLevelCode: z.string(),
+        shareBp: z.number().int(),
+        count: z.number().int(),
+      })
+      .nullable(),
+    widestSpread: z.object({ levelCode: z.string(), spreadBp: z.number().int() }).nullable(),
+  }),
+});
+
 export type DistributionResponse = z.infer<typeof distributionResponseSchema>;
 export type PayrollResponse = z.infer<typeof payrollResponseSchema>;
 export type OutliersResponse = z.infer<typeof outliersResponseSchema>;
@@ -251,3 +286,4 @@ export type PayrollChangeResponse = z.infer<typeof payrollChangeResponseSchema>;
 export type IncreaseStats = z.infer<typeof increaseStatsSchema>;
 export type RaiseStatsResponse = z.infer<typeof raiseStatsResponseSchema>;
 export type AttentionResponse = z.infer<typeof attentionResponseSchema>;
+export type LevelBandsResponse = z.infer<typeof levelBandsResponseSchema>;

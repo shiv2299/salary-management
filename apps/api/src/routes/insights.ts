@@ -2,6 +2,8 @@ import {
   attentionResponseSchema,
   distributionQuerySchema,
   distributionResponseSchema,
+  levelBandsQuerySchema,
+  levelBandsResponseSchema,
   outliersResponseSchema,
   payrollChangeResponseSchema,
   payrollQuerySchema,
@@ -16,6 +18,7 @@ import type { Database } from '../db/client';
 import { getAttention } from '../services/attention';
 import { getDistribution, getOutliers, getPayroll } from '../services/insights';
 import { getPayrollChange, getPayrollTrend, getRaiseStats } from '../services/insights-history';
+import { getLevelBands } from '../services/level-bands';
 import { getRecentChanges } from '../services/recent-changes';
 
 export interface InsightRoutesDeps {
@@ -86,6 +89,14 @@ export const insightRoutes =
       '/api/insights/attention',
       { schema: { response: { 200: attentionResponseSchema } } },
       () => getAttention(db, today()),
+    );
+
+    app.get(
+      '/api/insights/level-bands',
+      {
+        schema: { querystring: levelBandsQuerySchema, response: { 200: levelBandsResponseSchema } },
+      },
+      ({ query }) => getLevelBands(db, query.country),
     );
 
     return Promise.resolve();

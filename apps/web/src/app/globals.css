@@ -19,6 +19,14 @@
   --accent-tint-border: #bfdbfe;
   --series-secondary: #93c5fd;
   --series-promotion: #7c3aed;
+  /* Categorical chart series, always used in this order; slot 1 is the accent. */
+  --series-1: #1d4ed8;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #6250d6;
+  --series-7: #0891b2;
   --brand-panel: #0b1f4d;
 
   --foreground: var(--text-primary);
@@ -56,6 +64,13 @@
   --color-accent-tint-border: var(--accent-tint-border);
   --color-series-secondary: var(--series-secondary);
   --color-series-promotion: var(--series-promotion);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-series-7: var(--series-7);
   --color-brand-panel: var(--brand-panel);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);

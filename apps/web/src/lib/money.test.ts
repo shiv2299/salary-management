@@ -83,6 +83,12 @@ describe('signed changes', () => {
     expect(formatSignedMoney(-100_000, 'USD')).toBe('-$1,000.00');
     expect(formatSignedMoney(0, 'INR')).toBe('₹0.00');
   });
+
+  it('formats a money change compactly with its sign for a chart label', () => {
+    expect(formatSignedMoney(1_520_000_000, 'USD', { compact: true })).toBe('+$15.2M');
+    expect(formatSignedMoney(-130_000_000, 'USD', { compact: true })).toBe('-$1.3M');
+    expect(formatSignedMoney(0, 'USD', { compact: true })).toBe('$0');
+  });
 });
 
 describe('formatInputAmount', () => {

@@ -75,15 +75,19 @@ export function formatChangeBp(bp: number): string {
   return `${bp > 0 ? '+' : '-'}${formatPercentageBp(Math.abs(bp))}`;
 }
 
-/** A money change with an explicit sign; zero carries none. */
+/** A money change with an explicit sign; zero carries none. `compact` gives a chart label ("+$15.2M"). */
 export function formatSignedMoney(
   amountMinor: number,
   currencyCode: string,
-  options: { fraction?: boolean } = {},
+  options: { fraction?: boolean; compact?: boolean } = {},
 ): string {
-  if (amountMinor === 0) return formatMoney(0, currencyCode, options);
+  const format = (amount: number) =>
+    options.compact
+      ? formatMoneyCompact(amount, currencyCode)
+      : formatMoney(amount, currencyCode, options);
+  if (amountMinor === 0) return format(0);
   const sign = amountMinor > 0 ? '+' : '-';
-  return `${sign}${formatMoney(Math.abs(amountMinor), currencyCode, options)}`;
+  return `${sign}${format(Math.abs(amountMinor))}`;
 }
 
 /** Plain-text amount for an input's default value, e.g. 9000050 USD -> "90000.50". */

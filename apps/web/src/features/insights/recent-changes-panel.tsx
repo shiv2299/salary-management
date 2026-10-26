@@ -68,7 +68,11 @@ function ChangeEntry({ entry }: { entry: RecentChangeEntry }) {
 export function RecentChangesPanel() {
   const [range, setRange] = useState<'3y' | '5y'>('3y');
   const [offset, setOffset] = useState(0);
-  const { data, error, isPending, refetch } = useRecentChanges(range, offset, PAGE_SIZE);
+  const { data, error, isPending, refetch } = useRecentChanges({
+    range,
+    offset,
+    limit: PAGE_SIZE,
+  });
 
   return (
     <Panel

@@ -1,8 +1,10 @@
 export { healthResponseSchema, type HealthResponse } from './health';
 export {
+  ATTENTION_VALUES,
   DEFAULT_PAGE_SIZE,
   MAX_FILTER_VALUES,
   MAX_PAGE_SIZE,
+  attentionSchema,
   employeeDetailSchema,
   employeeExportQuerySchema,
   employeeFacetsQuerySchema,
@@ -20,6 +22,7 @@ export {
   historySummarySchema,
   salaryHistoryEntrySchema,
   updateEmployeeSchema,
+  type Attention,
   type EmployeeDetail,
   type EmployeeExportQueryParams,
   type EmployeeFacets,
@@ -38,6 +41,7 @@ export {
 } from './employees';
 export {
   PAYROLL_CAUSES,
+  attentionResponseSchema,
   distributionQuerySchema,
   increaseStatsSchema,
   payrollChangeResponseSchema,
@@ -50,6 +54,7 @@ export {
   recentChangeEntrySchema,
   recentChangesQuerySchema,
   recentChangesResponseSchema,
+  type AttentionResponse,
   type DistributionResponse,
   type IncreaseStats,
   type PayrollChangeResponse,

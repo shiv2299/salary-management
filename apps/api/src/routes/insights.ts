@@ -1,4 +1,5 @@
 import {
+  attentionResponseSchema,
   distributionQuerySchema,
   distributionResponseSchema,
   outliersResponseSchema,
@@ -12,6 +13,7 @@ import {
 } from '@acme/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Database } from '../db/client';
+import { getAttention } from '../services/attention';
 import { getDistribution, getOutliers, getPayroll } from '../services/insights';
 import { getPayrollChange, getPayrollTrend, getRaiseStats } from '../services/insights-history';
 import { getRecentChanges } from '../services/recent-changes';
@@ -78,6 +80,12 @@ export const insightRoutes =
       '/api/insights/raises',
       { schema: { response: { 200: raiseStatsResponseSchema } } },
       () => getRaiseStats(db, today()),
+    );
+
+    app.get(
+      '/api/insights/attention',
+      { schema: { response: { 200: attentionResponseSchema } } },
+      () => getAttention(db, today()),
     );
 
     return Promise.resolve();

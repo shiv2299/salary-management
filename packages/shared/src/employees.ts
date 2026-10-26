@@ -35,6 +35,16 @@ function multiValueParam<T extends z.ZodType>(item: T) {
   return z.preprocess(splitListParam, z.array(item).min(1).max(MAX_FILTER_VALUES).optional());
 }
 
+/** The "needs attention" lists an employee can belong to. */
+export const ATTENTION_VALUES = [
+  'outlier-above',
+  'outlier-below',
+  'no-raise-2y',
+  'compression',
+] as const;
+export const attentionSchema = z.enum(ATTENTION_VALUES);
+export type Attention = z.infer<typeof attentionSchema>;
+
 export const employeeListQuerySchema = z.object({
   country: multiValueParam(z.string().min(1)),
   department: multiValueParam(z.coerce.number().int().positive()),

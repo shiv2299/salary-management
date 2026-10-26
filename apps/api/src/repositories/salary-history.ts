@@ -149,3 +149,18 @@ export function listAllSalaryHistory(db: DbHandle) {
     .orderBy(asc(salaryHistory.employeeId), asc(salaryHistory.effectiveDate), asc(salaryHistory.id))
     .all();
 }
+
+/** The latest raise or promotion date per employee who has one. */
+export function listLastIncreaseDates(
+  db: DbHandle,
+): { employeeId: number; lastIncreaseOn: string }[] {
+  return db
+    .select({
+      employeeId: salaryHistory.employeeId,
+      lastIncreaseOn: sql<string>`max(${salaryHistory.effectiveDate})`,
+    })
+    .from(salaryHistory)
+    .where(inArray(salaryHistory.reason, ['raise', 'promotion']))
+    .groupBy(salaryHistory.employeeId)
+    .all();
+}

@@ -214,6 +214,33 @@ export const raiseStatsResponseSchema = z.object({
   }),
 });
 
+export const attentionResponseSchema = z.object({
+  asOf: z.string(),
+  activeHeadcount: z.number().int(),
+  outlierAbove: z.number().int(),
+  outlierBelow: z.number().int(),
+  /** (above + below) ÷ active headcount, in bp; 0 with no one active. */
+  outsidePeerRangeShareBp: z.number().int(),
+  noRaise2y: z.number().int(),
+  compression: z.object({
+    /** Long-tenured people in the flagged groups. */
+    peopleCount: z.number().int(),
+    groups: z.array(
+      z.object({
+        countryCode: z.string(),
+        countryName: z.string(),
+        levelId: z.number().int(),
+        levelCode: z.string(),
+        recentCount: z.number().int(),
+        tenuredCount: z.number().int(),
+        recentMedianBaseMinor: z.number().int(),
+        tenuredMedianBaseMinor: z.number().int(),
+        gapBp: z.number().int(),
+      }),
+    ),
+  }),
+});
+
 export type DistributionResponse = z.infer<typeof distributionResponseSchema>;
 export type PayrollResponse = z.infer<typeof payrollResponseSchema>;
 export type OutliersResponse = z.infer<typeof outliersResponseSchema>;
@@ -223,3 +250,4 @@ export type PayrollTrendResponse = z.infer<typeof payrollTrendResponseSchema>;
 export type PayrollChangeResponse = z.infer<typeof payrollChangeResponseSchema>;
 export type IncreaseStats = z.infer<typeof increaseStatsSchema>;
 export type RaiseStatsResponse = z.infer<typeof raiseStatsResponseSchema>;
+export type AttentionResponse = z.infer<typeof attentionResponseSchema>;

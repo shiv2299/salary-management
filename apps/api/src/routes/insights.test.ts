@@ -1,4 +1,5 @@
 import {
+  attentionResponseSchema,
   payrollChangeResponseSchema,
   payrollTrendResponseSchema,
   raiseStatsResponseSchema,
@@ -53,6 +54,7 @@ describe.each([
   '/api/insights/payroll-trend',
   '/api/insights/payroll-change',
   '/api/insights/raises',
+  '/api/insights/attention',
 ])('GET %s', (url) => {
   it('requires a session', async () => {
     current = await createTestApp();
@@ -224,5 +226,17 @@ describe('the history insights endpoints', () => {
     const response = await get(current, '/api/insights/payroll-trend');
 
     expect(payrollTrendResponseSchema.parse(response.json()).asOf).toBe('2026-03-10');
+  });
+});
+
+describe('GET /api/insights/attention', () => {
+  it('returns the counts of people needing attention', async () => {
+    const { t } = await setup();
+
+    const response = await get(t, '/api/insights/attention');
+
+    expect(response.statusCode).toBe(200);
+    const body = attentionResponseSchema.parse(response.json());
+    expect(body).toMatchObject({ asOf: '2026-01-15', activeHeadcount: 3, outlierAbove: 0 });
   });
 });

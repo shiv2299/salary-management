@@ -7,6 +7,7 @@ import {
   payrollChangeByCause,
   type PayrollGroupTotal,
   type PayrollPerson,
+  type PayrollSnapshot,
 } from '../domain/payroll';
 import { percentChangeBpOrNull } from '../domain/revision';
 import {
@@ -68,32 +69,29 @@ export function getPayrollTrend(db: DbHandle, today: string) {
     todayYear,
   );
 
-  const dates: { date: string; year: number; isToday: boolean }[] = [];
-  for (let year = firstYear; year < todayYear; year += 1) {
-    dates.push({ date: `${year}-12-31`, year, isToday: false });
-  }
-  dates.push({ date: today, year: todayYear, isToday: true });
-
-  const points = dates.map(({ date, year, isToday }) => {
-    const snapshot = payrollAt(people, date);
-    return {
-      date,
-      year,
-      isToday,
-      headcount: snapshot.headcount,
-      totalBaseMinor: snapshot.totalBaseMinor,
-      byCountry: groups.countries.map((g) => ({
-        ...g,
-        ...(snapshot.byCountry.get(g.key) ?? NONE),
-      })),
-      byDepartment: groups.departments.map((g) => ({
-        ...g,
-        ...(snapshot.byDepartment.get(Number(g.key)) ?? NONE),
-      })),
-    };
+  const toPoint = (snapshot: PayrollSnapshot, year: number, isToday: boolean) => ({
+    date: snapshot.date,
+    year,
+    isToday,
+    headcount: snapshot.headcount,
+    totalBaseMinor: snapshot.totalBaseMinor,
+    byCountry: groups.countries.map((g) => ({
+      ...g,
+      ...(snapshot.byCountry.get(g.key) ?? NONE),
+    })),
+    byDepartment: groups.departments.map((g) => ({
+      ...g,
+      ...(snapshot.byDepartment.get(Number(g.key)) ?? NONE),
+    })),
   });
 
+  const points: ReturnType<typeof toPoint>[] = [];
+  for (let year = firstYear; year < todayYear; year += 1) {
+    points.push(toPoint(payrollAt(people, `${year}-12-31`), year, false));
+  }
   const now = payrollAt(people, today);
+  points.push(toPoint(now, todayYear, true));
+
   const yearAgo = payrollAt(people, trailingWindowStart(today, 1));
   return {
     baseCurrency: BASE_CURRENCY,

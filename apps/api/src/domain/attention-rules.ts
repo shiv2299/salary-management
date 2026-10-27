@@ -81,6 +81,7 @@ export function compressionGroups(members: CompressionMember[], today: string): 
     }
     const recentMedian = computeDistribution(recent.map((m) => m.amountBaseMinor)).median;
     const tenuredMedian = computeDistribution(tenured.map((m) => m.amountBaseMinor)).median;
+    // A zero median has no ratio; it cannot occur while every salary is positive.
     if (tenuredMedian <= 0) continue;
     const exceedsMargin =
       BigInt(recentMedian) * 10_000n >

@@ -192,22 +192,41 @@ describe('payrollChangeByCause', () => {
     expect(change.toTotalBaseMinor).toBe(0);
   });
 
-  it("attributes a day's step to the row in force at the end of that day", () => {
+  it('gives each row dated the same day its own step, in id order', () => {
     const change = payrollChangeByCause(
       [
         person({
           rows: [
             row(1, '2020-01-01', 10_000_000, 'hire'),
-            row(7, '2025-05-01', 12_000_000, 'promotion'),
             row(8, '2025-05-01', 11_800_000, 'correction'),
+            row(7, '2025-05-01', 12_000_000, 'promotion'),
           ],
         }),
       ],
       FROM,
       TO,
     );
-    expect(change.causes.corrections).toEqual({ amountBaseMinor: 1_800_000, count: 1 });
-    expect(change.causes.promotions).toEqual({ amountBaseMinor: 0, count: 0 });
+    expect(change.causes.promotions).toEqual({ amountBaseMinor: 2_000_000, count: 1 });
+    expect(change.causes.corrections).toEqual({ amountBaseMinor: -200_000, count: 1 });
+  });
+
+  it('puts a raise and a promotion on the same day under their own causes', () => {
+    const change = payrollChangeByCause(
+      [
+        person({
+          rows: [
+            row(1, '2020-01-01', 10_000_000, 'hire'),
+            row(5, '2025-08-28', 10_500_000, 'raise'),
+            row(6, '2025-08-28', 12_000_000, 'promotion'),
+          ],
+        }),
+      ],
+      FROM,
+      TO,
+    );
+    expect(change.causes.raises).toEqual({ amountBaseMinor: 500_000, count: 1 });
+    expect(change.causes.promotions).toEqual({ amountBaseMinor: 1_500_000, count: 1 });
+    expect(change.toTotalBaseMinor - change.fromTotalBaseMinor).toBe(2_000_000);
   });
 
   it('ignores someone hired and gone inside the window', () => {

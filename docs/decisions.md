@@ -194,9 +194,9 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Alternatives considered**: compare first and last pay per person and attribute the whole difference to the latest reason (hides a raise followed by a correction); sum row deltas (double counts same-day corrections and ignores leavers).
 
-**Chosen**: from a year ago to today, each person's paid amount changes only on the day they join the payroll (New hires, + their pay), the day a salary row takes effect (+ the step, under the reason of the row in force at the end of that day), or the day they leave (People who left, − their pay). The steps telescope, so the parts sum exactly to the payroll difference.
+**Chosen**: from a year ago to today, each person's paid amount changes only on the day they join the payroll (New hires, + their pay), the day a salary row takes effect (+ the step, under that row's reason), or the day they leave (People who left, − their pay). When several rows take effect on one day, each row, in id order, adds its own step under its own reason: its amount minus the amount in force just before it. A raise and a promotion on the same day count once each, and a same-day correction shows as its own small step. Rows dated on the day someone joins or leaves are part of that join or leave. The steps telescope, so the parts sum exactly to the payroll difference.
 
-**Why**: an exact reconciliation is the acceptance rule, and this keeps each step under the reason that caused it.
+**Why**: an exact reconciliation is the acceptance rule, and this keeps each step under the reason that caused it. Scoring each row against the one before it is also how the raises card scores a raise, so a raise and a promotion on the same day land under the same cause on both cards.
 
 ## Needs attention: thresholds in one domain module
 

@@ -120,8 +120,9 @@ const CAUSE_OF_REASON: Record<SalaryReason, PayrollCause> = {
 
 /**
  * From the payroll on `from` to the payroll on `to` (from < to). Each person is walked through the
- * dates in (from, to] where something can change; a day's step is attributed to the row in force
- * at the end of that day, so a same-day correction takes the whole step.
+ * dates in (from, to] where something can change. On a day they stay on the payroll, each row dated
+ * that day, in id order, adds its own step under its own reason: its amount minus the amount in
+ * force just before it. On a day they enter or leave, the whole step goes to hires or leavers.
  */
 export function payrollChangeByCause(
   people: PayrollPerson[],
@@ -156,8 +157,15 @@ export function payrollChangeByCause(
         add('hires', next);
       } else if (paid !== null && next === null) {
         add('leavers', -paid);
-      } else if (paid !== null && next !== null && row !== null) {
-        if (row.effectiveDate === date) add(CAUSE_OF_REASON[row.reason], next - paid);
+      } else if (paid !== null && next !== null) {
+        const sameDay = person.rows
+          .filter((r) => r.effectiveDate === date)
+          .sort((a, b) => a.id - b.id);
+        let before = paid;
+        for (const r of sameDay) {
+          add(CAUSE_OF_REASON[r.reason], r.amountBaseMinor - before);
+          before = r.amountBaseMinor;
+        }
       }
       paid = next;
     }

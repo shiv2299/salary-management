@@ -5,6 +5,7 @@ import { deferredResponse } from '@/test/deferred';
 import { apiError, renderWithQuery, stubApi } from '@/test/render';
 import { toast } from 'sonner';
 import { BulkRevisionPage } from './bulk-revision-page';
+import { BulkRevisionSheet } from './bulk-revision-sheet';
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -16,8 +17,9 @@ vi.mock('next/link', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 let search = '';
+const back = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back }),
   useSearchParams: () => new URLSearchParams(search),
 }));
 
@@ -1022,5 +1024,62 @@ describe('BulkRevisionPage confirmation', () => {
     expect(screen.getByRole('link', { name: 'Cancel' }).getAttribute('href')).toBe(
       '/employees?country=US',
     );
+  });
+});
+
+describe('BulkRevisionSheet', () => {
+  const CONFIRM = 'POST /api/employees/bulk-salary-changes';
+  const renderSheet = () => renderWithQuery(<BulkRevisionSheet today="2026-10-19" />);
+
+  beforeEach(() => {
+    search = 'country=US&ids=1,2';
+    back.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the screen in a slide-over with a close button instead of a link back', async () => {
+    stubBulk();
+    renderSheet();
+    const sheet = screen.getByRole('dialog', { name: 'Bulk salary revision' });
+    expect(await within(sheet).findByText('2 people, active only')).toBeDefined();
+    expect(within(sheet).queryByRole('link', { name: 'Back to employees' })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels by closing the slide-over and going back to the list', () => {
+    stubBulk();
+    renderSheet();
+    expect(screen.queryByRole('link', { name: 'Cancel' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the slide-over from View employees after applying', async () => {
+    stubBulk({
+      [CONFIRM]: () =>
+        Response.json(
+          { batchId: 4, employeeCount: 2, effectiveDate: '2026-10-19' },
+          { status: 201 },
+        ),
+    });
+    renderSheet();
+    choose('7');
+    const review = await screen.findByRole('button', { name: 'Review & confirm 2 changes →' });
+    await waitFor(() => {
+      expect((review as HTMLButtonElement).disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(review);
+    const apply = await screen.findByRole('button', { name: 'Apply 2 raises' });
+    await waitFor(() => {
+      expect((apply as HTMLButtonElement).disabled).toBe(false);
+    }, WAIT);
+    fireEvent.click(apply);
+    expect(await screen.findByRole('heading', { name: 'Revision applied' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'View employees' }));
+    expect(back).toHaveBeenCalledTimes(1);
   });
 });

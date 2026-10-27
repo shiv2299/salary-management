@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from 'cn';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
@@ -35,7 +36,37 @@ import { useBulkPreview, useBulkSummary, useConfirmBulkRevision } from './use-bu
 const STEPS = ['Choose people', 'Set increase & review', 'Confirm'];
 const DEBOUNCE_MS = 400;
 
-export function BulkRevisionPage({ today }: { today?: string }) {
+const BACK_CLASS =
+  'inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline md:min-h-0';
+
+/** Back to the list: closes the slide-over when there is one, otherwise a link to the list. */
+function BackToList({
+  href,
+  onClose,
+  className,
+  children,
+}: {
+  href: string;
+  onClose: (() => void) | undefined;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return onClose ? (
+    <button type="button" onClick={onClose} className={cn(BACK_CLASS, className)}>
+      {children}
+    </button>
+  ) : (
+    <Link href={href} className={cn(BACK_CLASS, className)}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * The bulk revision screen. With `onClose` it is shown in the slide-over above the list: setup and
+ * review always stack, and Cancel and "View employees" close it instead of linking to the list.
+ */
+export function BulkRevisionPage({ today, onClose }: { today?: string; onClose?: () => void }) {
   const searchParams = useSearchParams();
   const paramsText = searchParams.toString();
   const listParams = useMemo(() => new URLSearchParams(paramsText), [paramsText]);
@@ -161,19 +192,18 @@ export function BulkRevisionPage({ today }: { today?: string }) {
     });
   };
 
-  const backLink = (
-    <Link
-      href={backHref}
-      className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline md:min-h-0"
-    >
+  // The slide-over has its own close button, so only the full page links back.
+  const backLink = onClose ? null : (
+    <Link href={backHref} className={cn(BACK_CLASS, 'gap-1')}>
       <ArrowLeft aria-hidden="true" className="size-4" />
       Back to employees
     </Link>
   );
+  const headerClass = cn('flex flex-col items-start gap-2', onClose && 'pr-10');
 
   if (!target) {
     return (
-      <div className="flex flex-col items-start gap-3 p-4 md:p-6">
+      <div className={cn('flex flex-col items-start gap-3 p-4 md:p-6', onClose && 'pr-12')}>
         {backLink}
         <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>
         <p className="text-sm text-text-primary">No one is selected for this revision.</p>
@@ -187,7 +217,7 @@ export function BulkRevisionPage({ today }: { today?: string }) {
   if (applied) {
     return (
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        <header className="flex flex-col items-start gap-2">
+        <header className={headerClass}>
           <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>
           <StepIndicator steps={STEPS} current={3} />
         </header>
@@ -197,12 +227,9 @@ export function BulkRevisionPage({ today }: { today?: string }) {
             {`${applied.count.toLocaleString('en-US')} ${applied.count === 1 ? 'raise' : 'raises'} recorded, effective ${formatDate(applied.effectiveDate)}.`}
           </p>
           <div className="flex gap-4 text-sm font-medium">
-            <Link
-              href={backHref}
-              className="inline-flex min-h-11 items-center text-primary hover:underline md:min-h-0"
-            >
+            <BackToList href={backHref} onClose={onClose}>
               View employees
-            </Link>
+            </BackToList>
             <Link
               href="/insights"
               className="inline-flex min-h-11 items-center text-primary hover:underline md:min-h-0"
@@ -217,12 +244,17 @@ export function BulkRevisionPage({ today }: { today?: string }) {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      <header className="flex flex-col items-start gap-2">
+      <header className={headerClass}>
         {backLink}
         <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>
         <StepIndicator steps={STEPS} current={dialogOpen ? 2 : 1} />
       </header>
-      <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+      <div
+        className={cn(
+          'flex flex-col gap-4',
+          !onClose && 'xl:grid xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start',
+        )}
+      >
         <BulkSetup
           target={target}
           listParams={listParams}
@@ -262,12 +294,9 @@ export function BulkRevisionPage({ today }: { today?: string }) {
           ) : null}
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-          <Link
-            href={backHref}
-            className="inline-flex min-h-11 items-center justify-center text-sm font-medium text-primary hover:underline md:min-h-0"
-          >
+          <BackToList href={backHref} onClose={onClose} className="justify-center">
             Cancel
-          </Link>
+          </BackToList>
           <Button className="w-full md:w-auto" disabled={!canReview} onClick={openDialog}>
             {`Review & confirm ${(preview.data?.items.length ?? 0).toLocaleString('en-US')} ${preview.data?.items.length === 1 ? 'change' : 'changes'} →`}
           </Button>

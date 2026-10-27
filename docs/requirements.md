@@ -62,7 +62,7 @@ Insights about the present cover **active employees only** — deactivated emplo
 | Role-based access control / SSO / multi-user | One persona only. If country/department-restricted access is ever needed, it belongs in the service layer as a scope applied to every repository query; nothing is pre-built for it now. |
 | Future-dated salary changes | Changes take effect on or before the day they're entered. Supporting scheduled changes would mean "current salary" depends on the date it's read, which the denormalized current-salary design deliberately avoids (`docs/decisions.md`). |
 | Excel import | The seed script supplies the data, so import isn't required to use the app. It's the natural first follow-up, and would reuse the same service-layer bulk-create function the seed script already uses. |
-| Org chart / reporting hierarchy | None of the FR-6..FR-10 insights require it, and a believable reporting tree in seed data adds complexity with no analytical payoff here. |
+| Org chart / reporting hierarchy | None of the FR-6..FR-10 or FR-14..FR-18 insights require it, and a believable reporting tree in seed data adds complexity with no analytical payoff here. |
 | Approval workflows and notifications | State machines that don't serve any requirement above. |
 | Demographic pay-equity analysis (e.g. by gender) | Sensitive data that needs a policy decision outside the scope of this product. |
 
@@ -74,7 +74,7 @@ Product decisions that shape the scope above, and the choice made for each. The 
 - Cross-country comparison uses a static, dated FX table, converting to a common base currency (USD) for insights. Outlier peer groups stay within one country (see `docs/decisions.md`).
 - Full effective-dated salary history is tracked, not just a current snapshot.
 - Insights trends convert past pay at today's static FX rates, so they show changes in pay rather than in exchange rates.
-- FR-6..FR-10 are the product's own answer to "what should HR be able to ask," chosen as the compensation questions an HR Manager most often has to answer for leadership.
+- FR-6..FR-10 and FR-14..FR-18 are the product's own answer to "what should HR be able to ask," chosen as the compensation questions an HR Manager most often has to answer for leadership.
 - Single HR user; no role/country/department-based access restriction.
 - No Excel import; CSV export only.
 
@@ -94,7 +94,7 @@ Each FR is done when the behavior below is covered by tests at the layer named i
 | FR | Accepted when |
 |---|---|
 | FR-1 | Searching "ann" matches "Joanne", "ann@acme.test", and "Channel Manager"; salary sort places a $90,000 employee above a ₹50,00,000 one (≈ $60,000); inactive employees are hidden unless the status filter includes them. Filtering by India and Germany at L3 returns exactly the L3 employees of both countries; sorting by level orders by rank; each filter option's count equals the rows that option alone matches under the search and the other groups' selections. Filtering by "No raise in over 2 years" and India returns exactly the flagged Indian employees, export returns the same rows, and each attention option's count follows the other groups' selections. |
-| FR-2 | A deactivated employee keeps their full salary history, disappears from the default list and from insights, and can be reactivated. Editing country or level directly is rejected. Deactivating on 1 Feb 2026 records that date, deactivating again while inactive keeps it, and reactivating clears it. |
+| FR-2 | A deactivated employee keeps their full salary history, disappears from the default list and from insights about the present (level bands, attention), while insights built from history keep the pay they were paid, and can be reactivated. Editing country or level directly is rejected. Deactivating on 1 Feb 2026 records that date, deactivating again while inactive keeps it, and reactivating clears it. |
 | FR-3 | A promotion that doesn't raise the level is rejected; a relocation stores the new salary in the new country's currency and updates the employee's country in the same transaction; a future effective date is rejected; a correction dated the same day as the row it fixes becomes the current salary. |
 | FR-4 | Confirming a 7% revision for N previewed employees writes exactly N rows sharing one batch, applies overrides exactly as entered, and is rejected entirely (no rows written) if any employee's salary changed after the preview. The added payroll shown before confirming equals, per currency, the sum of new minus current amounts including hand edits, and its USD total equals each currency's sum converted once at the documented rate. |
 | FR-5 | "Export current result" returns exactly the rows the list currently matches (all pages); "export all" includes inactive employees with a status column. |

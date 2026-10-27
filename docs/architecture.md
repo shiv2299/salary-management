@@ -114,7 +114,7 @@ SQLite has no percentile functions, so the service layer fetches the filtered se
 | What added to payroll | `GET /api/insights/payroll-change` | `payrollChangeByCause` from a year ago to today |
 | What we give in raises | `GET /api/insights/raises` | Per calendar year, in total and by country and department, from `increaseEvents` and `summariseIncreases` (`domain/increases.ts`), plus the last 12 months against the 12 before |
 | Whether levels mean consistent pay | `GET /api/insights/level-bands?country=` | `levelBands` (`domain/level-bands.ts`) over the country's active employees, using the peer-group summary for each level |
-| What changed, when | `GET /api/insights/recent-changes?range=3y\|5y\|10y\|all&year=&reason=&limit=&offset=` (default `range=3y`) | `salary_history` rows whose `effective_date` falls in the range (or in the calendar year chosen by `year`, which overrides it), newest first, joined to employee name, country, and status (inactive employees are included and marked). Rows sharing a `batch_id` collapse into a single entry (e.g. "47 people, +7%, Engineering L3 India") rather than one row per employee. Offset-paginated over the grouped entries |
+| What changed, when | `GET /api/insights/recent-changes?range=3y\|5y\|10y\|all&year=&reason=&limit=&offset=` (default `range=3y`; `reason` is multi-valued, repeated or comma-separated, OR-ed) | `salary_history` rows whose `effective_date` falls in the range (or in the calendar year chosen by `year`, which overrides it), newest first, joined to employee name, country, and status (inactive employees are included and marked). Rows sharing a `batch_id` collapse into a single entry (e.g. "47 people, +7%, Engineering L3 India") rather than one row per employee. Offset-paginated over the grouped entries. The response also carries `availableYears`, the calendar years with at least one change, newest first, which fill the page's year select |
 
 History-based insights read every employee and every `salary_history` row once per request (about 61,000 rows at the seeded size) and compute in memory, the same way the distribution statistics do. A payroll on date D counts an employee hired on or before D who is active or whose `deactivated_on` is later than D, at the row in force on D. The tiles and answer sentences use the last 12 months against the 12 before; charts by year use calendar years.
 
@@ -134,7 +134,7 @@ Peer grouping for outliers is country + level, not + department: at 10,000 emplo
 - About 4% of active employees, all with 3+ years' tenure, get no change of any kind from a date 2–3 years before `referenceDate`.
 - About 4% of employees leave, each deactivated with a `deactivated_on` date between 90 days after hire and the day before `referenceDate`; their history stops before it.
 - Measured row counts are in `docs/performance.md`.
-- **Inputs**: `seed(db, { rngSeed, referenceDate, employeeCount? })`. All generated dates are offsets back from `referenceDate`, so the salary-changes view (FR-10) always has data across its 3 and 5-year windows. On app boot the server passes today's date; tests pass a fixed date. The same two inputs always produce identical data.
+- **Inputs**: `seed(db, { rngSeed, referenceDate, employeeCount? })`. All generated dates are offsets back from `referenceDate`, so the salary-changes view (FR-10) always has data across its 3, 5 and 10-year and all-time ranges. On app boot the server passes today's date; tests pass a fixed date. The same two inputs always produce identical data.
 - Runs in a single transaction for insert performance; idempotent (no-op if `employees` already has rows), safe to run on app boot.
 - `npm run db:reset -w @acme/api` drops every table, applies every migration, restores the `users` rows (same ids and password hashes) and seeds again. It is the way to move an existing database to a new schema or seed; nothing wipes data automatically.
 - Writes go through the service layer: `createEmployees(batch)` (the same function `POST /api/employees` calls with a batch of one), and from there the single salary writer (§1). The seed has no HTTP endpoint of its own, and a future Excel import would be a thin layer on top of these functions rather than duplicated logic.
@@ -159,7 +159,7 @@ Peer grouping for outliers is country + level, not + department: at 10,000 emplo
 | `DELETE /api/employees/:id` | Soft delete: `status: inactive` and `deactivated_on` = today (injected clock); an already inactive employee keeps its date. Never a hard delete, to preserve salary history |
 | `POST /api/employees/:id/reactivate` | Sets `status: active` and clears `deactivated_on` |
 | `GET /api/employees/export?scope=filtered&<list filters>` \| `?scope=all` | Streams CSV. `filtered` = exactly the rows the list query matches (all pages, same search/filters, including `attention`); `all` = every employee, active and inactive. Columns include status, local amount + currency, USD amount, and effective date. Amounts are written as decimal strings formatted from integer minor units (`123456.78`), never via a float |
-| `GET /api/insights/distribution` \| `/payroll-trend` \| `/payroll-change` \| `/raises` \| `/level-bands` \| `/attention` \| `/recent-changes` | As described in §5 |
+| `GET /api/insights/distribution` \| `/payroll-trend` \| `/payroll-change` \| `/raises` \| `/level-bands` \| `/attention` \| `/recent-changes` | As described in §5. `recent-changes` takes a multi-valued `reason` and returns `availableYears` |
 | `GET /api/reference/countries` \| `/departments` \| `/levels` \| `/fx-rates` | Powers UI dropdowns/filters and the "FX rates as of" label |
 | `GET /api/reference/fx/convert?amountMinor=&from=&to=` | Server-side conversion for the relocation pre-fill. The browser never does money arithmetic |
 | `GET /api/health` | Scaffolded in the initial setup |
@@ -216,7 +216,7 @@ src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), 
 
 ## 9. Explicitly excluded from the data model
 
-No `manager_id` / reporting hierarchy on `employees`. None of the five HR questions in `docs/requirements.md` (FR-6..FR-10) require an org chart, and seeding a believable reporting tree would add generator complexity with no analytical payoff.
+No `manager_id` / reporting hierarchy on `employees`. None of the HR questions in `docs/requirements.md` (FR-6..FR-10 and FR-14..FR-18) require an org chart, and seeding a believable reporting tree would add generator complexity with no analytical payoff.
 
 ## 10. Testing strategy
 

@@ -21,6 +21,8 @@ const EMPLOYEE_ID = 1;
 
 const GET_URLS = [
   '/api/employees',
+  '/api/employees?sortBy=salary&sortOrder=desc&country=IN&level=3',
+  '/api/employees?search=ann',
   '/api/employees?sortBy=jobTitle&sortOrder=desc',
   '/api/employees?sortBy=department&sortOrder=desc',
   '/api/employees?sortBy=level&sortOrder=desc',
@@ -30,7 +32,18 @@ const GET_URLS = [
   '/api/employees/facets',
   '/api/employees/facets?search=ann&country=IN',
   '/api/insights/distribution?groupBy=country',
+  '/api/insights/payroll-trend',
+  '/api/insights/payroll-change',
+  '/api/insights/raises',
+  '/api/insights/level-bands?country=IN',
+  '/api/insights/attention',
   '/api/insights/recent-changes?range=5y',
+  '/api/insights/recent-changes?range=all',
+  '/api/insights/recent-changes?year=2024&reason=raise',
+  '/api/employees?attention=no-raise-2y',
+  '/api/employees/facets?attention=compression',
+  '/api/employees/export?scope=all',
+  '/api/employees/export?scope=filtered&country=IN&level=3',
   `/api/employees/${EMPLOYEE_ID}`,
   `/api/employees/${EMPLOYEE_ID}/peer-context`,
 ];

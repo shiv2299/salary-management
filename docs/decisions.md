@@ -218,7 +218,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Alternatives considered**: one endpoint for the whole page (any change reloads everything); pre-aggregated tables (a second write path the single salary writer would have to keep in step).
 
-**Chosen**: payroll trend, payroll change, raises, level bands and attention each have their own endpoint. The tiles read the trend summary, the raises' last 12 months and the attention counts. `GET /api/insights/payroll` and `/outliers` are removed, since today's trend point and the attention filter replace them.
+**Chosen**: payroll trend, payroll change, raises, level bands and attention each have their own endpoint. The tiles read the trend summary, the raises' last 12 months and the attention counts. There is no separate payroll or outliers endpoint: today's point of the trend and the attention filter cover them.
 
 **Why**: each card loads and fails on its own. Reading about 61,000 rows stays within the latency target (`docs/performance.md`). Removing the old endpoints leaves one definition of each figure.
 
@@ -244,7 +244,7 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: `seed({ rngSeed, referenceDate })`; all dates are offsets back from `referenceDate`.
 
-**Why**: with fixed absolute dates the seeded history would slide out of the 3/5-year window over time, and the view would gradually empty. Generating dates relative to a reference date keeps the demo meaningful whenever it runs, and the output is still fully deterministic for tests because they pass a fixed date.
+**Why**: with fixed absolute dates the seeded history would slide out of the 3, 5 and 10-year ranges over time, and the view would gradually empty. Generating dates relative to a reference date keeps the demo meaningful whenever it runs, and the output is still fully deterministic for tests because they pass a fixed date.
 
 ## Pagination: offset, not cursor
 
@@ -423,7 +423,7 @@ The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay b
 
 ## Last bulk revision: the batch with the latest effective date
 
-**Alternative considered**: the first batch entry of recent changes, which is windowed to 3 or 5 years and paginated, so an older revision would be missed.
+**Alternative considered**: the first batch entry of recent changes, which is windowed to a range (3 years by default) and paginated, so an older revision would be missed.
 
 **Chosen**: `GET /api/employees/bulk-salary-changes/latest`, taking the latest `effective_date` and the highest id on a tie. The batch table is small, so there is no index.
 

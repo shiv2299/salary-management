@@ -243,7 +243,8 @@ export function BulkRevisionPage({ today, onClose }: { today?: string; onClose?:
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
+    // In the slide-over the sticky footer meets the bottom edge, with no padding below it.
+    <div className={cn('flex flex-col gap-4 p-4 md:p-6', onClose && 'pb-0 md:pb-0')}>
       <header className={headerClass}>
         {backLink}
         <h1 className="text-xl font-semibold text-text-primary">Bulk salary revision</h1>

@@ -269,7 +269,7 @@ describe('InsightsPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Insights' })).toBeDefined();
     expect(
       await screen.findByText(
-        'Active employees · USD at FX rates of 15 Jan 2026 · Past years use the same rates',
+        'Figures for today cover active employees; trends include people who have since left · USD at FX rates of 15 Jan 2026 · Past years use the same rates',
       ),
     ).toBeDefined();
   });

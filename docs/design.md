@@ -118,7 +118,7 @@ Insights sits on `canvas`, with white cards on top of it. Employees and the deta
   - There is a Reset, and the submit button names the action ("Record raise").
 - **Export**: a split button: "Export current result" (the main action) plus "Export all employees" in its menu. It's a plain download link — no modal.
 - **Insights page** (`/insights`):
-  - **Header.** The title "Insights", then the meta line "Active employees · USD at FX rates of <date> · Past years use the same rates".
+  - **Header.** The title "Insights", then the meta line "Figures for today cover active employees; trends include people who have since left · USD at FX rates of <date> · Past years use the same rates".
   - **Headline tiles.** Five tiles, two per row below `sm`, three from `sm` and five from `xl`:
     - Annual payroll ("$612.4M", hint "↑ 6.2% vs 12 months ago");
     - Active headcount ("9,577", hint "↑ 312 vs 12 months ago");

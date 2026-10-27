@@ -21,7 +21,7 @@ export function InsightsPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold text-text-primary">Insights</h1>
         <p className="text-xs text-text-secondary">
-          {`Active employees · USD at FX rates of ${fxDate ?? '…'} · Past years use the same rates`}
+          {`Figures for today cover active employees; trends include people who have since left · USD at FX rates of ${fxDate ?? '…'} · Past years use the same rates`}
         </p>
       </header>
       <HeadlineTiles />

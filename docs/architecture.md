@@ -189,10 +189,11 @@ src/app/
   (app)/insights/page.tsx                 # default landing page post-login: headline tiles and question cards
   (app)/insights/changes/page.tsx         # every salary change: range, reason and year in the URL
   (app)/employees/page.tsx                # list: left filter panel + TanStack Table, toolbar, pagination, export, bulk selection bar
-  (app)/employees/revisions/new/page.tsx  # bulk revision screen; selection carried in the query string
+  (app)/employees/revisions/new/page.tsx  # bulk revision screen, full page (direct navigation / refresh); selection carried in the query string
   (app)/employees/[id]/page.tsx           # full-page detail (direct navigation / refresh)
   (app)/@drawer/default.tsx               # renders nothing when no drawer is open
   (app)/@drawer/(.)employees/[id]/page.tsx  # intercepted route: same detail rendered in a slide-over drawer over the list
+  (app)/@drawer/(.)employees/revisions/new/page.tsx  # intercepted route: same bulk revision screen in a wide slide-over over the list
 src/features/
   auth/       # login form, useSession hook (wraps /api/auth/me), route guard
   employees/  # query hooks, table columns, filter panel, drawer tabs, forms
@@ -207,7 +208,7 @@ src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), 
 - The Insights page fills sentence templates from API figures (`features/insights/answers.ts`) and slices yearly series by range. It never computes a money figure, percentage or ratio.
 - Route guard: the `(app)` layout calls `GET /api/auth/me`; a 401 redirects to `/login`. Sufficient for a single-user, non-SEO internal tool.
 - Insights is the default route after login (§5): it's the surface used weekly, versus the employee list and salary changes which are used far less often.
-- Employee detail uses a Next.js parallel route slot (`@drawer`) plus an intercepting route, so it opens as a slide-over drawer while keeping the list's scroll position and filters. On direct navigation or refresh, the same URL renders the full page instead. Both render the same detail component from `features/employees`.
+- Employee detail uses a Next.js parallel route slot (`@drawer`) plus an intercepting route, so it opens as a slide-over drawer while keeping the list's scroll position and filters. On direct navigation or refresh, the same URL renders the full page instead. Both render the same detail component from `features/employees`. The bulk revision screen works the same way through `@drawer/(.)employees/revisions/new`, rendering `features/bulk-revision`'s screen in a wider slide-over.
 - The relocation form fetches the converted amount from `/api/reference/fx/convert` to pre-fill the salary field; the HR Manager can then edit it.
 - CSV export is a plain `<a href="/api/employees/export?...">` built from the current URL's filter params (or `scope=all`); the session cookie authenticates it.
 - Components: shadcn/ui (Table, Sheet, Dialog, Form, Select, Badge, Toast) as the base, themed per `docs/design.md`; the shared building blocks live in `components/ui/`. The employee list is a TanStack Table (headless, `manualSorting` and `manualPagination`, so the server stays the only place data is sorted and paged) beside a collapsible left filter panel whose state lives in the URL. The employee drawer has three tabs: Change salary, Details, and History. Recharts for the insights dashboard.

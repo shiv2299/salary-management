@@ -391,13 +391,13 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Revisit if**: HR wants a drill-down into a batch (add a batch-members endpoint).
 
-## Bulk revision: its own screen at `/employees/revisions/new`, the selection in the query string
+## Bulk revision: a wide slide-over at `/employees/revisions/new`, the selection in the query string
 
-**Alternatives considered**: the panel that replaced the list; `/employees/bulk-revision` (the drawer's intercepting route rewrites every one-segment `/employees/<x>` soft navigation into the drawer); carrying the selection in `sessionStorage` or in memory (lost in a new tab, missing when storage is blocked, and gone after a refresh in memory).
+**Alternatives considered**: the panel that replaced the list; a separate full page (the list disappears while reviewing, and before a percentage is chosen most of the page is empty); a centered modal (a paged table of editable amounts is cramped in a dialog, and the confirm step would be a dialog on top of a dialog); `/employees/bulk-revision` (the drawer's intercepting route rewrites every one-segment `/employees/<x>` soft navigation into the drawer); carrying the selection in `sessionStorage` or in memory (lost in a new tab, missing when storage is blocked, and gone after a refresh in memory).
 
-**Chosen**: the screen lives at `/employees/revisions/new`, and its query string is the list's own query plus `select=all` or `ids=3,12`. At most 1,000 people can be picked by hand (about 6 KB of URL); beyond that the selection bar asks for "select all matching". No percentage is pre-chosen, and changing it keeps hand edits, because an edit is an amount the HR Manager typed, not a percentage.
+**Chosen**: the screen lives at `/employees/revisions/new`. A soft navigation from the list is intercepted by `@drawer/(.)employees/revisions/new` and renders the screen in a 960px slide-over above the list, as employee detail does; direct navigation or a refresh renders the same component as a full page. Closing the slide-over goes back in history. A click outside it does not close it, because that would discard the percentage and hand edits. Its query string is the list's own query plus `select=all` or `ids=3,12`. At most 1,000 people can be picked by hand (about 6 KB of URL); beyond that the selection bar asks for "select all matching". No percentage is pre-chosen, and changing it keeps hand edits, because an edit is an amount the HR Manager typed, not a percentage.
 
-**Why**: refresh, back and a copied link reproduce the screen, and "Back to employees" rebuilds the list exactly. A `select=all` filter is evaluated when the screen loads; the confirm still sends the explicit reviewed list (see "Bulk revision: confirm an explicit, checked list, not a filter").
+**Why**: the HR Manager keeps the list they selected from in view, and closing returns to it exactly as it was, selection included. Refresh, back and a copied link still reproduce the screen, and the full page's "Back to employees" rebuilds the list exactly. The cost is a 960px panel, too narrow to put the setup beside the review table, so in the panel the setup always stacks above it. A `select=all` filter is evaluated when the screen loads; the confirm still sends the explicit reviewed list (see "Bulk revision: confirm an explicit, checked list, not a filter").
 
 ## Bulk revision figures: a server summary that follows the edits
 

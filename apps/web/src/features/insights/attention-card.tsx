@@ -38,7 +38,7 @@ function rowsOf(attention: AttentionResponse): AttentionRow[] {
       meaning:
         groups.length === 0
           ? 'No country and level where new hires are paid more.'
-          : `Long-tenured staff in groups where people hired in the last year are paid more: ${groups
+          : `Long-tenured staff paid less than the median of people hired in the last year, in: ${groups
               .map((group) => `${group.countryName} ${group.levelCode}`)
               .join(', ')}.`,
       href: '/employees?attention=compression',

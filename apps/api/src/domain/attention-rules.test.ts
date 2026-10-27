@@ -65,9 +65,21 @@ describe('compressionGroups', () => {
         recentMedianBaseMinor: 10_600_000,
         tenuredMedianBaseMinor: 10_000_000,
         gapBp: 600,
-        tenuredEmployeeIds: tenured.map((m) => m.employeeId),
+        paidLessEmployeeIds: tenured.map((m) => m.employeeId),
       },
     ]);
+  });
+
+  it("lists only the long-tenured staff paid less than the recent hires' median", () => {
+    const recent = members(5, '2025-06-01', 12_000_000);
+    const below = members(3, '2023-01-15', 10_000_000);
+    const atMedian = members(1, '2023-01-15', 12_000_000);
+    const above = members(1, '2023-01-15', 13_000_000);
+
+    const [group] = compressionGroups([...recent, ...below, ...atMedian, ...above], TODAY);
+
+    expect(group).toMatchObject({ tenuredCount: 5, tenuredMedianBaseMinor: 10_000_000 });
+    expect(group!.paidLessEmployeeIds).toEqual(below.map((m) => m.employeeId));
   });
 
   it('does not flag a gap of exactly 5%', () => {

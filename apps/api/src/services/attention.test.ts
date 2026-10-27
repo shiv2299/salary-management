@@ -153,11 +153,12 @@ describe('getAttentionSets', () => {
     expect(getAttention(database.db, TODAY).noRaise2y).toBe(4);
   });
 
-  it('lists the long-tenured staff of compressed groups and describes each group', () => {
+  it('lists the long-tenured staff of compressed groups paid less than the new hires and describes each group', () => {
     const level = listLevels(database.db).find((l) => l.id === 2)!;
     const tenured = Array.from({ length: 5 }, () =>
       add({ levelId: 2, hireDate: '2020-01-01', amountMinor: 10_000_000 }),
     );
+    add({ levelId: 2, hireDate: '2020-01-01', amountMinor: 12_000_000 });
     for (let i = 0; i < 5; i++)
       add({ levelId: 2, hireDate: '2025-06-01', amountMinor: 11_000_000 });
 
@@ -173,7 +174,7 @@ describe('getAttentionSets', () => {
         levelId: 2,
         levelCode: level.code,
         recentCount: 5,
-        tenuredCount: 5,
+        tenuredCount: 6,
         recentMedianBaseMinor: 11_000_000,
         tenuredMedianBaseMinor: 10_000_000,
         gapBp: 1000,

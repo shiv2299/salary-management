@@ -60,7 +60,7 @@ function findAttention(db: DbHandle, today: string): AttentionFindings {
     })),
     today,
   );
-  sets.compression = compression.flatMap((g) => g.tenuredEmployeeIds).sort((a, b) => a - b);
+  sets.compression = compression.flatMap((g) => g.paidLessEmployeeIds).sort((a, b) => a - b);
 
   return { activeHeadcount: rows.length, sets, compression };
 }

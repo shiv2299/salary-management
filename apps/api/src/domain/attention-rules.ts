@@ -40,13 +40,14 @@ export interface CompressionGroup {
   recentMedianBaseMinor: number;
   tenuredMedianBaseMinor: number;
   gapBp: number;
-  /** Ascending. */
-  tenuredEmployeeIds: number[];
+  /** Long-tenured staff paid less than the recent hires' median, ascending. */
+  paidLessEmployeeIds: number[];
 }
 
 /**
  * Country and level groups where recent hires are paid more than long-tenured colleagues, by more
- * than `COMPRESSION_MARGIN_BP` at the median. Largest gap first, then country code, then level id.
+ * than `COMPRESSION_MARGIN_BP` at the median. Each lists only its long-tenured staff paid less than
+ * the recent hires' median. Largest gap first, then country code, then level id.
  */
 export function compressionGroups(members: CompressionMember[], today: string): CompressionGroup[] {
   const recentAfter = trailingWindowStart(today, RECENT_HIRE_YEARS);
@@ -95,7 +96,10 @@ export function compressionGroups(members: CompressionMember[], today: string): 
       recentMedianBaseMinor: recentMedian,
       tenuredMedianBaseMinor: tenuredMedian,
       gapBp: percentChangeBp(tenuredMedian, recentMedian),
-      tenuredEmployeeIds: tenured.map((m) => m.employeeId).sort((a, b) => a - b),
+      paidLessEmployeeIds: tenured
+        .filter((m) => m.amountBaseMinor < recentMedian)
+        .map((m) => m.employeeId)
+        .sort((a, b) => a - b),
     });
   }
   return flagged.sort(

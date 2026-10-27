@@ -651,7 +651,7 @@ describe('InsightsPage', () => {
     expect(within(row('Paid less than new hires')).getByText('23')).toBeDefined();
     expect(
       within(row('Paid less than new hires')).getByText(
-        'Long-tenured staff in groups where people hired in the last year are paid more: India L2, India L3.',
+        'Long-tenured staff paid less than the median of people hired in the last year, in: India L2, India L3.',
       ),
     ).toBeDefined();
     expect(link('Paid less than new hires')?.getAttribute('href')).toBe(

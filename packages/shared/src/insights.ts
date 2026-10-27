@@ -181,7 +181,7 @@ export const attentionResponseSchema = z.object({
   outsidePeerRangeShareBp: z.number().int(),
   noRaise2y: z.number().int(),
   compression: z.object({
-    /** Long-tenured people in the flagged groups. */
+    /** Long-tenured people in the flagged groups paid less than that group's recent-hire median. */
     peopleCount: z.number().int(),
     groups: z.array(
       z.object({

@@ -165,7 +165,7 @@ Insights sits on `canvas`, with white cards on top of it. Employees and the deta
   - **Who needs attention?** Three rows, each with a count in 22px, a title, a one-line meaning, and "View these people →" (left out when the count is 0):
     - "Outside peer range": "Paid well above or below others at the same level in the same country.", with "142 above · 45 below".
     - "No raise in over 2 years": "Active employees whose last raise or promotion took effect more than 24 months ago."
-    - "Paid less than new hires": "Long-tenured staff in groups where people hired in the last year are paid more: India L2, India L3." It reads "No country and level where new hires are paid more." when there are none.
+    - "Paid less than new hires": "Long-tenured staff paid less than the median of people hired in the last year, in: India L2, India L3." It reads "No country and level where new hires are paid more." when there are none.
 
     This card has no chart, so it has no "View as table".
   - **What changed recently?**

@@ -84,7 +84,7 @@ Product decisions that shape the scope above, and the choice made for each. The 
 - **Performance**: list and insights endpoints respond in under 300 ms (p95, measured locally) on the full 10,000-row dataset. Actual numbers are recorded in `docs/performance.md`.
 - **Data integrity**: monetary amounts are stored as integer minor units with an ISO currency code, never floats; salary history is append-only.
 - **Measured, not estimated**: seed time and full test-suite runtime are measured and recorded in `docs/performance.md`.
-- **Scalability**: the data model and query patterns are designed to hold up at 100,000+ employees, not just the seeded 10,000 — see `docs/architecture.md` §12. This is an architectural property, not something demonstrated with a 100k seed in this build.
+- **Scalability**: the system is built and measured for 10,000 employees, and designed so it can grow to 100,000+ without a rework — see `docs/architecture.md` §12. The data model and the list, detail and distribution reads hold at that size as they are; the history-based insights and the attention lists would first need the cache described there. This is an architectural property, not something demonstrated with a 100k seed in this build.
 - **UI/UX**: the interface follows `docs/design.md` — a single, binding reference so the visual and interaction design stays consistent regardless of which session or tool implements a given screen.
 
 ## 7. Acceptance Criteria

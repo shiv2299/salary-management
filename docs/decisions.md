@@ -212,7 +212,9 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: `services/attention.ts` computes the four id sets from active employees, today's date and the peer groups. The list, facets, export and bulk selection AND the union of the chosen sets with their other filters, passed to SQLite as one JSON array through `json_each`.
 
-**Why**: one definition serves the list, the counts, the export and the bulk revision, so "export current result" and "select all matching" take exactly the people shown. One bound parameter stays within SQLite's limit at any size.
+**Why**: one definition serves the list, the counts, the export and the bulk revision, so "export current result" and "select all matching" take exactly the people shown. One bound parameter stays within SQLite's limit at any size. Computing the sets reads every active employee and the peer groups on each call: about 65–85 ms at p95 for the facet counts and an attention-filtered list on the seeded 10,000 employees (`docs/performance.md`), growing linearly with headcount.
+
+**Revisit if**: the employee count reaches about 30,000, or the p95 of the facets call nears 300 ms. Then cache the attention lists per today and data version.
 
 ## Insights endpoints: one per card, history read in full per request
 
@@ -220,7 +222,9 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: payroll trend, payroll change, raises, level bands and attention each have their own endpoint. The tiles read the trend summary, the raises' last 12 months and the attention counts. There is no separate payroll or outliers endpoint: today's point of the trend and the attention filter cover them.
 
-**Why**: each card loads and fails on its own. Reading about 61,000 rows stays within the latency target (`docs/performance.md`). Removing the old endpoints leaves one definition of each figure.
+**Why**: each card loads and fails on its own. Reading about 61,000 history rows takes about 93–135 ms at p95 per endpoint on the seeded 10,000 employees (`docs/performance.md`), and the cost grows linearly with history. Removing the old endpoints leaves one definition of each figure.
+
+**Revisit if**: the employee count reaches about 30,000, or the p95 of these endpoints nears 300 ms. Then cache the loaded history per today and data version, so the three history endpoints share one load.
 
 ## Charts: one value axis, a strip chart for the second measure
 
@@ -531,7 +535,7 @@ The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay b
 
 **Chosen**: the `docs/architecture.md` §6 bullets, with these values: ten cycles, 180 days' tenure for a cycle, entry pay +3% a year (`MARKET_GROWTH_BP = 300`) against 4.5% increments, promotions of 10–20% only for someone at or above entry pay, India's entry pay by level ₹8.0L / 10.8L / 14.5L / 19.5L / 26L / 35L (steps of about 1.35×), 4% of active employees with no change for the last 2–3 years, compression in India L2, India L3 and US L2 with recent hires 20% above entry pay, and 4% leavers with `deactivated_on`.
 
-**Why**: every insight has real people behind it by design, and seed tests assert each proportion. Entry pay that trails increments is what makes tenure pay off, so the three planted groups show compression. On a small seed a few other groups can show a noise-level gap (5% or less); the full 10,000-employee seed shows only the planted three. With India's steeper steps a 10–20% promotion left every promotee below the new level's fences and the outliers list filled with promotions.
+**Why**: every insight has real people behind it by design, and seed tests assert each proportion. Entry pay that trails increments is what makes tenure pay off, so the three planted groups show compression. On a small seed a few other groups can show a noise-level gap (5% or less); the full 10,000-employee seed shows only the planted three. With India's steeper steps a 10–20% promotion left every promotee below the new level's fences and the "Outside peer range" attention count filled with promotions.
 
 ## Salary history chart: ranges zoom the chart, figures cover the whole history, USD after a currency change
 

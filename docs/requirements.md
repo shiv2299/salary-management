@@ -84,7 +84,7 @@ Product decisions that shape the scope above, and the choice made for each. The 
 - **Performance**: list and insights endpoints respond in under 300 ms (p95, measured locally) on the full 10,000-row dataset. Actual numbers are recorded in `docs/performance.md`.
 - **Data integrity**: monetary amounts are stored as integer minor units with an ISO currency code, never floats; salary history is append-only.
 - **Measured, not estimated**: seed time and full test-suite runtime are measured and recorded in `docs/performance.md`.
-- **Scalability**: the data model and query patterns are designed to hold up at 100,000+ employees, not just the seeded 10,000 — see `docs/architecture.md` §12. This is an architectural property, not something demonstrated with a 100k seed in the submitted build.
+- **Scalability**: the data model and query patterns are designed to hold up at 100,000+ employees, not just the seeded 10,000 — see `docs/architecture.md` §12. This is an architectural property, not something demonstrated with a 100k seed in this build.
 - **UI/UX**: the interface follows `docs/design.md` — a single, binding reference so the visual and interaction design stays consistent regardless of which session or tool implements a given screen.
 
 ## 7. Acceptance Criteria

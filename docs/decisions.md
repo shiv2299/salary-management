@@ -331,6 +331,24 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: `docs/architecture.md` §4 relies on "JSON only" as a second CSRF layer. A cross-site HTML form can send `text/plain`, which would have reached body-less mutations such as reactivate. Clients must not send a `Content-Type: application/json` header with an empty body on those routes.
 
+## Login: no rate limit
+
+**Alternatives considered**: `@fastify/rate-limit` on `POST /api/auth/login` (for example 10 attempts per IP per 15 minutes); locking the account after repeated failures.
+
+**Chosen**: no throttling in the app. Each attempt costs an argon2id verify (tens of milliseconds by design), an unknown email is checked against a decoy hash so it takes as long as a known one, and the only account is the HR Manager's, whose password is set at deployment.
+
+**Why**: with a single user, an account lockout would let anyone lock the HR Manager out. A per-IP limit is useful but belongs in front of the app: the deployment sits behind a TLS-terminating proxy or platform router (README "Docker"), which can rate-limit every route without a new dependency here, and an in-process limiter would count the proxy's address rather than the client's unless trusted-proxy settings are also right.
+
+**Revisit if**: the app is exposed without such a proxy, or more users are added. Then add `@fastify/rate-limit` on the login route with `trustProxy` configured.
+
+## Security headers: a same-origin Content Security Policy
+
+**Chosen**: the web server sends a Content Security Policy limited to `'self'`, plus `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`, and does not send `X-Powered-By` (`docs/architecture.md` §4).
+
+**Why**: the app loads nothing from another origin, so a policy of `'self'` costs nothing and blocks injected third-party scripts and clickjacking. Scripts and styles still allow `'unsafe-inline'`, because Next.js inlines its bootstrap; a nonce-based policy would remove that but forces every page to render dynamically.
+
+**Revisit if**: anything starts loading from another origin (an analytics script, a CDN font), which the policy would block until it is listed.
+
 ## Recent changes: every history row counts, shown under the country in force
 
 **Chosen**: the recent-changes view lists every `salary_history` row effective in the window, including hire rows (shown with no "from" amount). Each entry's country is the one in force from that row onward, not the employee's current country. "From" is the pay on the employee's previous row by effective date, which may be in another currency after a relocation.

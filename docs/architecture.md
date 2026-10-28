@@ -117,6 +117,8 @@ Search is a substring match and deliberately uses no index (§7, `docs/decisions
 - **Deny by default**: a Fastify `onRequest` hook requires a valid session on **every** `/api/*` route, except an explicit allowlist: `POST /api/auth/login` and `GET /api/health`. A new route is therefore protected without anyone having to remember to add it. Failures return `401` with the standard `{ error: { code, message } }` shape.
 - Dependency: `@fastify/cookie`, for parsing and setting the cookie. The JWT is signed and verified with `jose`.
 - The seed script creates the one HR user from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` environment variables (documented in `.env.example` and the README), not a hardcoded credential.
+- **Response headers**: every page carries a Content Security Policy that allows only the app's own origin (no third-party scripts, styles, fonts or connections), `frame-ancestors 'none'` with `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and a strict referrer policy, set in `apps/web/next.config.ts`; `X-Powered-By` is off. The API sets `nosniff` on every response itself, since the rewrite does not pass the page headers through.
+- **No login throttling** (`docs/decisions.md` "Login: no rate limit").
 - No password reset, registration, or RBAC — one persona only (see `docs/requirements.md`).
 
 ## 5. Insights engine

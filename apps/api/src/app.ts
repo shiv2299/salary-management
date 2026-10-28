@@ -66,6 +66,10 @@ export function buildApp({
   app.decorateRequest('userId', null);
 
   app.addHook('onRequest', async (request, reply) => {
+    // Set first, so it is on every response, a 401 included: the API sends JSON and CSV only, and
+    // a browser must never reinterpret either as HTML.
+    void reply.header('x-content-type-options', 'nosniff');
+
     // Decide from the route Fastify matched, never from the raw URL: the router decodes the path
     // (`/%61pi/x` reaches `/api/x`), so a string match on request.url could be bypassed. A request
     // that matched no route has no pattern, so it is never public and needs a session like the rest.

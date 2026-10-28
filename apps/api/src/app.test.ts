@@ -26,4 +26,13 @@ describe('app', () => {
       error: { code: 'NOT_FOUND', message: 'Route GET /api/does-not-exist not found' },
     });
   });
+
+  it('tells browsers not to sniff the content type of any response, including a 401', async () => {
+    current = await createTestApp();
+
+    const response = await current.app.inject({ method: 'GET', url: '/api/employees' });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+  });
 });

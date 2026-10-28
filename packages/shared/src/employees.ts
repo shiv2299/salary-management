@@ -218,6 +218,16 @@ export type EmployeeDetail = z.infer<typeof employeeDetailSchema>;
 const personName = z.string().trim().min(1).max(100);
 const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
 
+/**
+ * The largest salary amount the system stores, in minor units (900,000,000.00 in a two-decimal
+ * currency). 100,000 such amounts still sum within `Number.MAX_SAFE_INTEGER`, so payroll totals
+ * stay exact integers.
+ */
+export const MAX_AMOUNT_MINOR = 90_000_000_000;
+
+/** A positive whole number of minor units, at most `MAX_AMOUNT_MINOR`. */
+const salaryAmountSchema = z.number().int().positive().max(MAX_AMOUNT_MINOR);
+
 export const newEmployeeSchema = z.object({
   firstName: personName,
   lastName: personName,
@@ -228,7 +238,7 @@ export const newEmployeeSchema = z.object({
   jobTitle: z.string().trim().min(1).max(100),
   hireDate: isoDateSchema,
   /** Initial annual salary in the minor units of the country's currency. */
-  amountMinor: z.number().int().positive(),
+  amountMinor: salaryAmountSchema,
 });
 
 export type NewEmployeeBody = z.infer<typeof newEmployeeSchema>;
@@ -251,7 +261,7 @@ export const salaryChangeSchema = z
     reason: z.enum(['raise', 'promotion', 'relocation', 'correction']),
     effectiveDate: isoDateSchema,
     /** In the minor units of the currency the employee is paid in from this change on. */
-    amountMinor: z.number().int().positive(),
+    amountMinor: salaryAmountSchema,
     newLevelId: z.number().int().positive().optional(),
     newCountryCode: z.string().min(1).optional(),
   })
@@ -269,7 +279,7 @@ export const salaryChangePreviewBodySchema = z
   .object({
     reason: salaryChangeReasonSchema,
     /** In the minor units of the currency the employee would be paid in. */
-    amountMinor: z.number().int().positive().optional(),
+    amountMinor: salaryAmountSchema.optional(),
     /** An increase on the current salary, 1 to 10,000 basis points. */
     percentageBp: z.number().int().min(1).max(10_000).optional(),
     newLevelId: z.number().int().positive().optional(),

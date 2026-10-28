@@ -407,13 +407,13 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Why**: the browser never converts or applies a percentage, so every figure that does comes from `domain/`. One rounding per currency keeps the USD total consistent with the per-currency figures shown beside it. The median is the "typical" the rest of the app uses, and one outlier cannot move it.
 
-## Bulk revision amounts: a new amount is at most 90,000,000,000 minor units
+## Salary amounts: at most 90,000,000,000 minor units
 
-**Alternatives considered**: no upper bound, as for a single salary change, with the totals failing as a server error once a currency's sum leaves the safe integer range; returning the totals as strings or `BigInt` so no sum can overflow.
+**Alternatives considered**: no upper bound, with payroll totals failing as a server error once a sum leaves the safe integer range; returning every total as a string or `BigInt` so no sum can overflow.
 
-**Chosen**: every `newAmountMinor` in a bulk summary's edits and in a bulk confirm is at most `MAX_BULK_AMOUNT_MINOR` = 90,000,000,000 minor units (900,000,000.00 in a two-decimal currency), checked by the Zod schema, so a larger one is a `400`.
+**Chosen**: every salary amount the API accepts (a new employee's salary, a single salary change and its preview, and each `newAmountMinor` in a bulk summary or confirm) is at most `MAX_AMOUNT_MINOR` = 90,000,000,000 minor units (900,000,000.00 in a two-decimal currency), checked by the Zod schema, so a larger one is a `400`. The forms check the same limit and say "Enter an amount up to …" inline.
 
-**Why**: the totals are exact integer sums sent as JSON numbers. 100,000 amounts at the cap (the most a confirm or a summary's edit list accepts) add up to 9,000,000,000,000,000, inside `Number.MAX_SAFE_INTEGER` (9,007,199,254,740,991), so a hand-typed figure can never push a sum out of the exact range. The cap is still far above any real annual salary in INR, USD or EUR, and a figure typed with too many digits becomes a validation error instead of a failed totals request. The single salary-change schemas sum nothing, so they keep no cap.
+**Why**: this is the largest amount the system can store safely, not a pay policy. Totals are exact integer sums sent as JSON numbers, and every amount ends up in one: the payroll trend and payroll change insights add up every history row, so a single oversized salary would turn them into server errors for good (deactivating the employee keeps the history). 100,000 amounts at the limit add up to 9,000,000,000,000,000, inside `Number.MAX_SAFE_INTEGER` (9,007,199,254,740,991). The limit is far above any real annual salary in INR, USD or EUR. Sending totals as strings would remove the limit but change every money field in the shared types, the web app and the CSV export, for a case no real salary reaches.
 
 **Revisit if**: a currency with very large nominal amounts (such as IDR or VND) is added, where a real salary could approach the cap.
 

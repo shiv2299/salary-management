@@ -2,6 +2,7 @@ export { healthResponseSchema, type HealthResponse } from './health';
 export {
   ATTENTION_VALUES,
   DEFAULT_PAGE_SIZE,
+  MAX_AMOUNT_MINOR,
   MAX_FILTER_VALUES,
   MAX_PAGE_SIZE,
   attentionSchema,
@@ -64,7 +65,6 @@ export {
   type RecentChangesResponse,
 } from './insights';
 export {
-  MAX_BULK_AMOUNT_MINOR,
   bulkConfirmBodySchema,
   bulkConfirmResponseSchema,
   bulkOverrideSchema,

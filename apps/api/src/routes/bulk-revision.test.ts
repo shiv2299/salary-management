@@ -1,4 +1,4 @@
-import { MAX_BULK_AMOUNT_MINOR } from '@acme/shared';
+import { MAX_AMOUNT_MINOR } from '@acme/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createEmployees } from '../services/employees';
 import { FIXED_NOW } from '../test/test-db';
@@ -198,7 +198,7 @@ describe('POST /api/employees/bulk-salary-changes/summary', () => {
     const response = await post(t, url, {
       filter: {},
       percentageBp: 500,
-      overrides: [{ employeeId: 1, newAmountMinor: MAX_BULK_AMOUNT_MINOR }],
+      overrides: [{ employeeId: 1, newAmountMinor: MAX_AMOUNT_MINOR }],
     });
 
     expect(response.statusCode).toBe(200);
@@ -266,7 +266,7 @@ describe('POST /api/employees/bulk-salary-changes', () => {
         {
           employeeId: 1,
           expectedCurrentAmountMinor: 10_000_000,
-          newAmountMinor: MAX_BULK_AMOUNT_MINOR + 1,
+          newAmountMinor: MAX_AMOUNT_MINOR + 1,
         },
       ]),
     );

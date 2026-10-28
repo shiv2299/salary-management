@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { MAX_AMOUNT_MINOR } from '@acme/shared';
 import { FIXED_NOW } from '../test/test-db';
 import { createTestApp } from '../test/test-app';
 import { createEmployees } from '../services/employees';
@@ -291,6 +292,17 @@ describe('POST /api/employees/:id/salary-changes/preview', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('rejects an amount above the largest the system stores with 400', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', url, {
+      reason: 'raise',
+      amountMinor: MAX_AMOUNT_MINOR + 1,
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
   it('requires a session', async () => {
     const t = await setup();
 
@@ -327,6 +339,7 @@ describe('POST /api/employees', () => {
       { ...newEmployee, firstName: undefined },
       { ...newEmployee, amountMinor: 70.5 },
       { ...newEmployee, amountMinor: 0 },
+      { ...newEmployee, amountMinor: MAX_AMOUNT_MINOR + 1 },
       { ...newEmployee, hireDate: '01/05/2024' },
       { ...newEmployee, hireDate: '2024-13-45' },
       { ...newEmployee, email: 'not-an-email' },
@@ -533,6 +546,31 @@ describe('POST /api/employees/:id/salary-changes', () => {
 
       expect(response.statusCode, JSON.stringify(bad)).toBe(400);
     }
+  });
+
+  it('rejects a zero amount and one above the largest the system stores as a validation error', async () => {
+    const t = await setup();
+
+    for (const amountMinor of [0, MAX_AMOUNT_MINOR + 1]) {
+      const response = await send(t, 'POST', '/api/employees/1/salary-changes', {
+        ...raise,
+        amountMinor,
+      });
+
+      expect(response.statusCode, String(amountMinor)).toBe(400);
+      expect(response.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('accepts an amount at the largest the system stores', async () => {
+    const t = await setup();
+
+    const response = await send(t, 'POST', '/api/employees/1/salary-changes', {
+      ...raise,
+      amountMinor: MAX_AMOUNT_MINOR,
+    });
+
+    expect(response.statusCode).toBe(201);
   });
 
   it('answers an unknown employee with 404', async () => {

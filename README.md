@@ -10,10 +10,13 @@ Employee salary management web app for an HR Manager at a multi-country organisa
 ## Setup and run
 
 ```bash
+nvm use                                  # or any Node 24; older versions stop npm ci with EBADENGINE
 npm ci
 cp apps/api/.env.example apps/api/.env   # sets the HR login; edit the password first
 npm run dev
 ```
+
+npm 11 prints `install-scripts` warnings during `npm ci` for packages with native builds, such as `better-sqlite3` and `argon2`. They are expected: both ship prebuilt binaries, and the app and tests run without approving the scripts.
 
 The first start migrates the database and seeds 10,000 demo employees, which takes about 17 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
 

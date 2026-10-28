@@ -8,8 +8,9 @@
     "build": "next build",
     "postbuild": "cp -r .next/static .next/standalone/apps/web/.next/",
     "start": "node .next/standalone/apps/web/server.js",
-    "typecheck": "next typegen && tsc -p tsconfig.json",
-    "test": "vitest run"
+    "typecheck": "npm run typegen && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typegen": "next typegen"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",

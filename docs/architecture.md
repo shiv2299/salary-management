@@ -4,6 +4,38 @@ This document is the engineering design for the system described in `docs/requir
 
 ## 1. Stack and module boundaries
 
+How a request flows through the system, and the one path that writes salaries:
+
+```mermaid
+flowchart LR
+  browser["Browser<br/>HR Manager"]
+
+  subgraph web["apps/web: Next.js"]
+    pages["App Router pages<br/>Client Components + TanStack Query"]
+    rewrite["/api/* rewrite<br/>same origin, session cookie"]
+  end
+
+  subgraph api["apps/api: Fastify"]
+    guard["Auth guard<br/>deny by default on the matched route"]
+    routes["routes/<br/>Zod validation at the boundary"]
+    services["services/<br/>business rules"]
+    writer["applySalaryChanges<br/>the single salary writer"]
+    repos["repositories/<br/>Drizzle queries"]
+    domain["domain/<br/>pure functions: money, FX, stats, rules"]
+  end
+
+  shared["packages/shared<br/>Zod schemas + types"]
+  db[("SQLite<br/>employees, salary_history,<br/>reference data, fx_rates")]
+
+  browser --> pages --> rewrite --> guard --> routes --> services
+  services --> repos --> db
+  services --> domain
+  services -->|"create, change, bulk revision, seed"| writer
+  writer -->|"one transaction:<br/>history row + current_* columns"| repos
+  shared -.-> pages
+  shared -.-> routes
+```
+
 Monorepo (npm workspaces), scaffolded per `docs/prompts/initial.md`:
 
 ```

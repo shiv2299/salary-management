@@ -266,7 +266,7 @@ export function EmployeesPage({ today }: { today?: string }) {
               </Button>
               {tooManyPicked && (
                 <span className="ml-auto text-text-secondary">
-                  Pick up to 1,000 people, or select all matching.
+                  {`Pick up to ${MAX_PICKED_IDS.toLocaleString('en-US')} people, or select all matching.`}
                 </span>
               )}
               <Button

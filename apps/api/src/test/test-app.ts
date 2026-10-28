@@ -21,7 +21,7 @@ export async function createTestApp(options: { now?: () => Date; secureCookies?:
     ...(options.now ? { now: options.now } : {}),
   });
 
-  async function loginCookie(): Promise<string> {
+  async function login(): Promise<string> {
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
@@ -29,6 +29,14 @@ export async function createTestApp(options: { now?: () => Date; secureCookies?:
     });
     const header = response.headers['set-cookie'];
     return String(Array.isArray(header) ? header[0] : header).split(';')[0]!;
+  }
+
+  // Logs in once per app and reuses the cookie: each login is an argon2 verify, and a test that
+  // sends several requests would otherwise pay for one per request.
+  let session: Promise<string> | undefined;
+  function loginCookie(): Promise<string> {
+    session ??= login();
+    return session;
   }
 
   return { app, database, loginCookie };

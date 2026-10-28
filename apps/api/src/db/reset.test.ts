@@ -30,7 +30,9 @@ function dump(db: Db): string {
   ]);
 }
 
-describe('resetDatabase', () => {
+// Each test migrates and seeds a database, some more than once, so they get more than the default
+// 5 s on a busy machine.
+describe('resetDatabase', { timeout: 20_000 }, () => {
   it('replaces every employee and salary row with a fresh seed', async () => {
     const { db } = createDatabase(':memory:');
     await bootstrapDatabase(db, { ...options, hrUser });

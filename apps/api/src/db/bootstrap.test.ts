@@ -18,7 +18,9 @@ const loginDeps = {
   clock: () => new Date('2026-06-30T09:00:00.000Z'),
 };
 
-describe('bootstrapDatabase', () => {
+// Each test migrates and seeds a database, some more than once, so they get more than the default
+// 5 s on a busy machine.
+describe('bootstrapDatabase', { timeout: 20_000 }, () => {
   it('migrates, seeds and creates the HR user on an empty database', async () => {
     const { db } = createDatabase(':memory:');
 

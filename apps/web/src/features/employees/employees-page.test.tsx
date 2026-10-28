@@ -12,6 +12,12 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// A limit of 2 instead of 1,000 lets the over-the-limit case render 3 rows rather than 1,001.
+// No other test here picks more than 2 people. selection.test.ts covers the real limit.
+vi.mock('@/features/bulk-revision/selection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/bulk-revision/selection')>()),
+  MAX_PICKED_IDS: 2,
+}));
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -252,16 +258,16 @@ describe('EmployeesPage', () => {
     expect(push).toHaveBeenCalledWith('/employees/revisions/new?country=US&select=all');
   });
 
-  it('disables the bulk revision when more than 1,000 people are picked by hand', async () => {
+  it('disables the bulk revision when more people are picked by hand than the limit', async () => {
     stubApi({
       ...REFERENCE_ROUTES,
       'GET /api/employees/facets': employeeFacets(),
       'GET /api/employees': () =>
         Response.json({
-          items: Array.from({ length: 1001 }, (_, index) =>
+          items: Array.from({ length: 3 }, (_, index) =>
             employeeItem({ id: index + 1, firstName: `Person${index + 1}`, lastName: 'Test' }),
           ),
-          total: 1001,
+          total: 3,
           limit: 50,
           offset: 0,
         }),
@@ -271,7 +277,7 @@ describe('EmployeesPage', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
 
     const bar = screen.getByRole('region', { name: 'Selection' });
-    expect(within(bar).getByText('Pick up to 1,000 people, or select all matching.')).toBeDefined();
+    expect(within(bar).getByText('Pick up to 2 people, or select all matching.')).toBeDefined();
     expect(within(bar).getByRole('button', { name: 'Apply % increase' })).toHaveProperty(
       'disabled',
       true,

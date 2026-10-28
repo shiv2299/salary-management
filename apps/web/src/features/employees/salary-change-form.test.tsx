@@ -105,6 +105,16 @@ describe('SalaryChangeForm', () => {
     expect(saveCalls(calls)).toEqual([]);
   });
 
+  it('refuses an amount above the largest the system stores', async () => {
+    const { calls } = renderForm();
+
+    typeAmount('900000000.01');
+    save();
+
+    expect(await screen.findByText(/^Enter an amount up to /)).toBeDefined();
+    expect(saveCalls(calls)).toEqual([]);
+  });
+
   it('names the action on the submit button for each reason', () => {
     renderForm();
 

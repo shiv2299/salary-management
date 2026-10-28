@@ -1,6 +1,8 @@
 // Display and input helpers only. Amounts are integer minor units end to end; nothing here does FX
 // or rounding arithmetic. Conversion and rounding belong to the server (docs/architecture.md §3).
 
+import { MAX_AMOUNT_MINOR } from '@acme/shared';
+
 const LOCALE_BY_CURRENCY: Record<string, string> = { INR: 'en-IN', EUR: 'de-DE', USD: 'en-US' };
 
 function localeFor(currencyCode: string): string {
@@ -51,6 +53,11 @@ export function parseMajorToMinor(text: string, currencyCode: string): number | 
   if (fraction.length > exponent) return null;
   const minor = BigInt(`${match[1]}${fraction.padEnd(exponent, '0')}`);
   return minor <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(minor) : null;
+}
+
+/** "Enter an amount up to $900,000,000.00": the inline error for an amount above `MAX_AMOUNT_MINOR`. */
+export function amountLimitMessage(currencyCode: string): string {
+  return `Enter an amount up to ${formatMoney(MAX_AMOUNT_MINOR, currencyCode)}`;
 }
 
 /** Parses "7.25" into 725 basis points; the API accepts 1 to 10,000. */

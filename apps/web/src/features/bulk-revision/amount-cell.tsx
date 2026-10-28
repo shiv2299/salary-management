@@ -1,9 +1,9 @@
 'use client';
 
-import type { BulkPreviewItem } from '@acme/shared';
+import { MAX_AMOUNT_MINOR, type BulkPreviewItem } from '@acme/shared';
 import { useId } from 'react';
 import { Input } from '@/components/ui/input';
-import { formatInputAmount, parseMajorToMinor } from '@/lib/money';
+import { amountLimitMessage, formatInputAmount, parseMajorToMinor } from '@/lib/money';
 import { resolveNewAmount } from './bulk-state';
 
 /** An editable new-salary amount: the proposed figure until the user types their own. */
@@ -20,11 +20,14 @@ export function AmountCell({
   const name = `${item.firstName} ${item.lastName}`;
   const resolved = resolveNewAmount(item, text);
   const edited = text !== undefined && resolved.overridden;
-  const error = !resolved.valid
-    ? parseMajorToMinor(text ?? '', item.currencyCode) === null
+  const typed = resolved.valid ? null : parseMajorToMinor(text ?? '', item.currencyCode);
+  const error = resolved.valid
+    ? null
+    : typed === null
       ? 'Enter an amount, for example 1234.50'
-      : 'Must be higher than the current amount'
-    : null;
+      : typed > MAX_AMOUNT_MINOR
+        ? amountLimitMessage(item.currencyCode)
+        : 'Must be higher than the current amount';
 
   return (
     <div className="flex flex-col items-end gap-0.5">

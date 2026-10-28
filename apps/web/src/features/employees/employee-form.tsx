@@ -1,13 +1,13 @@
 'use client';
 
-import type { NewEmployeeBody } from '@acme/shared';
+import { MAX_AMOUNT_MINOR, type NewEmployeeBody } from '@acme/shared';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api';
-import { parseMajorToMinor } from '@/lib/money';
+import { amountLimitMessage, parseMajorToMinor } from '@/lib/money';
 import { useCountries, useDepartments, useLevels } from '@/features/reference/use-reference';
 import { useCreateEmployee } from './use-employee';
 
@@ -63,6 +63,8 @@ export function EmployeeForm({ today, onCreated }: Props) {
     if (!text('amount')) next.amount = 'Enter the starting annual salary';
     else if (currencyCode && (amountMinor === null || amountMinor <= 0)) {
       next.amount = 'Enter an amount like 1234.50';
+    } else if (currencyCode && amountMinor !== null && amountMinor > MAX_AMOUNT_MINOR) {
+      next.amount = amountLimitMessage(currencyCode);
     }
     setErrors(next);
     if (Object.keys(next).length > 0 || amountMinor === null) return;

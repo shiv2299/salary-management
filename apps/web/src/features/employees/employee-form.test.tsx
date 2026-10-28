@@ -72,6 +72,18 @@ describe('EmployeeForm', () => {
     });
   });
 
+  it('refuses a salary above the largest the system stores without calling the server', async () => {
+    const { calls } = stubApi(REFERENCE_ROUTES);
+    renderForm();
+    await fillValidForm();
+    fill('Starting annual salary', '900000000.01');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create employee' }));
+
+    expect(await screen.findByText(/^Enter an amount up to /)).toBeDefined();
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
   it('shows the currency of the chosen country next to the salary', async () => {
     stubApi(REFERENCE_ROUTES);
     renderForm();

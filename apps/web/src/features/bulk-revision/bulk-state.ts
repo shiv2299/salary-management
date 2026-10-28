@@ -1,4 +1,9 @@
-import type { BulkConfirmBody, BulkOverride, BulkPreviewItem } from '@acme/shared';
+import {
+  MAX_AMOUNT_MINOR,
+  type BulkConfirmBody,
+  type BulkOverride,
+  type BulkPreviewItem,
+} from '@acme/shared';
 import { parseMajorToMinor } from '@/lib/money';
 
 /** Hand-typed override text keyed by employee id. Absent means "use the proposed amount". */
@@ -7,7 +12,7 @@ export type Overrides = Record<number, string>;
 export interface ResolvedAmount {
   amountMinor: number;
   overridden: boolean;
-  /** False for text that is not an amount or does not raise pay; blocks the confirm. */
+  /** False for text that is not an amount, does not raise pay or exceeds `MAX_AMOUNT_MINOR`; blocks the confirm. */
   valid: boolean;
 }
 
@@ -22,7 +27,8 @@ export function resolveNewAmount(
   if (typed === null) return { amountMinor: proposed, overridden: true, valid: false };
   if (typed === proposed) return { amountMinor: proposed, overridden: false, valid: true };
   // Every bulk row is a raise, so an override must exceed the current pay (a comparison, not math).
-  return { amountMinor: typed, overridden: true, valid: typed > item.currentAmountMinor };
+  const valid = typed > item.currentAmountMinor && typed <= MAX_AMOUNT_MINOR;
+  return { amountMinor: typed, overridden: true, valid };
 }
 
 export function buildConfirmBody(

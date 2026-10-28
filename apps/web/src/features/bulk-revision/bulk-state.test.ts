@@ -52,6 +52,10 @@ describe('resolveNewAmount', () => {
     expect(resolveNewAmount(item(), '10000').valid).toBe(false);
     expect(resolveNewAmount(item(), '9000').valid).toBe(false);
   });
+
+  it('rejects an amount above the largest the system stores', () => {
+    expect(resolveNewAmount(item(), '900000000.01').valid).toBe(false);
+  });
 });
 
 describe('buildConfirmBody', () => {

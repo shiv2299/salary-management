@@ -288,6 +288,8 @@ describe('BulkRevisionPage review', () => {
     expect(cell.getAttribute('aria-invalid')).toBe('true');
     fireEvent.change(cell, { target: { value: 'abc' } });
     expect(screen.getByText('Enter an amount, for example 1234.50')).toBeDefined();
+    fireEvent.change(cell, { target: { value: '900000000.01' } });
+    expect(screen.getByText(/^Enter an amount up to /)).toBeDefined();
     expect(screen.getByRole('button', { name: 'Undo edit for Ravi Menon' })).toBeDefined();
   });
 

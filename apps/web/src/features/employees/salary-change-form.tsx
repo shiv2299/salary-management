@@ -1,6 +1,11 @@
 'use client';
 
-import type { EmployeeDetail, SalaryChangeBody, SalaryChangePreviewBody } from '@acme/shared';
+import {
+  MAX_AMOUNT_MINOR,
+  type EmployeeDetail,
+  type SalaryChangeBody,
+  type SalaryChangePreviewBody,
+} from '@acme/shared';
 import { cn } from 'cn';
 import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
@@ -10,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
+  amountLimitMessage,
   formatPercentageBp,
   parseMajorToMinor,
   parsePercentageToBp,
@@ -234,6 +240,7 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
     const amountMinor = parseMajorToMinor(amountText, currencyCode);
     if (amountText.trim() === '') next.amount = 'Enter the new annual salary';
     else if (amountMinor === null || amountMinor <= 0) next.amount = 'Enter an amount like 1234.50';
+    else if (amountMinor > MAX_AMOUNT_MINOR) next.amount = amountLimitMessage(currencyCode);
     else if (reason === 'raise' && amountMinor <= current.amountMinor) {
       next.amount = 'A raise must be higher than the current salary';
     }

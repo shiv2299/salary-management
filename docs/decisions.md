@@ -204,7 +204,9 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: `domain/attention-rules.ts` holds `NO_RAISE_YEARS = 2`, `RECENT_HIRE_YEARS = 1`, `LONG_TENURE_YEARS = 3`, `COMPRESSION_MIN_SUBGROUP = 5` and `COMPRESSION_MARGIN_BP = 500`. A group is compressed only when its recent hires' median is more than 5% above its long-tenured median. Within a compressed group, only the long-tenured staff paid less than the recent hires' median are listed: listing every long-tenured person flagged 2,104 people (22% of active staff) on the seeded data, 468 of whom earn at or above the new hires; the narrowed list is 1,636 (17%).
 
-**Why**: these are product rules, not user settings. A gap of a few percent between two small groups' medians is noise, and the margin keeps the card to groups where recent hires are clearly paid more.
+**Why**: these are product rules, not user settings. A gap of a few percent between two small groups' medians is noise, and the margin keeps the card to groups where recent hires are clearly paid more. The compression list is larger than the other two because the seed plants it in three of the biggest groups (India L2, India L3 and US L2, with new hires 20% above entry pay), so most long-tenured people there do earn less than the people just hired. That count is the point: it is how many people a market adjustment for those groups would touch.
+
+**Revisit if**: HR finds the list too long to act on. Then order it by the gap to the recent hires' median, or list only those below the long-tenured group's p25.
 
 ## Attention filter: resolved to ids on the server, ANDed with the other filters
 

@@ -33,7 +33,7 @@ Before writing any feature code (not required for pure scaffolding with no domai
 
 - Tests are fast, deterministic, and named as plain sentences.
 - Clock and RNG are injected wherever a test needs determinism — never a real `Date.now()` or unseeded random in a test path.
-- Follow the testing pyramid in `docs/architecture.md` §10: domain tests are the majority, then repository/service, then a handful of API and frontend tests. No E2E in this build.
+- Follow the testing strategy in `docs/architecture.md` §10: on the API, every rule is tested in `domain/` or against an in-memory database in the service layer, with route tests for the HTTP contract only; on the web, component tests cover interaction and state. No E2E in this build.
 
 ## Working habits
 

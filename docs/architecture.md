@@ -257,11 +257,16 @@ No `manager_id` / reporting hierarchy on `employees`. None of the HR questions i
 |---|---|---|---|
 | Domain | money rounding, FX conversion, bulk-revision amount, `computeDistribution` (incl. interpolation), IQR outlier check, current-row selection rule, seed distribution math | Vitest | Pure functions, no I/O; written first |
 | Repository/service | employee CRUD, single salary writer (backdated, same-day correction, promotion, relocation), bulk revision incl. 409 on stale preview, insights queries, auth (hash/verify/issue token) | Vitest + in-memory SQLite, small fixed fixture | Injected clock and RNG for determinism |
-| API | route validation, pagination params, auth 401/200 and deny-by-default, error shape, CSV export scopes and headers | Vitest + Fastify `app.inject()` | A handful per route |
+| API | route validation, pagination params, auth 401/200 and deny-by-default, error shape, CSV export scopes and headers | Vitest + Fastify `app.inject()` | The HTTP contract only; rules are tested below it |
 | Frontend | employee table rendering, form validation, relocation pre-fill, bulk revision overrides, insights chart data mapping, auth redirect | Vitest + React Testing Library + jsdom, stubbed `fetch` | Component tests live next to the component |
 | E2E | — | Not in this build | Matches `AGENTS.md` |
 
-Test names are plain sentences. Coverage is reported honestly; no arbitrary percentage target is chased.
+**The actual shape** (October 2026): about 150 domain tests, 195 service tests, 110 route tests and 30 database tests on the API, and about 345 component and hook tests on the web. This is not a classic pyramid, for two reasons:
+
+- On the API, many rules are queries (payroll on a date, peer groups, attention lists), so they are tested in the service layer against an in-memory database with a small fixed fixture. Those tests still run in milliseconds and carry the same injected clock and RNG as domain tests.
+- On the web, most of the risk is interaction state rather than markup: debounced previews, answers that arrive out of order, a bulk revision whose preview, totals and confirm must agree, and filters held in the URL. With no E2E layer, component tests with a stubbed `fetch` are the only place those are caught, and several real bugs were (`docs/ai-workflow.md`).
+
+Test names are plain sentences. Coverage is not measured; the acceptance criteria in `docs/spec.md` §3 are the bar rather than a percentage.
 
 ## 11. Deployment
 

@@ -97,6 +97,9 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
   const latestConversion = useRef(0);
 
   const current = employee.salary;
+  // The server judges a raise or promotion against the pay in force on the effective date. History
+  // is newest first, so that is the first row dated on or before it.
+  const inForce = employee.history.find((row) => row.effectiveDate <= effectiveDate) ?? current;
   const currentLevel = levels.find((level) => level.id === employee.levelId);
   const higherLevels = levels.filter((level) => level.rank > (currentLevel?.rank ?? Infinity));
   const destinations = countries.filter((country) => country.code !== employee.countryCode);
@@ -241,8 +244,16 @@ export function SalaryChangeForm({ employee, today, onSaved }: Props) {
     if (amountText.trim() === '') next.amount = 'Enter the new annual salary';
     else if (amountMinor === null || amountMinor <= 0) next.amount = 'Enter an amount like 1234.50';
     else if (amountMinor > MAX_AMOUNT_MINOR) next.amount = amountLimitMessage(currencyCode);
-    else if (reason === 'raise' && amountMinor <= current.amountMinor) {
-      next.amount = 'A raise must be higher than the current salary';
+    // Amounts in different currencies are not comparable here, so the server judges those.
+    else if (inForce.currencyCode === currencyCode) {
+      if (reason === 'raise' && amountMinor <= inForce.amountMinor) {
+        next.amount =
+          inForce.effectiveDate < current.effectiveDate
+            ? 'A raise must be higher than the salary in force on that date'
+            : 'A raise must be higher than the current salary';
+      } else if (reason === 'promotion' && amountMinor < inForce.amountMinor) {
+        next.amount = 'A promotion cannot lower the salary';
+      }
     }
     if (reason === 'promotion' && newLevelId === '') next.level = 'Choose the new level';
     if (reason === 'relocation' && newCountryCode === '') next.country = 'Choose the new country';

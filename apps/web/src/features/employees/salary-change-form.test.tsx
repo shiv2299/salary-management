@@ -236,6 +236,51 @@ describe('SalaryChangeForm', () => {
     });
   });
 
+  it('refuses a promotion that lowers the salary', async () => {
+    const { calls } = renderForm();
+    chooseReason('Promotion');
+    await screen.findByRole('option', { name: 'L4 · Lead' });
+    fireEvent.change(screen.getByLabelText('New level'), { target: { value: '4' } });
+    typeAmount('4000000');
+
+    save('Record promotion');
+
+    expect(await screen.findByText('A promotion cannot lower the salary')).toBeDefined();
+    expect(saveCalls(calls)).toEqual([]);
+  });
+
+  it('judges a backdated raise against the salary in force on its date', async () => {
+    // Paid 4,500,000.00 from hire and 5,000,000.00 from 2025-04-01.
+    const { calls } = renderForm({
+      routes: { 'POST /api/employees/1/salary-changes': saved },
+    });
+    fireEvent.change(screen.getByLabelText('Effective date'), { target: { value: '2024-01-01' } });
+    typeAmount('4800000');
+
+    save();
+
+    await waitFor(() => {
+      expect(saveCalls(calls)).toHaveLength(1);
+    });
+    expect(saveCalls(calls)[0]?.body).toMatchObject({
+      effectiveDate: '2024-01-01',
+      amountMinor: 480_000_000,
+    });
+  });
+
+  it('refuses a backdated raise that is not above the salary in force on its date', async () => {
+    const { calls } = renderForm();
+    fireEvent.change(screen.getByLabelText('Effective date'), { target: { value: '2024-01-01' } });
+    typeAmount('4400000');
+
+    save();
+
+    expect(
+      await screen.findByText('A raise must be higher than the salary in force on that date'),
+    ).toBeDefined();
+    expect(saveCalls(calls)).toEqual([]);
+  });
+
   it('pre-fills a relocation with the salary converted by the server and says how', async () => {
     const { calls } = renderForm({
       routes: {

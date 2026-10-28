@@ -2,6 +2,16 @@
 
 A short log of non-obvious trade-offs: what was chosen, what the alternative was, and why. `docs/architecture.md` describes what will be built; this document explains the calls that weren't forced by the requirements alone.
 
+## Top 5
+
+The calls that shaped the app most. Everything below them follows from these or is detail.
+
+1. **Salary is effective-dated history, one reason per change, written by one function.** A snapshot can't say how pay got where it is, and that is half the HR Manager's questions. ([Salary history](#salary-history-effective-dated-history-not-a-current-snapshot))
+2. **Insights compare countries in USD at a static, dated rate; fairness is judged only against same-country peers.** Leadership's questions cross countries, but exchange rates must not decide who looks underpaid. ([Cross-country comparison](#cross-country-comparison-one-base-currency-for-insights-peers-within-one-country))
+3. **Six chosen questions, not a report builder.** Each one leads to a decision someone makes regularly (`docs/insights.md`).
+4. **SQLite with a cached current salary.** One user means almost no concurrent writes, so one container and millisecond tests cost nothing; the cache keeps the list and current-pay reads at a few milliseconds, well inside the 300 ms target (`docs/performance.md`). ([Database](#database-sqlite-not-postgres), [Current salary](#current-salary-denormalized-cache-not-a-derived-query))
+5. **One HR role, with restricted access planned but not built.** It would be a scope applied in the service layer; the steps are written down. ([Access scope](#no-pre-built-access-scope-parameter))
+
 ## Database: SQLite, not Postgres
 
 **Alternative considered**: Postgres (managed, or in a second container).
@@ -572,3 +582,15 @@ The flag is `peerPosition(...).outlier` from `getPeerGroups`, evaluated on pay b
 **Chosen**: 3Y / 5Y / 10Y / All, default All, change only the chart's window, which ends today (or on the deactivation date) and never starts before the hire date. The summary line and figures cover the whole history and come from `domain/`. Average yearly growth is compound (`(current ÷ hire)^(365.25 ÷ days) − 1`, rounded half away from zero to a basis point, null under 365 days). The biggest jump is the largest increase, earliest on a tie. After a relocation the summary and chart are in USD at the current static rates, as the per-row % already is (see "History % change").
 
 **Why**: one person's history is a couple of dozen rows, so the whole story is the useful default and a range is just a closer look. Compound growth is the figure that reads as "a year" across uneven gaps. Plotting two currencies on one axis would show the exchange rate, not the pay.
+
+## Excel import: a one-off migration first, an import screen later
+
+**Alternative considered**: an import screen in the first release.
+
+**Chosen**: neither is built yet. Day-one data would come in through a one-off migration script. It would read a sheet laid out like the CSV export (`id`, `status`, `salary_usd` and `salary_effective_date` ignored) and map department names and level codes to their ids. Each row would be validated with `newEmployeeSchema`, which holds the same field rules as `POST /api/employees`: name and email format, and a positive salary under the cap. The script would then call `createEmployee`, which adds the business rules (known country, department and level, unique email, no future hire date) and writes through `createEmployees` and `applySalaryChanges`, like any other new employee.
+
+**Why**: a migration runs once, and a script that reuses the API's validation and create functions writes nothing new. An import screen is real UI work: an upload, errors shown row by row, a decision on what happens to the good rows when some fail. It is better designed once a real sheet shows what goes wrong. Using the export's layout means there is no second format to document: HR can export a few rows to see the layout, then fill it in Excel.
+
+**Limit**: `createEmployee` dates the first salary row at the hire date. If a sheet holds only today's pay, trends and history show that pay as flat back to the hire date. Past changes, if the sheet has them, would load as dated rows through `applySalaryChanges`.
+
+**Revisit if**: HR needs to load data more than once, for example after an acquisition or a large hiring round. That is when the screen earns its place.

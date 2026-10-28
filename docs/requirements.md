@@ -28,7 +28,8 @@ Quality targets (`docs/spec.md` §2): list and insights responses under 300 ms p
 | Live FX rates | A static, dated FX table keeps conversions deterministic and removes an external dependency. |
 | Role-based access / SSO / multi-user | One persona only. Restricted access would be a scope applied in the service layer (`docs/decisions.md`). |
 | Future-dated salary changes | Scheduled changes would make "current salary" depend on when it is read, which the current-salary design avoids (`docs/decisions.md`). |
-| Excel import | The seed supplies the data. Import is the natural first follow-up and would reuse the seed's service-layer create function. |
+| Excel import screen | Day-one data would come in through a one-off migration script in the CSV export's layout, reusing the API's validation and create functions (`docs/decisions.md`). An import screen with row-by-row errors is the first follow-up. |
+| Policy pay ranges, compa-ratio, raise budgets | They need a compensation-policy decision: what each level should pay and what a cycle may spend. The level bands here describe actual pay. A bulk revision already shows its cost before confirming, which is where a budget check would go. |
 | Org chart / reporting hierarchy | No insight needs it, and a believable reporting tree in seed data adds complexity with no analytical payoff. |
 | Approval workflows and notifications | State machines that serve no requirement above. |
 | Demographic pay-equity analysis | Sensitive data that needs a policy decision outside this product. |
@@ -38,6 +39,10 @@ Quality targets (`docs/spec.md` §2): list and insights responses under 300 ms p
 - Salary means annual base pay.
 - Insights compare countries in USD at a static, dated FX rate; outlier peer groups stay within one country.
 - Trends convert past pay at today's rates, so they show changes in pay rather than in exchange rates.
-- The insights are the product's own choice of the compensation questions an HR Manager most often answers for leadership.
+- The insights answer six chosen questions rather than offering a report builder. `docs/insights.md` says which and why.
 
 The reasoning behind each is in `docs/decisions.md`.
+
+## 6. Which Pay Questions, and Why
+
+The six Insights cards each answer a question that leads to a decision someone makes regularly, using data the app already keeps. `docs/insights.md` maps each one to who asks it and the decision it drives, and lists the questions considered and dropped.

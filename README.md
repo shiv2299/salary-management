@@ -89,7 +89,9 @@ docker run -p 3000:3000 -v salary-data:/data --env-file .env salary-management
 
 Salary means annual base pay. The app keeps every salary change as effective-dated history and shows cross-country insights in USD through a static FX table. It is built for a single HR Manager login.
 
-Deliberately left out: bonus, allowances and equity; live FX rates; role-based or country/department-restricted access; Excel import (CSV export is supported). The full list, with reasons, is in `docs/requirements.md` §4. Trade-offs, including how restricted access would be added, are in `docs/decisions.md`.
+Insights answer six questions, each tied to a decision someone makes; which ones, who asks them and what was dropped is in `docs/insights.md`.
+
+Deliberately left out: bonus, allowances and equity; live FX rates; role-based or country/department-restricted access; policy pay ranges and raise budgets; an import screen (day-one data would come in through a one-off migration script in the CSV export's layout). The full list, with reasons, is in `docs/requirements.md` §4. Trade-offs are in `docs/decisions.md`, which opens with the five that shaped the app most.
 
 ## Structure
 
@@ -97,5 +99,5 @@ Deliberately left out: bonus, allowances and equity; live FX rates; role-based o
 packages/shared/   Zod schemas shared by API and web (@acme/shared)
 apps/api/          Fastify API, Drizzle + better-sqlite3 (@acme/api)
 apps/web/          Next.js App Router, Tailwind, shadcn/ui (@acme/web)
-docs/              Requirements, spec, architecture, design, decisions, performance, AI workflow
+docs/              Requirements, spec, insights, architecture, design, decisions, performance, AI workflow
 ```

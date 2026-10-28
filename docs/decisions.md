@@ -309,7 +309,15 @@ A short log of non-obvious trade-offs: what was chosen, what the alternative was
 
 **Chosen**: a change backdated to before a relocation is stored in the currency of the country the employee was in on that date. Only a relocation uses the new country's currency.
 
-**Why**: the history row is a statement about what the employee was paid on that date. Using today's currency would label an old rupee amount as euros. The "a raise must increase the current amount" rule still compares against the current amount, so a backdated raise across a relocation is judged by the HR Manager, not guessed at by the system.
+**Why**: the history row is a statement about what the employee was paid on that date. Using today's currency would label an old rupee amount as euros. The same reasoning sets the baseline for the raise and promotion rules (next record).
+
+## Raises and promotions are judged against the pay in force on their date
+
+**Alternatives considered**: compare every change with the current salary, which is simpler and was the first rule; allow a promotion with any amount, as a level move whose pay is the HR Manager's call.
+
+**Chosen**: a raise must be higher, and a promotion must not be lower, than the amount the employee was paid on the change's effective date, in the currency of that date. For a change dated today that is the current salary. A correction takes any positive amount, so it remains the way to record a genuine cut.
+
+**Why**: comparing with today's salary rejected a valid backdated raise (paid 10 lakh, raised to 15 lakh in June, a missed raise to 12 lakh in March was refused) and, across a relocation, compared rupees with euros, so a cut in rupees could pass as a "raise" because the number was larger than today's euro amount. The pay in force on the date is what the raise actually changed, and it is always in the same currency as the new row (previous record). A promotion that cuts pay is almost always a typing mistake; allowing an equal amount keeps a level move with no immediate raise possible.
 
 ## Email: stored lowercase, unique case-insensitively
 

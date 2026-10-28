@@ -200,8 +200,8 @@ Every `/api/*` route requires a session except `POST /api/auth/login` and `GET /
 
 **Salary-change validation** (Zod at the boundary, business rules in the service):
 - **All reasons**: `effectiveDate` ≤ today (injected clock) and ≥ the employee's `hire_date`; the employee must be active; `amountMinor` > 0 and at most `MAX_AMOUNT_MINOR` (checked by the Zod schema, so a larger one is a `400`; see `docs/decisions.md` "Salary amounts").
-- **`raise`**: `amountMinor` greater than the current amount; `newLevelId` and `newCountryCode` not allowed.
-- **`promotion`**: `newLevelId` required, with a higher `rank` than the current level.
+- **`raise`**: `amountMinor` greater than the amount in force on `effectiveDate` (the current amount for a change dated today, the pay of the time for a backdated one, always in that date's currency); `newLevelId` and `newCountryCode` not allowed. A bulk revision applies the same rule to each item.
+- **`promotion`**: `newLevelId` required, with a higher `rank` than the current level; `amountMinor` not lower than the amount in force on `effectiveDate`.
 - **`relocation`**: `newCountryCode` required and different from the current country; `amountMinor` is in the new country's currency.
 - **`correction`**: any positive amount; optional `newLevelId` to fix a mis-entered level.
 - **`hire`**: not accepted here — hire rows come only from `POST /api/employees`.

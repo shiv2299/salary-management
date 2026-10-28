@@ -19,7 +19,7 @@ import {
 } from '../repositories/salary-revision-batches';
 import { withAttention } from './attention';
 import { getPeerGroups, type PeerGroup } from './peer-groups';
-import { currencyInForce } from './salary-changes';
+import { payInForce } from './salary-changes';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
 
 export type BulkSelectionInput =
@@ -222,6 +222,9 @@ export function confirmBulkRevision(db: DbHandle, input: BulkConfirmInput, deps:
     }
 
     const today = deps.now().slice(0, 10);
+    const inForce = new Map(
+      ids.map((id) => [id, payInForce(tx, employees.get(id)!, input.effectiveDate)]),
+    );
     const violations = input.items.flatMap((item) => {
       const employee = employees.get(item.employeeId)!;
       return validateSalaryChange(
@@ -234,7 +237,7 @@ export function confirmBulkRevision(db: DbHandle, input: BulkConfirmInput, deps:
           today,
           hireDate: employee.hireDate,
           status: employee.status,
-          currentAmountMinor: employee.currentAmountMinor,
+          amountInForceMinor: inForce.get(item.employeeId)!.amountMinor,
           currentCountryCode: employee.countryCode,
           currentLevelRank: 0,
         },
@@ -257,7 +260,7 @@ export function confirmBulkRevision(db: DbHandle, input: BulkConfirmInput, deps:
         employeeId: item.employeeId,
         reason: 'raise' as const,
         amountMinor: item.newAmountMinor,
-        currencyCode: currencyInForce(tx, employees.get(item.employeeId)!, input.effectiveDate),
+        currencyCode: inForce.get(item.employeeId)!.currencyCode,
         effectiveDate: input.effectiveDate,
         batchId,
       })),

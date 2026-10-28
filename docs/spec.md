@@ -13,8 +13,8 @@ The detailed behaviour behind `docs/requirements.md`: every functional requireme
 
 - **FR-3**: Record salary as effective-dated history, not a mutable snapshot — so past pay is never lost. Each change has exactly one reason:
   - **hire** — the initial salary, created with the employee.
-  - **raise** — a pay increase with no change of level.
-  - **promotion** — a move to a higher level together with its new salary, recorded as one change.
+  - **raise** — a pay increase with no change of level. Both a raise and a promotion are compared with the pay in force on their effective date, so a backdated raise is judged against the pay of that time.
+  - **promotion** — a move to a higher level together with its new salary, recorded as one change. The salary cannot go down.
   - **relocation** — a move to another country. The new salary is in the new country's currency; the form pre-fills it with the current salary converted at the static FX rate, and the HR Manager can change it before saving.
   - **correction** — fixes a previously entered amount (and, if it was wrong, the level).
 
@@ -63,7 +63,7 @@ Each FR is done when the behavior below is covered by tests at the layer named i
 |---|---|
 | FR-1 | Searching "ann" matches "Joanne", "ann@acme.test", and "Channel Manager"; salary sort places a $90,000 employee above a ₹50,00,000 one (≈ $60,000); inactive employees are hidden unless the status filter includes them. Filtering by India and Germany at L3 returns exactly the L3 employees of both countries; sorting by level orders by rank; each filter option's count equals the rows that option alone matches under the search and the other groups' selections. Filtering by "No raise in over 2 years" and India returns exactly the flagged Indian employees, export returns the same rows, and each attention option's count follows the other groups' selections. |
 | FR-2 | A deactivated employee keeps their full salary history, disappears from the default list and from insights about the present (level bands, attention), while insights built from history keep the pay they were paid, and can be reactivated. Editing country or level directly is rejected. Deactivating on 1 Feb 2026 records that date, deactivating again while inactive keeps it, and reactivating clears it. |
-| FR-3 | A promotion that doesn't raise the level is rejected; a relocation stores the new salary in the new country's currency and updates the employee's country in the same transaction; a future effective date is rejected; a correction dated the same day as the row it fixes becomes the current salary. |
+| FR-3 | A promotion that doesn't raise the level or that lowers pay is rejected; a raise backdated before a later raise is accepted when it beats the pay of its date, and one dated before a relocation is compared in the currency of the time; a relocation stores the new salary in the new country's currency and updates the employee's country in the same transaction; a future effective date is rejected; a correction dated the same day as the row it fixes becomes the current salary. |
 | FR-4 | Confirming a 7% revision for N previewed employees writes exactly N rows sharing one batch, applies overrides exactly as entered, and is rejected entirely (no rows written) if any employee's salary changed after the preview. The added payroll shown before confirming equals, per currency, the sum of new minus current amounts including hand edits, and its USD total equals each currency's sum converted once at the documented rate. |
 | FR-5 | "Export current result" returns exactly the rows the list currently matches (all pages); "export all" includes inactive employees with a status column. |
 | FR-6 | Distribution stats for a fixed fixture match hand-computed values, including interpolated percentiles. |

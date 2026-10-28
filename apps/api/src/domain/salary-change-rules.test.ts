@@ -5,7 +5,7 @@ const context = {
   today: '2025-06-01',
   hireDate: '2020-03-01',
   status: 'active' as const,
-  currentAmountMinor: 100000,
+  amountInForceMinor: 100000,
   currentCountryCode: 'IN',
   currentLevelRank: 3,
 };
@@ -65,13 +65,13 @@ describe('validateSalaryChange: all reasons', () => {
 });
 
 describe('validateSalaryChange: raise', () => {
-  it('accepts an amount above the current amount with no level or country change', () => {
+  it('accepts an amount above the amount in force with no level or country change', () => {
     expect(validateSalaryChange(validRaise, context)).toEqual([]);
   });
 
-  it('rejects an amount equal to the current amount', () => {
+  it('rejects an amount equal to the amount in force', () => {
     expect(validateSalaryChange({ ...validRaise, amountMinor: 100000 }, context)).toEqual([
-      'a raise must increase the current amount',
+      'a raise must increase the amount in force on its effective date',
     ]);
   });
 
@@ -92,6 +92,18 @@ describe('validateSalaryChange: promotion', () => {
 
   it('accepts a promotion to a higher level rank', () => {
     expect(validateSalaryChange(promotion, { ...context, newLevelRank: 4 })).toEqual([]);
+  });
+
+  it('accepts a promotion that keeps the amount in force', () => {
+    expect(
+      validateSalaryChange({ ...promotion, amountMinor: 100000 }, { ...context, newLevelRank: 4 }),
+    ).toEqual([]);
+  });
+
+  it('rejects a promotion that lowers the amount in force', () => {
+    expect(
+      validateSalaryChange({ ...promotion, amountMinor: 99999 }, { ...context, newLevelRank: 4 }),
+    ).toEqual(['a promotion must not lower the amount in force on its effective date']);
   });
 
   it('rejects a promotion with no new level', () => {

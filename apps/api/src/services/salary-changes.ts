@@ -10,14 +10,20 @@ import { listSalaryHistory } from '../repositories/salary-history';
 import { applySalaryChanges, type SalaryWriterDeps } from './salary-writer';
 
 /**
- * The currency the employee is paid in on `effectiveDate`: that of the history row in force then,
- * which differs from the current currency when the date is before a relocation.
+ * What the employee is paid on `effectiveDate`: the amount and currency of the history row in force
+ * then, which differ from the current salary when the date is before a later change.
  */
-export function currencyInForce(db: DbHandle, employee: Employee, effectiveDate: string): string {
+export function payInForce(
+  db: DbHandle,
+  employee: Employee,
+  effectiveDate: string,
+): { amountMinor: number; currencyCode: string } {
   const inForce = listSalaryHistory(db, employee.id).filter(
     (row) => row.effectiveDate <= effectiveDate,
   );
-  return inForce.length > 0 ? selectCurrentRow(inForce).currencyCode : employee.currentCurrencyCode;
+  return inForce.length > 0
+    ? selectCurrentRow(inForce)
+    : { amountMinor: employee.currentAmountMinor, currencyCode: employee.currentCurrencyCode };
 }
 
 /**
@@ -38,11 +44,12 @@ export function recordSalaryChange(
     const levelRanks = new Map(listLevels(tx).map((l) => [l.id, l.rank]));
     const countries = new Map(listCountries(tx).map((c) => [c.code, c]));
 
+    const inForce = payInForce(tx, employee, input.effectiveDate);
     const violations = validateSalaryChange(input, {
       today: deps.now().slice(0, 10),
       hireDate: employee.hireDate,
       status: employee.status,
-      currentAmountMinor: employee.currentAmountMinor,
+      amountInForceMinor: inForce.amountMinor,
       currentCountryCode: employee.countryCode,
       currentLevelRank: levelRanks.get(employee.levelId) ?? 0,
       ...(input.newLevelId !== undefined && levelRanks.has(input.newLevelId)
@@ -64,7 +71,7 @@ export function recordSalaryChange(
     const currencyCode =
       input.newCountryCode !== undefined
         ? countries.get(input.newCountryCode)!.currencyCode
-        : currencyInForce(tx, employee, input.effectiveDate);
+        : inForce.currencyCode;
 
     applySalaryChanges(
       tx,

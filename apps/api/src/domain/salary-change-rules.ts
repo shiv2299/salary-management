@@ -12,7 +12,11 @@ export interface SalaryChangeContext {
   today: string;
   hireDate: string;
   status: 'active' | 'inactive';
-  currentAmountMinor: number;
+  /**
+   * The amount paid on the change's effective date, in the currency of that date. For a change
+   * dated today this is the current salary; for a backdated one it is the pay of the time.
+   */
+  amountInForceMinor: number;
   currentCountryCode: string;
   currentLevelRank: number;
   newLevelRank?: number;
@@ -43,8 +47,8 @@ export function validateSalaryChange(
 
   switch (input.reason) {
     case 'raise':
-      if (input.amountMinor <= context.currentAmountMinor) {
-        violations.push('a raise must increase the current amount');
+      if (input.amountMinor <= context.amountInForceMinor) {
+        violations.push('a raise must increase the amount in force on its effective date');
       }
       if (input.newLevelId !== undefined || input.newCountryCode !== undefined) {
         violations.push('a raise cannot change level or country');
@@ -58,6 +62,9 @@ export function validateSalaryChange(
         context.newLevelRank <= context.currentLevelRank
       ) {
         violations.push('a promotion must move to a higher level rank');
+      }
+      if (input.amountMinor < context.amountInForceMinor) {
+        violations.push('a promotion must not lower the amount in force on its effective date');
       }
       if (input.newCountryCode !== undefined) {
         violations.push('only a relocation can change country');

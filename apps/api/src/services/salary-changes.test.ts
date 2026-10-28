@@ -328,6 +328,76 @@ describe('recordSalaryChange: correction and backdating', () => {
     expect(employee(id)).toMatchObject({ countryCode: 'DE', currentCurrencyCode: 'EUR' });
   });
 
+  it('judges a backdated raise against the pay in force on its effective date', () => {
+    const id = addAsha();
+    recordSalaryChange(
+      database.db,
+      id,
+      { reason: 'raise', effectiveDate: '2025-04-01', amountMinor: 600_000_000 },
+      deps,
+    );
+
+    recordSalaryChange(
+      database.db,
+      id,
+      { reason: 'raise', effectiveDate: '2024-01-01', amountMinor: 550_000_000 },
+      deps,
+    );
+
+    expect(historyOf(id)).toHaveLength(3);
+    expect(employee(id)).toMatchObject({ currentAmountMinor: 600_000_000 });
+  });
+
+  it('rejects a backdated raise that does not increase the pay in force on its date', () => {
+    const id = addAsha();
+    recordSalaryChange(
+      database.db,
+      id,
+      { reason: 'raise', effectiveDate: '2025-04-01', amountMinor: 600_000_000 },
+      deps,
+    );
+
+    const error = rejection(() =>
+      recordSalaryChange(
+        database.db,
+        id,
+        { reason: 'raise', effectiveDate: '2024-01-01', amountMinor: 500_000_000 },
+        deps,
+      ),
+    );
+
+    expect(error?.statusCode).toBe(422);
+    expect(historyOf(id)).toHaveLength(2);
+  });
+
+  it('compares a raise dated before a relocation in the currency paid at the time', () => {
+    const id = addAsha();
+    recordSalaryChange(
+      database.db,
+      id,
+      {
+        reason: 'relocation',
+        effectiveDate: '2024-01-01',
+        amountMinor: 7_000_000,
+        newCountryCode: 'DE',
+      },
+      deps,
+    );
+
+    // 10,000,000 paise is more than today's 7,000,000 euro cents but a cut from 500,000,000 paise.
+    const error = rejection(() =>
+      recordSalaryChange(
+        database.db,
+        id,
+        { reason: 'raise', effectiveDate: '2022-01-01', amountMinor: 10_000_000 },
+        deps,
+      ),
+    );
+
+    expect(error?.statusCode).toBe(422);
+    expect(error?.message).toContain('raise must increase');
+  });
+
   it('lets a correction fix the level', () => {
     const id = addAsha();
 

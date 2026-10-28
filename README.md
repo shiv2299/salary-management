@@ -18,7 +18,7 @@ npm run dev
 
 npm 11 prints `install-scripts` warnings during `npm ci` for packages with native builds, such as `better-sqlite3` and `argon2`. They are expected: both ship prebuilt binaries, and the app and tests run without approving the scripts.
 
-The first start migrates the database and seeds 10,000 demo employees, which takes about 17 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
+The first start migrates the database and seeds 10,000 demo employees, which takes about 16 seconds before the API begins listening. Later starts skip both. The HR user is created from `HR_SEED_EMAIL` / `HR_SEED_PASSWORD` on that first start only; changing them afterwards does not change an existing password. `npm run db:seed -w @acme/api` runs the same steps without starting the server.
 
 **Starting over.** `npm run db:reset -w @acme/api` drops every table, applies the migrations and seeds a fresh dataset, keeping the HR login (its email, password and any open session). Stop the API first. Run it after pulling a change to the schema or the seed: nothing wipes the database automatically, and the start-up seed does nothing once employees exist. With Docker, remove the volume instead (`docker volume rm salary-data`) and start the container again.
 

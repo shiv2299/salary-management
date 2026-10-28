@@ -220,8 +220,9 @@ const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
 
 /**
  * The largest salary amount the system stores, in minor units (900,000,000.00 in a two-decimal
- * currency). 100,000 such amounts still sum within `Number.MAX_SAFE_INTEGER`, so payroll totals
- * stay exact integers.
+ * currency). Payroll totals add up USD amounts, and at the current FX rates (EUR at 1.08 is the
+ * highest) 90,000 such amounts still sum within `Number.MAX_SAFE_INTEGER`, so the totals stay
+ * exact integers.
  */
 export const MAX_AMOUNT_MINOR = 90_000_000_000;
 

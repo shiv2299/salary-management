@@ -79,7 +79,7 @@ docker run -p 3000:3000 -v salary-data:/data --env-file .env salary-management
 | `API_URL`                           | build only | Where the web server forwards `/api/*`. Baked in at build time (`--build-arg API_URL=...`); the default `http://127.0.0.1:3001` is right for this image.   |
 | `LOG_LEVEL`                         | no         | `info` by default.                                                                                                                                         |
 
-- **Seed on boot**: on the first start with an empty database the API migrates and seeds 10,000 demo employees (about 17 seconds before it listens; the health check allows for it). Every later start is an idempotent no-op when employees already exist, so a restart never re-seeds.
+- **Seed on boot**: on the first start with an empty database the API migrates and seeds 10,000 demo employees (about 16 seconds before it listens; the health check allows for it). Every later start is an idempotent no-op when employees already exist, so a restart never re-seeds.
 - **Persistence**: the SQLite file must be on a persistent volume. On a host with an ephemeral filesystem the data would be lost on every deploy, and seed-on-boot would silently replace it with fresh demo data.
 - **HTTPS**: in production the session cookie is `Secure`, so browsers only send it over HTTPS (plain `http://localhost` is exempt). Put the container behind a TLS-terminating proxy or platform router.
 - **Health**: `GET /api/health` is public and returns `{"status":"ok","database":"ok"}`; the image `HEALTHCHECK` calls it through the web server.

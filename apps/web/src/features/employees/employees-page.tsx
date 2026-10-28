@@ -188,7 +188,7 @@ export function EmployeesPage({ today }: { today?: string }) {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-text-primary">Employees</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!isDesktop && (
             <Button
               variant="outline"

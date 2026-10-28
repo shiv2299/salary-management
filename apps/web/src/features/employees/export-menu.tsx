@@ -13,12 +13,15 @@ import { exportHref, type ListFilters } from './list-filters';
 export function ExportMenu({ filters }: { filters: ListFilters }) {
   return (
     <div className="inline-flex">
+      {/* The short label below sm keeps the header actions on one phone-width row. */}
       <a
         href={exportHref('filtered', filters)}
+        aria-label="Export current result"
         className={cn(buttonVariants({ variant: 'outline' }), 'rounded-r-none border-r-0')}
       >
         <Download />
-        Export current result
+        <span className="sm:hidden">Export</span>
+        <span className="hidden sm:inline">Export current result</span>
       </a>
       <DropdownMenu>
         <DropdownMenuTrigger

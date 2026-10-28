@@ -1,6 +1,6 @@
 # Architecture
 
-This document is the engineering design for the system described in `docs/requirements.md`. It covers module boundaries, data model, core subsystems, API surface, frontend structure, and testing strategy. Visual design and UI interaction rules live in `docs/design.md`, which this document defers to rather than duplicates. Trade-offs and alternatives considered are logged separately in `docs/decisions.md`; this document describes what will be built and why it's shaped this way.
+This document is the engineering design for the system described in `docs/requirements.md` and specified in `docs/spec.md`. It covers module boundaries, data model, core subsystems, API surface, frontend structure, and testing strategy. Visual design and UI interaction rules live in `docs/design.md`, which this document defers to rather than duplicates. Trade-offs and alternatives considered are logged separately in `docs/decisions.md`; this document describes what will be built and why it's shaped this way.
 
 ## 1. Stack and module boundaries
 
@@ -81,7 +81,7 @@ Core tables:
 | `salary_revision_batches` | `id`, `created_at`, `effective_date`, `percentage_bp` (integer basis points; 700 = 7%), `employee_count`, `note` | One row per bulk revision (e.g. "7% raise — Engineering L3 India"); lets `salary_history` rows be grouped back into a single event for display (§5, FR-10) |
 | `users` | `id`, `email`, `password_hash`, `created_at` | Single seeded HR row; no roles table |
 
-**Which row is "current"**: the employee's `salary_history` row with the latest `effective_date`, with the highest `id` breaking ties. Because future effective dates are rejected at the API boundary (`docs/requirements.md` FR-3), the latest-dated row is always already in effect, so the cache never has to change on its own as time passes. The single writer (§1) re-selects the current row inside its transaction after inserting rather than assuming the new row is current, so:
+**Which row is "current"**: the employee's `salary_history` row with the latest `effective_date`, with the highest `id` breaking ties. Because future effective dates are rejected at the API boundary (`docs/spec.md` FR-3), the latest-dated row is always already in effect, so the cache never has to change on its own as time passes. The single writer (§1) re-selects the current row inside its transaction after inserting rather than assuming the new row is current, so:
 - a **backdated** change (earlier than the current row) is recorded in history without changing current pay;
 - a **correction** dated the same day as the row it fixes wins the tie on `id` and becomes current. The wrong row stays in history for audit.
 
@@ -249,7 +249,7 @@ src/lib/api.ts  # typed fetch wrapper (same-origin, cookie sent automatically), 
 
 ## 9. Explicitly excluded from the data model
 
-No `manager_id` / reporting hierarchy on `employees`. None of the HR questions in `docs/requirements.md` (FR-6..FR-10 and FR-14..FR-18) require an org chart, and seeding a believable reporting tree would add generator complexity with no analytical payoff.
+No `manager_id` / reporting hierarchy on `employees`. None of the HR questions in `docs/spec.md` (FR-6..FR-10 and FR-14..FR-18) require an org chart, and seeding a believable reporting tree would add generator complexity with no analytical payoff.
 
 ## 10. Testing strategy
 

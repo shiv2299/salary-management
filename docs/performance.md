@@ -1,6 +1,6 @@
 # Performance
 
-Measured numbers, not estimates (`docs/requirements.md` §6). Filled in once the features exist; until then every value is "not yet measured".
+Measured numbers, not estimates (`docs/spec.md` §2). Filled in once the features exist; until then every value is "not yet measured".
 
 Target: list and insights endpoints respond in under 300 ms (p95) on the full 10,000-employee dataset.
 

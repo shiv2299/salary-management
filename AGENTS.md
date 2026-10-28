@@ -6,10 +6,11 @@ This file is the single source of project conventions. Every session working in 
 
 Before writing any feature code (not required for pure scaffolding with no domain logic):
 
-1. `docs/requirements.md` — what the product does and why, as numbered functional requirements.
-2. `docs/architecture.md` — data model, module boundaries, API surface, testing strategy.
-3. `docs/design.md` — binding visual and interaction rules for anything the HR Manager sees or clicks. UI work follows this exactly; it is not a style suggestion.
-4. `docs/decisions.md` — trade-offs already made and why, so they aren't re-litigated or accidentally reversed.
+1. `docs/requirements.md` — one page: the goal, the user, the scope and what is deliberately left out.
+2. `docs/spec.md` — the numbered functional requirements, quality targets and acceptance criteria the code is built and tested against.
+3. `docs/architecture.md` — data model, module boundaries, API surface, testing strategy.
+4. `docs/design.md` — binding visual and interaction rules for anything the HR Manager sees or clicks. UI work follows this exactly; it is not a style suggestion.
+5. `docs/decisions.md` — trade-offs already made and why, so they aren't re-litigated or accidentally reversed.
 
 `docs/performance.md` holds measured latency, seed time, and test runtime.
 

@@ -94,5 +94,5 @@ Deliberately left out: bonus, allowances and equity; live FX rates; role-based o
 packages/shared/   Zod schemas shared by API and web (@acme/shared)
 apps/api/          Fastify API, Drizzle + better-sqlite3 (@acme/api)
 apps/web/          Next.js App Router, Tailwind, shadcn/ui (@acme/web)
-docs/              Requirements, architecture, design, decisions
+docs/              Requirements, spec, architecture, design, decisions, performance
 ```

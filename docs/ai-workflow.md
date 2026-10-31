@@ -20,7 +20,7 @@ Because the rules live in the repo, a new session or a different model gets the 
 | Docs | Requirements, architecture and design were written and argued through in conversation, then reviewed, with the findings resolved in one commit (`0ba3db6`). |
 | Scaffold | `docs/prompts/initial.md`: scaffolding only, verify every package version, small commits that each pass lint, typecheck and tests, never `any` or `@ts-ignore` to get past an error. |
 | Features | Work by functional requirement from `docs/spec.md`. Each FR has an acceptance criterion that names the behaviour its tests must show. |
-| Redesign | A brainstormed UI spec, then one plan per phase (employees, bulk revision, seed and history, insights), each executed and reviewed before the next. The resulting rules live in `design.md`, `architecture.md` and `decisions.md`; the spec and plan files were working notes and were removed afterwards (`bbd752a` removed them, and its parent still has them). |
+| Redesign | A brainstormed UI spec, then one plan per phase (employees, bulk revision, seed and history, insights), each executed and reviewed before the next. The resulting rules live in `design.md`, `architecture.md` and `decisions.md`; the spec and the plans themselves are in `docs/plans/`, kept as written. |
 
 ## Where AI output was wrong, and what changed
 

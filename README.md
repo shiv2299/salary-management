@@ -100,4 +100,5 @@ packages/shared/   Zod schemas shared by API and web (@acme/shared)
 apps/api/          Fastify API, Drizzle + better-sqlite3 (@acme/api)
 apps/web/          Next.js App Router, Tailwind, shadcn/ui (@acme/web)
 docs/              Requirements, spec, insights, architecture, design, decisions, performance, AI workflow
+docs/plans/        The redesign spec and phase plans the agents worked from
 ```
